@@ -13,4 +13,4 @@ class TDMANode():
     
     def run(self):
         while True:
-            self.current_state.execute()
+            self.current_state = self.current_state.execute()
