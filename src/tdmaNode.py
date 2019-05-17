@@ -1,6 +1,10 @@
 from states import Initialization, Synchronization, Scheduling, Task, Listen, State
 
 
+# ENCAPSULATE INFO NECESSARY TO STATES IN OBJECTS (ex: TimingInfo could contain logical_clock, clock_diff, etc.)
+# Info passed with objects is passed by reference
+
+
 class TDMANode():
     def __init__(self):
         self.states = { State.INITIALIZATION: Initialization(), 
