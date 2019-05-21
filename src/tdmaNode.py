@@ -8,6 +8,7 @@ from messages import MessageBox
 
 class TDMANode():
     def __init__(self):
+        self.id = 0
         self.pozyx = None
         self.socket = socket()
 
@@ -18,9 +19,9 @@ class TDMANode():
         self.anchors = Anchors()
 
         self.states = { State.INITIALIZATION: Initialization(self.neighborhood, self.message_box, self.anchors), 
-                        State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.message_box),
-                        State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.anchors),
-                        State.TASK: Task(self.timing, self.anchors),
+                        State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.message_box, self.id),
+                        State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.anchors, self.id),
+                        State.TASK: Task(self.timing, self.anchors, self.id),
                         State.LISTEN: Listen(self.neighborhood, self.slot_assignment, self.timing, self.message_box) }
         
         self.current_state = self.states[State.INITIALIZATION]
