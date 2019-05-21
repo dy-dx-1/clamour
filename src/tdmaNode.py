@@ -31,6 +31,8 @@ class TDMANode():
             self.pozyx = PozyxSerial(serial_port)
         else:
             raise Exception("No Pozyx connected. Check your USB cable or your driver.")
+        
+        return self
 
     def __exit__(self, exception_type, exception_value, traceback):
         self.socket.close()
