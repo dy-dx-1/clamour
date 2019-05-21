@@ -1,3 +1,6 @@
+from socket import socket
+from pypozyx import PozyxSerial, get_first_pozyx_serial_port
+
 from states import Initialization, Synchronization, Scheduling, Task, Listen, State
 from interfaces import Neighborhood, SlotAssignment, Timing
 
@@ -7,6 +10,9 @@ from interfaces import Neighborhood, SlotAssignment, Timing
 
 class TDMANode():
     def __init__(self):
+        self.pozyx = None
+        self.socket = socket()
+
         self.neighborhood = Neighborhood()
         self.slot_assignment = SlotAssignment()
         self.timing = Timing()
@@ -18,6 +24,16 @@ class TDMANode():
                         State.LISTEN: Listen(self.neighborhood, self.slot_assignment, self.timing) }
         
         self.current_state = self.states[State.INITIALIZATION]
+
+    def __enter__(self):
+        serial_port = get_first_pozyx_serial_port()
+        if serial_port is not None:
+            self.pozyx = PozyxSerial(serial_port)
+        else:
+            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.socket.close()
     
     def run(self):
         while True:

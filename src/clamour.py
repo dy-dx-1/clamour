@@ -2,8 +2,8 @@ from tdmaNode import TDMANode
 
 
 def main():
-    node = TDMANode()
-    node.run()
+    with TDMANode() as node:
+        node.run()
 
 
 if __name__ == "__main__":
