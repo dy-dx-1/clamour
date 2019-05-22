@@ -23,23 +23,23 @@ class UWBMessage(object):
 
 
 class UWBSynchronizationMessage(UWBMessage):
-    def __init__(self, message_type: MessageType, data: int):
+    def __init__(self, message_type: MessageType=MessageType.SYNC, data: int=0):
         super(UWBSynchronizationMessage, self).__init__(message_type, data)
         self.CLOCK_MASK =      0b00111111111111111111111111111111
-        self.syncClock = -1
+        self.synchronized_clock = -1
 
     def decode(self):
-        self.syncClock = self.data & self.CLOCK_MASK
+        self.synchronized_clock = self.data & self.CLOCK_MASK
 
     def encode(self):
-        self.data = (self.message_type << 30) + self.syncClock
+        self.data = (self.message_type << 30) + self.synchronized_clock
 
     def __repr__(self):
-        print(" Type ", self.message_type, " Clock ", self.syncClock)
+        print(" Type ", self.message_type, " Clock ", self.synchronized_clock)
 
 
 class UWBTDMAMessage(UWBMessage):
-    def __init__(self, message_type: MessageType, data: int):
+    def __init__(self, message_type: MessageType=MessageType.TDMA, data: int=0):
         super(UWBTDMAMessage, self).__init__(message_type, data)
         self.SLOT_MASK =       0b00111111111111111000000000000000
         self.TDMACODE_MASK =   0b00000000000000000111111111111111
@@ -62,7 +62,7 @@ class UWBTDMAMessage(UWBMessage):
 
 
 class UWBCommunicationMessage(UWBMessage):
-    def __init__(self, message_type: MessageType, data: int):
+    def __init__(self, message_type: MessageType=MessageType.COMM, data: int=0):
         super(UWBCommunicationMessage, self).__init__(message_type, data)
         self.CONFIDENCE_MASK = 0b001111
         self.XPOS_MASK =       0b0000001111111111

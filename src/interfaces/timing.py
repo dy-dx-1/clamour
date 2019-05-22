@@ -1,4 +1,8 @@
+from logicalClock import LogicalClock
+
+COMM_DELAY = 0.027 # delay estimation is 0.005s.
 SLOT_FOR_RESET = 30
+THRESHOLD_SYNTIME=0.01
 
 # Schedule of times
 syncTimeLen = 20000 # Time leave for syn (ms)
@@ -20,9 +24,8 @@ class Timing():
         self.clock_differential = 0
         self.clock_differential_dev = 0
         self.clock_differential_stat = 0
-        self.logical_clock = object()
+        self.logical_clock = LogicalClock()
         self.received_frequency_sample = 0
-        self.jumped = False
         self.current_time_in_cycle = 0
         self.synchronized = False
         self.current_slot_id = 0

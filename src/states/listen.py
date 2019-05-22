@@ -41,7 +41,7 @@ class Listen(TDMAState):
 
         if message_handler.is_new_message(sender_id, data):
             self.update_neighbor_dictionary()
-            if type(self.message_box.current_message) is UWBCommunicationMessage:
+            if isinstance(self.message_box.current_message, UWBCommunicationMessage):
                 # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
                 #       such as counting steps using a pedometer
                 pass
