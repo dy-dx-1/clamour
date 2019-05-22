@@ -1,8 +1,7 @@
 from .constants import State
 from .tdmaState import TDMAState
 from interfaces import Neighborhood, Anchors
-from messages import MessageBox
-from messageFactory import MessageFactory
+from messages import MessageBox, MessageFactory
 
 from pypozyx import PozyxSerial, RXInfo
 from pypozyx.definitions.constants import POZYX_DISCOVERY_ALL_DEVICES, POZYX_SUCCESS
