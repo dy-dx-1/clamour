@@ -9,7 +9,7 @@ from messages import MessageBox
 class TDMANode():
     def __init__(self):
         self.id = 0
-        self.pozyx = None
+        self.pozyx = self.connect_pozyx()
         self.socket = socket()
 
         self.neighborhood = Neighborhood()
@@ -27,10 +27,7 @@ class TDMANode():
         self.current_state = self.states[State.INITIALIZATION]
 
     def __enter__(self):
-        serial_port = get_first_pozyx_serial_port()
-        if serial_port is not None:
-            self.pozyx = PozyxSerial(serial_port)
-        else:
+        if self.pozyx is None:
             raise Exception("No Pozyx connected. Check your USB cable or your driver.")
         
         return self
@@ -41,3 +38,7 @@ class TDMANode():
     def run(self):
         while True:
             self.current_state = self.current_state.execute()
+
+    def connect_pozyx(self):
+        serial_port = get_first_pozyx_serial_port()
+        return PozyxSerial(serial_port) if serial_port is not None else None
