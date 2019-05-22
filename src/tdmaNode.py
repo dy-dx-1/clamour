@@ -18,7 +18,7 @@ class TDMANode():
         self.message_box = MessageBox()
         self.anchors = Anchors()
 
-        self.states = { State.INITIALIZATION: Initialization(self.neighborhood, self.message_box, self.anchors, self.id), 
+        self.states = { State.INITIALIZATION: Initialization(self.neighborhood, self.message_box, self.anchors, self.id, self.pozyx), 
                         State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.message_box, self.id),
                         State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.anchors, self.id),
                         State.TASK: Task(self.timing, self.anchors, self.id, self.socket),

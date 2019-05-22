@@ -2,10 +2,9 @@ from .types import MessageType
 
 
 class UWBMessage(object):
-    def __init__(self, intData=0):
-        TYPE_BIT_MASK =   0b11000000000000000000000000000000# 0b11000000 00000000 00000000 00000000
-        self.data = intData
-        self.msgType = (self.data & TYPE_BIT_MASK) >> 30
+    def __init__(self, message_type: MessageType, data: int):
+        self.data = data
+        self.message_type = message_type
 
     def decode(self):
         # Is this a posssible state?
@@ -24,8 +23,8 @@ class UWBMessage(object):
 
 
 class UWBSynchronizationMessage(UWBMessage):
-    def __init__(self):
-        super(UWBSynchronizationMessage, self).__init__()
+    def __init__(self, message_type: MessageType, data: int):
+        super(UWBSynchronizationMessage, self).__init__(message_type, data)
         self.CLOCK_MASK =      0b00111111111111111111111111111111
         self.syncClock = -1
 
@@ -33,15 +32,15 @@ class UWBSynchronizationMessage(UWBMessage):
         self.syncClock = self.data & self.CLOCK_MASK
 
     def encode(self):
-        self.data = (self.msgType << 30) + self.syncClock
+        self.data = (self.message_type << 30) + self.syncClock
 
     def __repr__(self):
-        print(" Type ", self.msgType, " Clock ", self.syncClock)
+        print(" Type ", self.message_type, " Clock ", self.syncClock)
 
 
 class UWBTDMAMessage(UWBMessage):
-    def __init__(self):
-        super(UWBTDMAMessage, self).__init__()
+    def __init__(self, message_type: MessageType, data: int):
+        super(UWBTDMAMessage, self).__init__(message_type, data)
         self.SLOT_MASK =       0b00111111111111111000000000000000
         self.TDMACODE_MASK =   0b00000000000000000111111111111111
         self.tdmaSlotid = -1
@@ -56,15 +55,15 @@ class UWBTDMAMessage(UWBMessage):
     def encode(self):
         if self.tdmaCode < 0:
             self.tdmaCode = 16384 - self.tdmaCode
-        self.data = (self.msgType << 30) + (self.tdmaSlotid << 15) + self.tdmaCode
+        self.data = (self.message_type << 30) + (self.tdmaSlotid << 15) + self.tdmaCode
 
     def __repr__(self):
-        print(" Type ",self.msgType, " slot ", self.tdmaSlotid, " code ", self.tdmaCode)
+        print(" Type ",self.message_type, " slot ", self.tdmaSlotid, " code ", self.tdmaCode)
 
 
 class UWBCommunicationMessage(UWBMessage):
-    def __init__(self):
-        super(UWBCommunicationMessage, self).__init__()
+    def __init__(self, message_type: MessageType, data: int):
+        super(UWBCommunicationMessage, self).__init__(message_type, data)
         self.CONFIDENCE_MASK = 0b001111
         self.XPOS_MASK =       0b0000001111111111
         self.YPOS_MASK =       0b00000000000000001111111111
@@ -81,7 +80,7 @@ class UWBCommunicationMessage(UWBMessage):
         self.comZpos = self.data & self.ZPOS_MASK
 
     def encode(self):
-        self.data = (self.msgType << 30) + (self.comConfidence << 26) + (self.comXpos << 16) + (self.comYpos << 6) + self.comZpos
+        self.data = (self.message_type << 30) + (self.comConfidence << 26) + (self.comXpos << 16) + (self.comYpos << 6) + self.comZpos
 
     def __repr__(self):
-        print(" Type ", self.msgType, " confidence ", self.comConfidence," X ", self.comXpos," Y ",self.comYpos," X ",self.comZpos)
+        print(" Type ", self.message_type, " confidence ", self.comConfidence," X ", self.comXpos," Y ",self.comYpos," X ",self.comZpos)
