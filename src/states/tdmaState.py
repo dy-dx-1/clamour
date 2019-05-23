@@ -1,6 +1,7 @@
+from abc import ABC
 from .constants import State
 
-class TDMAState():
+class TDMAState(ABC):
     def execute(self) -> State:
         pass
 
