@@ -3,3 +3,6 @@ class TDMAControlMessage():
         self.id = id
         self.slot = slot
         self.code = code
+
+    def __equals__(self, other):
+        return self.slot == other.slot and self.code == other.code
