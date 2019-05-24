@@ -15,7 +15,7 @@ class Scheduling(TDMAState):
         self.id = id
         self.messenger = messenger
 
-    def execute(self):
+    def execute(self) -> State:
         self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
         self.slot_assignment.update_free_slots()
 

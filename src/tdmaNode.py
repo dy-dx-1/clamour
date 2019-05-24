@@ -24,7 +24,7 @@ class TDMANode():
                         State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, self.socket, self.pozyx),
                         State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger) }
         
-        self.current_state = self.states[State.INITIALIZATION]
+        self.current_state: State = self.states[State.INITIALIZATION]
 
     def __enter__(self):
         if self.pozyx is None:
