@@ -12,7 +12,7 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
 
 from ekf import CustomEKF
 from interfaces import Anchors, Neighborhood, Timing
-from interfaces.timing import FrameLen, tdmaExcSlotLen, tdmaExcStartTime
+from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -53,7 +53,7 @@ class Task(TDMAState):
         return self.next()
         
     def next(self) -> State:
-        if self.timing.current_time_in_cycle > (tdmaExcStartTime + self.timing.frame_id * FrameLen + (self.timing.current_slot_id + 1) * tdmaExcSlotLen):
+        if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION + (self.timing.current_slot_id + 1) * TASK_SLOT_DURATION):
             return State.LISTEN
         else:
             return State.TASK

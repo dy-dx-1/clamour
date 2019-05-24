@@ -1,8 +1,8 @@
 from pypozyx import PozyxSerial
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
-from interfaces.timing import (numNodes, syncTimeLen, tdmaExcStartTime,
-                               tdmaSchSlotLen)
+from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME,
+                               SCHEDULING_SLOT_DURATION)
 from messenger import Messenger
 
 from .constants import State
@@ -22,7 +22,7 @@ class Scheduling(TDMAState):
         self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
         self.slot_assignment.update_free_slots()
 
-        if int(((self.timing.current_time_in_cycle - syncTimeLen) % (numNodes*tdmaSchSlotLen)) / tdmaSchSlotLen) == self.id - 99:
+        if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES*SCHEDULING_SLOT_DURATION)) / SCHEDULING_SLOT_DURATION) == self.id - 99:
             self.messenger.broadcast_control_message()
         else:
             self.messenger.receive_message()
@@ -33,7 +33,7 @@ class Scheduling(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        if self.timing.current_time_in_cycle > tdmaExcStartTime:
+        if self.timing.current_time_in_cycle > TASK_START_TIME:
             return State.LISTEN
         else:
             return State.SCHEDULING

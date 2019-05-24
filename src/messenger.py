@@ -4,7 +4,7 @@ from time import perf_counter
 from pypozyx import POZYX_SUCCESS, Data, PozyxSerial, RXInfo, SingleRegister
 
 from interfaces import Neighborhood, SlotAssignment
-from interfaces.timing import tdmaNumSlots
+from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, MessageType,
                       TDMAControlMessage, UWBSynchronizationMessage,
                       UWBTDMAMessage)
@@ -28,12 +28,12 @@ class Messenger():
     def broadcast_control_message(self):
         if self.message_box.empty():
             # No prioritary message to broadcast (such as rejection). Proposal can be made.
-            if len(self.slot_assigment.pure_send_list) < (int((tdmaNumSlots+1)/self.neighborhood.synchronized_active_neighbor_count)) and len(self.slot_assigment.non_block) > 0:
+            if len(self.slot_assigment.pure_send_list) < (int((NB_TASK_SLOTS+1)/self.neighborhood.synchronized_active_neighbor_count)) and len(self.slot_assigment.non_block) > 0:
                 # Propose new slot by randomly choosing from non_block
                 slot = random.randint(0, len(self.slot_assigment.non_block))
                 code = -1
                 self.slot_assigment.send_list[slot] = self.id
-            elif len(self.slot_assigment.pure_send_list) < 2*(tdmaNumSlots+1)/(3*self.neighborhood.synchronized_active_neighbor_count) and len(self.slot_assigment.subpriority_slots) > 1:
+            elif len(self.slot_assigment.pure_send_list) < 2*(NB_TASK_SLOTS+1)/(3*self.neighborhood.synchronized_active_neighbor_count) and len(self.slot_assigment.subpriority_slots) > 1:
                 # Propose new slot by randomly choosing from subpriority_slots
                 slot = random.choice(self.slot_assigment.subpriority_slots)
                 code = -1

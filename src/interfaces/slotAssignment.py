@@ -1,13 +1,13 @@
-from .timing import tdmaNumSlots
+from .timing import NB_TASK_SLOTS
 
 class SlotAssignment():
     def __init__(self):
-        self.block = [-1] * tdmaNumSlots
+        self.block = [-1] * NB_TASK_SLOTS
         self.non_block = []
-        self.send_list = [-1] * tdmaNumSlots
+        self.send_list = [-1] * NB_TASK_SLOTS
         self.pure_send_list = []
-        self.receive_list = [-1] * tdmaNumSlots
-        self.free_slots = tdmaNumSlots
+        self.receive_list = [-1] * NB_TASK_SLOTS
+        self.free_slots = NB_TASK_SLOTS
         self.subpriority_slots = []
 
     def update_free_slots(self):
@@ -16,7 +16,7 @@ class SlotAssignment():
         self.subpriority_slots.clear()
         freeSlotCount = 0
 
-        for x in range(tdmaNumSlots):
+        for x in range(NB_TASK_SLOTS):
             if self.send_list[x] != -1 or self.receive_list[x] != -1:
                 self.block[x] = 1
             else:

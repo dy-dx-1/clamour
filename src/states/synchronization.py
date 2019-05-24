@@ -7,7 +7,7 @@ from interfaces import Neighborhood, SlotAssignment, Timing
 from messages import (MessageFactory, SynchronisationMessage,
                       UWBSynchronizationMessage)
 from messenger import Messenger
-from timing import COMM_DELAY, THRESHOLD_SYNTIME, syncTimeLen
+from timing import COMMUNICATION_DELAY, THRESHOLD_SYNTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
 from .tdmaState import TDMAState
@@ -41,7 +41,7 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
-        if self.timing.current_time_in_cycle > syncTimeLen and self.timing.synchronized:
+        if self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized:
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
@@ -81,7 +81,7 @@ class Synchronization(TDMAState):
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronisationMessage(sender_id=sender_id, clock=self.timing.logical_clock.getLogicalTime(), neibLogical=message.syncClock/100000)
-        sync_msg.offset += COMM_DELAY
+        sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
