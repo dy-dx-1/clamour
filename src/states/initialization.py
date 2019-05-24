@@ -32,7 +32,6 @@ class Initialization(TDMAState):
 
             if self.messenger.is_new_message(sender_id, data):
                 self.messenger.update_neighbor_dictionary()
-                self.neighborhood.add_anchor_to_neighbors(sender_id)
                 self.neighborhood.is_alone = False
         
         self.reset_discovery_settings()
