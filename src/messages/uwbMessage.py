@@ -39,12 +39,12 @@ class UWBSynchronizationMessage(UWBMessage):
 
 
 class UWBTDMAMessage(UWBMessage):
-    def __init__(self, message_type: MessageType=MessageType.TDMA, data: int=0):
+    def __init__(self, message_type: MessageType=MessageType.TDMA, data: int=0, slot: int=-1, code: int=-5):
         super(UWBTDMAMessage, self).__init__(message_type, data)
         self.SLOT_MASK =       0b00111111111111111000000000000000
         self.TDMACODE_MASK =   0b00000000000000000111111111111111
-        self.tdmaSlotid = -1
-        self.tdmaCode = -5
+        self.tdmaSlotid = slot
+        self.tdmaCode = code
 
     def decode(self):
         self.tdmaSlotid = (self.data & self.SLOT_MASK) >> 15

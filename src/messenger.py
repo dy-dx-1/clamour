@@ -1,6 +1,8 @@
+import random
 from time import perf_counter
 from interfaces import Neighborhood, SlotAssignment
-from messages import MessageBox, MessageFactory, MessageType, TDMAControlMessage
+from interfaces.timing import tdmaNumSlots
+from messages import MessageBox, MessageFactory, MessageType, TDMAControlMessage, UWBTDMAMessage
 from pypozyx import PozyxSerial, Data, RXInfo, POZYX_SUCCESS
 
 class Messenger():
@@ -12,7 +14,32 @@ class Messenger():
         self.slot_assigment = slot_assigment
 
     def broadcast_control_message(self):
-        pass
+        if len(self.message_box.message_queue) == 0:
+            if len(self.slot_assigment.pure_send_list) < (int((tdmaNumSlots+1)/self.neighborhood.synchronized_active_neighbor_count)) and len(self.slot_assigment.non_block) > 0:
+                # Propose new slot by randomly choosing from non_block
+                slot = random.randint(0, len(self.slot_assigment.non_block))
+                code = -1
+                self.slot_assigment.send_list[slot] = self.id
+            elif len(self.slot_assigment.pure_send_list) < 2*(tdmaNumSlots+1)/(3*self.neighborhood.synchronized_active_neighbor_count) and len(self.slot_assigment.subpriority_slots) > 1:
+                # Propose new slot by randomly choosing from subpriority_slots
+                slot = random.choice(self.slot_assigment.subpriority_slots)
+                code = -1
+                self.slot_assigment.send_list[slot] = self.id
+            else:
+                # Repetitively broadcast one of own slot. TODO: why?
+                slot = random.choice(self.slot_assigment.pure_send_list)
+                code = -1
+        else:
+            slot = self.message_box.message_queue[-1].slot
+            code = self.message_box.message_queue[-1].code
+            del self.message_box.message_queue[-1]
+        
+        self.broadcast(slot, code)
+
+    def broadcast(self, slot: int, code: int) -> None:
+        message = UWBTDMAMessage(slot=slot, code=code)
+        message.encode()
+        self.pozyx.sendData(0, Data([message.data], 'I'))
 
     def receive_message(self) -> None:
         sender_id, data, status = self.obtain_message_from_pozyx()
@@ -23,7 +50,6 @@ class Messenger():
             if received_data.message_type == MessageType.TDMA:
                 received_control_message = TDMAControlMessage(sender_id, received_data.slot, received_data.code)
                 self.handle_control_message(received_control_message)
-            
 
     def handle_control_message(self, control_message: TDMAControlMessage) -> None:
         if control_message.code == -1:
