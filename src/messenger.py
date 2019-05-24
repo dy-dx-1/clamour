@@ -2,8 +2,8 @@ import random
 from time import perf_counter
 from interfaces import Neighborhood, SlotAssignment
 from interfaces.timing import tdmaNumSlots
-from messages import MessageBox, MessageFactory, MessageType, TDMAControlMessage, UWBTDMAMessage
-from pypozyx import PozyxSerial, Data, RXInfo, POZYX_SUCCESS
+from messages import MessageBox, MessageFactory, MessageType, TDMAControlMessage, UWBTDMAMessage, UWBSynchronizationMessage
+from pypozyx import PozyxSerial, Data, RXInfo, SingleRegister, POZYX_SUCCESS
 
 class Messenger():
     def __init__(self, id: int, message_box: MessageBox, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assigment: SlotAssignment):
@@ -12,6 +12,13 @@ class Messenger():
         self.pozyx = pozyx
         self.neighborhood = neighborhood
         self.slot_assigment = slot_assigment
+
+    def broadcast_synchronization_message(self, time: int) -> None:
+        message = UWBSynchronizationMessage()
+        message.synchronized_clock = time
+        message.encode()
+
+        self.pozyx.sendData(Data([message.data], "I"))
 
     def broadcast_control_message(self):
         if self.message_box.empty():
@@ -129,3 +136,8 @@ class Messenger():
                                                                                 new_message)
         self.message_box.put(new_message)
         self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))
+
+    def handle_error(self):
+        error_code = SingleRegister()
+        status = self.pozyx.getErrorCode(error_code)
+        print("Error occured: " + status)

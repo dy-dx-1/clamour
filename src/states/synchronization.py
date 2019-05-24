@@ -1,26 +1,23 @@
 from .constants import State, JUMP_THRESHOLD
 from .tdmaState import TDMAState
 from interfaces import Neighborhood, SlotAssignment, Timing
-from messages import MessageBox, MessageFactory, UWBSynchronizationMessage, SynchronisationMessage
-
+from messages import MessageFactory, UWBSynchronizationMessage, SynchronisationMessage
+from messenger import Messenger
 from timing import THRESHOLD_SYNTIME, syncTimeLen, COMM_DELAY
 
 from time import perf_counter
 from numpy import std, mean
-from pypozyx import PozyxSerial, RXInfo
-from pypozyx.definitions.constants import POZYX_SUCCESS
-from pypozyx.structures.generic import Data, SingleRegister
+from pypozyx import POZYX_SUCCESS
 
 
 class Synchronization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
-                timing: Timing, message_box: MessageBox, id: int, pozyx: PozyxSerial):
+                timing: Timing, messenger: Messenger, id: int):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.timing = timing
-        self.message_box = message_box
         self.id = id
-        self.pozyx = pozyx
+        self.messenger = messenger
 
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 0 if len(self.timing.clock_differential_stat) == 0  \
@@ -47,33 +44,30 @@ class Synchronization(TDMAState):
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self):
-        message = UWBSynchronizationMessage()
-        message.synchronized_clock = int(round(self.timing.logical_clock.get_updated_clock()*100000))
-        message.encode()
-
-        self.pozyx.sendData(Data([message.data], "I"))
+        time = int(round(self.timing.logical_clock.get_updated_clock()*100000))
+        self.messenger.broadcast_synchronization_message(time)
 
     def synchronize(self):
         # We listen for synchronization messages an arbitrary number of times
         for _ in range(10):
-            sender_id, data, status = self.obtain_message_from_pozyx()
-            if status == POZYX_SUCCESS and message_handler.is_new_message(sender_id, data):
+            sender_id, data, status = self.messenger.obtain_message_from_pozyx()
+            if status == POZYX_SUCCESS and self.messenger.is_new_message(sender_id, data):
                 message = MessageFactory.create(data)
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
                     self.update_offset(sender_id, message)
                 else:
                     print("Wrong message type")
-                self.update_neighbor_dictionary()
+                self.messenger.update_neighbor_dictionary()
             else:
-                self.handle_error()
+                self.messenger.handle_error()
 
     def reset_scheduling(self):
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
-        self.message_box.queue.clear()
+        self.messenger.queue.clear()
         self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
         self.slot_assignment.update_free_slots()
 
@@ -82,14 +76,6 @@ class Synchronization(TDMAState):
         self.timing.synchronization_offset_mean = 20
         self.timing.synchronized = False
     
-    def obtain_message_from_pozyx(self):
-        info = RXInfo()
-        data = Data([0], 'i')
-        status = self.pozyx.readRXBufferData(data)
-        self.pozyx.getRxInfo(info)
-
-        return info[0], data[0], status
-
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronisationMessage(sender_id=sender_id, clock=self.timing.logical_clock.getLogicalTime(), neibLogical=message.syncClock/100000)
         sync_msg.offset += COMM_DELAY
@@ -116,19 +102,3 @@ class Synchronization(TDMAState):
             self.timing.clock_differential = []
 
         self.timing.received_frequency_sample.append(perf_counter())
-
-
-    def handle_error(self):
-        error_code = SingleRegister()
-        status = self.pozyx.getErrorCode(error_code)
-        print("Error occured: " + status)
-
-    def update_neighbor_dictionary(self):
-        new_message = MessageFactory.create(self.message_box.peek_last().data)
-        new_message.decode()
-        self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,
-                                                                                perf_counter(),
-                                                                                new_message.message_type,
-                                                                                new_message)
-        self.message_box.put(new_message)
-        self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))
