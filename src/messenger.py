@@ -89,7 +89,7 @@ class Messenger():
     def reject_proposal(self, message: TDMAControlMessage) -> None:
         """This slot was already occupied, so the proposal must be rejected."""
 
-        if not self.message_box.contains(message):
+        if message not in self.message_box:
             self.message_box.put(message)
 
     def handle_feedback(self, message: TDMAControlMessage) -> None:
@@ -98,7 +98,7 @@ class Messenger():
         It is necessary to delete the send schedule in this slot 
         and to mark this slot as no-sending slot (-2)."""
 
-        if not self.message_box.contains(message):
+        if message not in self.message_box:
             self.message_box.put(message)
         
         self.slot_assigment.send_list[message.slot] = -2
@@ -112,8 +112,8 @@ class Messenger():
     def is_new_message(self, sender_id: int, message_data: int) -> bool:
         if sender_id != 0 and message_data != 0:
             if id != self.message_box.peek_last().id or message_data != self.message_box.peek_last().data:
-                self.message_box.self.message_box.peek_last().id = sender_id
-                self.message_box.self.message_box.peek_last().data = message_data
+                self.message_box.peek_last().id = sender_id
+                self.message_box.peek_last().data = message_data
                 return True
         return False
 
