@@ -1,10 +1,12 @@
 from socket import socket
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
+
+from pypozyx import Data, PozyxSerial, get_first_pozyx_serial_port
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
-from states import Initialization, Synchronization, Scheduling, Task, Listen, State
-from interfaces import Neighborhood, SlotAssignment, Timing, Anchors
+from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
 from messenger import Messenger
+from states import (Initialization, Listen, Scheduling, State, Synchronization,
+                    Task)
 
 
 class TDMANode():

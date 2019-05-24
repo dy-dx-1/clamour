@@ -1,13 +1,16 @@
-from .constants import State, JUMP_THRESHOLD
-from .tdmaState import TDMAState
-from interfaces import Neighborhood, SlotAssignment, Timing
-from messages import MessageFactory, UWBSynchronizationMessage, SynchronisationMessage
-from messenger import Messenger
-from timing import THRESHOLD_SYNTIME, syncTimeLen, COMM_DELAY
-
 from time import perf_counter
-from numpy import std, mean
+
+from numpy import mean, std
 from pypozyx import POZYX_SUCCESS
+
+from interfaces import Neighborhood, SlotAssignment, Timing
+from messages import (MessageFactory, SynchronisationMessage,
+                      UWBSynchronizationMessage)
+from messenger import Messenger
+from timing import COMM_DELAY, THRESHOLD_SYNTIME, syncTimeLen
+
+from .constants import JUMP_THRESHOLD, State
+from .tdmaState import TDMAState
 
 
 class Synchronization(TDMAState):

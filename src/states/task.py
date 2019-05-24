@@ -1,20 +1,21 @@
-from .constants import State
-from .tdmaState import TDMAState
-
-from ekf import CustomEKF
-from interfaces import Timing, Anchors, Neighborhood
-from interfaces.timing import tdmaExcStartTime, FrameLen, tdmaExcSlotLen
-
 import random
 import struct
-from time import time
-from socket import socket as Socket
 from enum import Enum
+from socket import socket as Socket
+from time import time
+
 from numpy import array, atleast_2d
-from pypozyx import (PozyxSerial, LinearAcceleration, SingleRegister, DeviceList, 
-                     DeviceRange, Coordinates,
-                     POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, 
-                     POZYX_SUCCESS, POZYX_POS_ALG_UWB_ONLY, POZYX_3D)
+from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
+                     POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_POS_ALG_UWB_ONLY,
+                     POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
+                     LinearAcceleration, PozyxSerial, SingleRegister)
+
+from ekf import CustomEKF
+from interfaces import Anchors, Neighborhood, Timing
+from interfaces.timing import FrameLen, tdmaExcSlotLen, tdmaExcStartTime
+
+from .constants import State
+from .tdmaState import TDMAState
 
 
 class Task(TDMAState):

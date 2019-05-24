@@ -1,5 +1,6 @@
-from .uwbMessage import UWBMessage, UWBCommunicationMessage, UWBSynchronizationMessage, UWBTDMAMessage
 from .types import MessageType
+from .uwbMessage import (UWBCommunicationMessage, UWBMessage,
+                         UWBSynchronizationMessage, UWBTDMAMessage)
 
 
 class MessageFactory():

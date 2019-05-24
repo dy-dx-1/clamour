@@ -1,6 +1,7 @@
 from .messageBox import MessageBox
+from .messageFactory import MessageFactory
 from .synchronizationMessage import SynchronisationMessage
 from .tdmaControlMessage import TDMAControlMessage
-from .uwbMessage import UWBMessage, UWBCommunicationMessage, UWBSynchronizationMessage, UWBTDMAMessage
 from .types import MessageType
-from .messageFactory import MessageFactory
+from .uwbMessage import (UWBCommunicationMessage, UWBMessage,
+                         UWBSynchronizationMessage, UWBTDMAMessage)

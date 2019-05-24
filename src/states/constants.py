@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class State(Enum):
     INITIALIZATION: 0
     SYNCHRONIZATION: 1

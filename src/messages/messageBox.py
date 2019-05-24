@@ -1,5 +1,7 @@
 from queue import Queue
+
 from messages import UWBMessage
+
 
 class MessageBox(Queue):
     """This class is inspired by a standard queue.

@@ -1,10 +1,13 @@
+from pypozyx import PozyxSerial
+
+from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
+from interfaces.timing import (numNodes, syncTimeLen, tdmaExcStartTime,
+                               tdmaSchSlotLen)
+from messenger import Messenger
+
 from .constants import State
 from .tdmaState import TDMAState
 
-from messenger import Messenger
-from interfaces import Neighborhood, SlotAssignment, Anchors, Timing
-from interfaces.timing import syncTimeLen, numNodes, tdmaSchSlotLen, tdmaExcStartTime
-from pypozyx import PozyxSerial
 
 class Scheduling(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,

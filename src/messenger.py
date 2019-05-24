@@ -1,9 +1,14 @@
 import random
 from time import perf_counter
+
+from pypozyx import POZYX_SUCCESS, Data, PozyxSerial, RXInfo, SingleRegister
+
 from interfaces import Neighborhood, SlotAssignment
 from interfaces.timing import tdmaNumSlots
-from messages import MessageBox, MessageFactory, MessageType, TDMAControlMessage, UWBTDMAMessage, UWBSynchronizationMessage
-from pypozyx import PozyxSerial, Data, RXInfo, SingleRegister, POZYX_SUCCESS
+from messages import (MessageBox, MessageFactory, MessageType,
+                      TDMAControlMessage, UWBSynchronizationMessage,
+                      UWBTDMAMessage)
+
 
 class Messenger():
     def __init__(self, id: int, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assigment: SlotAssignment):

@@ -1,6 +1,7 @@
-from pypozyx import Coordinates
 from filterpy.kalman import ExtendedKalmanFilter
-from numpy import array, eye, asarray, dot, linalg
+from numpy import array, asarray, dot, eye, linalg
+from pypozyx import Coordinates
+
 
 class CustomEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates):
@@ -120,4 +121,3 @@ class CustomEKF(ExtendedKalmanFilter):
 
         if self.x[3] > self.zone_limits[zone][3]:
             self.x[3] = self.zone_limits[zone][3]
-

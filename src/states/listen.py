@@ -1,9 +1,11 @@
-from .constants import State
-from .tdmaState import TDMAState
 from interfaces import SlotAssignment, Timing
-from interfaces.timing import Timing, FCYCLE, SLOT_FOR_RESET, tdmaExcStartTime
+from interfaces.timing import FCYCLE, SLOT_FOR_RESET, Timing, tdmaExcStartTime
 from messages import UWBCommunicationMessage
 from messenger import Messenger
+
+from .constants import State
+from .tdmaState import TDMAState
+
 
 class Listen(TDMAState):
     def __init__(self, slot_assignment: SlotAssignment, timing: Timing, messenger: Messenger):
@@ -39,4 +41,3 @@ class Listen(TDMAState):
                 # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
                 #       such as counting steps using a pedometer
                 pass
-        
