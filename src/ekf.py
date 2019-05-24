@@ -1,8 +1,9 @@
+from pypozyx import Coordinates
 from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, eye, asarray, dot, linalg
 
 class CustomEKF(ExtendedKalmanFilter):
-    def __init__(self):
+    def __init__(self, position: Coordinates):
         super(CustomEKF, self).__init__(dim_x=9, dim_y=6)
 
         self.dt = 0.1
@@ -30,6 +31,9 @@ class CustomEKF(ExtendedKalmanFilter):
                                 [0, 0, 1, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 1, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 1]])
+        
+        self.x = array([position.x/10, 0, 0, position.y/10, 0, 0, position.z/10, 0, 0])
+
 
 
     def setQF(self):
@@ -87,9 +91,6 @@ class CustomEKF(ExtendedKalmanFilter):
                 hx_out[i] = linalg.norm([x[0]-nei_pose[i][0], x[3]-nei_pose[i][1], x[6]-nei_pose[i][2]])
 
         return hx_out
-
-    def setPose(self, position):
-        self.x = array([position.x/10, 0, 0, position.y/10, 0, 0, position.z/10, 0, 0])
 
     def pre_update(self, dt):
         if(dt != self.dt):

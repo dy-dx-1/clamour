@@ -26,7 +26,8 @@ class Task(TDMAState):
         self.remote_id = None
         self.localize = self.ranging
         self.done = False
-        self.extended_kalman_filter = CustomEKF()
+        self.position = Coordinates()
+        self.extended_kalman_filter = CustomEKF(self.position)
         self.socket = socket
         self.dt = 0
         self.last_measurement = [0, 0, 0]
@@ -37,7 +38,6 @@ class Task(TDMAState):
         self.last_ekf_step_time = 0
         self.dimension = POZYX_3D
         self.height = 1000
-        self.position = Coordinates()
 
     def execute(self) -> State:
         if not self.anchors.discovery_done:
