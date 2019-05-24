@@ -3,7 +3,7 @@ from pypozyx import PozyxSerial, get_first_pozyx_serial_port
 
 from states import Initialization, Synchronization, Scheduling, Task, Listen, State
 from interfaces import Neighborhood, SlotAssignment, Timing, Anchors
-from messages import MessageBox
+from messenger import Messenger
 
 
 class TDMANode():
@@ -15,14 +15,14 @@ class TDMANode():
         self.neighborhood = Neighborhood()
         self.slot_assignment = SlotAssignment()
         self.timing = Timing()
-        self.message_box = MessageBox()
         self.anchors = Anchors()
+        self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment)
 
-        self.states = { State.INITIALIZATION: Initialization(self.neighborhood, self.message_box, self.anchors, self.id, self.pozyx), 
-                        State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.message_box, self.id, self.pozyx),
-                        State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.anchors, self.id, self.pozyx),
-                        State.TASK: Task(self.timing, self.anchors, self.id, self.socket),
-                        State.LISTEN: Listen(self.neighborhood, self.slot_assignment, self.timing, self.message_box, self.pozyx) }
+        self.states = { State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx, self.messenger), 
+                        State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.messenger, self.id),
+                        State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.timing, self.id, self.messenger),
+                        State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, self.socket, self.pozyx),
+                        State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger) }
         
         self.current_state = self.states[State.INITIALIZATION]
 
@@ -37,7 +37,7 @@ class TDMANode():
     
     def run(self):
         while True:
-            self.current_state = self.current_state.execute()
+            self.current_state = self.states[self.current_state.execute()]
 
     def connect_pozyx(self):
         serial_port = get_first_pozyx_serial_port()

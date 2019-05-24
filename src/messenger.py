@@ -6,9 +6,9 @@ from messages import MessageBox, MessageFactory, MessageType, TDMAControlMessage
 from pypozyx import PozyxSerial, Data, RXInfo, SingleRegister, POZYX_SUCCESS
 
 class Messenger():
-    def __init__(self, id: int, message_box: MessageBox, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assigment: SlotAssignment):
+    def __init__(self, id: int, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assigment: SlotAssignment):
         self.id = id
-        self.message_box = message_box
+        self.message_box = MessageBox()
         self.pozyx = pozyx
         self.neighborhood = neighborhood
         self.slot_assigment = slot_assigment
