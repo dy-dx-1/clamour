@@ -23,7 +23,7 @@ class Task(TDMAState):
         self.timing = timing
         self.anchors = anchors
         self.id = id
-        self.remote_id = 0
+        self.remote_id = None
         self.localize = self.ranging
         self.done = False
         self.extended_kalman_filter = CustomEKF()
