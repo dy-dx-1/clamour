@@ -4,6 +4,7 @@ from interfaces import Neighborhood, SlotAssignment, Timing
 from interfaces.timing import Timing, FCYCLE, SLOT_FOR_RESET, tdmaExcStartTime
 from messages import MessageBox, MessageFactory, UWBCommunicationMessage
 
+from time import perf_counter
 from pypozyx import PozyxSerial, RXInfo
 from pypozyx.definitions.constants import POZYX_DISCOVERY_ALL_DEVICES, POZYX_SUCCESS
 from pypozyx.structures.generic import Data
@@ -41,7 +42,7 @@ class Listen(TDMAState):
 
         if message_handler.is_new_message(sender_id, data):
             self.update_neighbor_dictionary()
-            if isinstance(self.message_box.current_message, UWBCommunicationMessage):
+            if isinstance(self.message_box.peek_first(), UWBCommunicationMessage):
                 # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
                 #       such as counting steps using a pedometer
                 pass
@@ -56,9 +57,11 @@ class Listen(TDMAState):
         return info[0], data[0]
     
     def update_neighbor_dictionary(self):
-        self.message_box.current_message = MessageFactory.create(self.message_box.last_received_message_data)
-        self.message_box.current_message.decode()
-        self.neighborhood.current_neighbors[self.message_box.last_received_message_id] = (self.message_box.last_received_message_id,
-                                                                                        self.message_box.current_message.message_type,
-                                                                                        self.message_box.current_message)
+        new_message = MessageFactory.create(self.message_box.peek_last().data)
+        new_message.decode()
+        self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,
+                                                                                perf_counter(),
+                                                                                new_message.message_type,
+                                                                                new_message)
+        self.message_box.put(new_message)
         self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))

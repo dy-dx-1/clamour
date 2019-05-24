@@ -73,7 +73,7 @@ class Synchronization(TDMAState):
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
-        self.message_box.message_queue = []
+        self.message_box.queue.clear()
         self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
         self.slot_assignment.update_free_slots()
 
@@ -124,9 +124,11 @@ class Synchronization(TDMAState):
         print("Error occured: " + status)
 
     def update_neighbor_dictionary(self):
-        self.message_box.current_message = MessageFactory.create(self.message_box.last_received_message_data)
-        self.message_box.current_message.decode()
-        self.neighborhood.current_neighbors[self.message_box.last_received_message_id] = (self.message_box.last_received_message_id,
-                                                                                        self.message_box.current_message.message_type,
-                                                                                        self.message_box.current_message)
+        new_message = MessageFactory.create(self.message_box.peek_last().data)
+        new_message.decode()
+        self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,
+                                                                                perf_counter(),
+                                                                                new_message.message_type,
+                                                                                new_message)
+        self.message_box.put(new_message)
         self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))

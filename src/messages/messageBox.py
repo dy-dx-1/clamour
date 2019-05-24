@@ -1,16 +1,19 @@
-from typing import List
+from queue import Queue
 from messages import UWBMessage
 
-class MessageBox():
-    # TODO: turn into a queue
-    def __init__(self):
-        self.last_received_message_id = 0
-        self.last_received_message_data = None
-        self.current_message: UWBMessage = None
-        self.message_queue: List[UWBMessage] = []
+class MessageBox(Queue):
+    """This class is inspired by a standard queue.
+    However, it needed to be based on a regular array
+    because traversal is sometimes necessary."""
 
-    def contains(self, message):
-        for x in range(len(self.message_queue)):
-            if self.message_queue[x] == message:
+    def __contains__(self, message: UWBMessage) -> bool:
+        for m in self.queue:
+            if m == message:
                 return True
         return False
+
+    def peek_first(self) -> UWBMessage:
+        return self.queue[0]
+
+    def peek_last(self) -> UWBMessage:
+        return self.queue[len(self.queue) - 1]

@@ -14,7 +14,8 @@ class Messenger():
         self.slot_assigment = slot_assigment
 
     def broadcast_control_message(self):
-        if len(self.message_box.message_queue) == 0:
+        if self.message_box.empty():
+            # No prioritary message to broadcast (such as rejection). Proposal can be made.
             if len(self.slot_assigment.pure_send_list) < (int((tdmaNumSlots+1)/self.neighborhood.synchronized_active_neighbor_count)) and len(self.slot_assigment.non_block) > 0:
                 # Propose new slot by randomly choosing from non_block
                 slot = random.randint(0, len(self.slot_assigment.non_block))
@@ -30,9 +31,8 @@ class Messenger():
                 slot = random.choice(self.slot_assigment.pure_send_list)
                 code = -1
         else:
-            slot = self.message_box.message_queue[-1].slot
-            code = self.message_box.message_queue[-1].code
-            del self.message_box.message_queue[-1]
+            message = self.message_box.get()
+            slot, code = message.slot, message.code
         
         self.broadcast(slot, code)
 
@@ -83,7 +83,7 @@ class Messenger():
         """This slot was already occupied, so the proposal must be rejected."""
 
         if not self.message_box.contains(message):
-            self.message_box.message_queue.append(message)
+            self.message_box.put(message)
 
     def handle_feedback(self, message: TDMAControlMessage) -> None:
         """If code == id, it is a feedback from the receiver. 
@@ -92,7 +92,7 @@ class Messenger():
         and to mark this slot as no-sending slot (-2)."""
 
         if not self.message_box.contains(message):
-            self.message_box.message_queue.append(message)
+            self.message_box.put(message)
         
         self.slot_assigment.send_list[message.slot] = -2
 
@@ -104,9 +104,9 @@ class Messenger():
 
     def is_new_message(self, sender_id: int, message_data: int) -> bool:
         if sender_id != 0 and message_data != 0:
-            if id != self.message_box.last_received_message_id or message_data != self.message_box.last_received_message_data:
-                self.message_box.last_received_message_id = sender_id
-                self.message_box.last_received_message_data = message_data
+            if id != self.message_box.peek_last().id or message_data != self.message_box.peek_last().data:
+                self.message_box.self.message_box.peek_last().id = sender_id
+                self.message_box.self.message_box.peek_last().data = message_data
                 return True
         return False
 
@@ -121,10 +121,11 @@ class Messenger():
     def update_neighbor_dictionary(self):
         #TODO: This function should not be here -> untagle dependancies with neighborhood
 
-        self.message_box.current_message = MessageFactory.create(self.message_box.last_received_message_data)
-        self.message_box.current_message.decode()
-        self.neighborhood.current_neighbors[self.message_box.last_received_message_id] = (self.message_box.last_received_message_id,
-                                                                                        perf_counter(),
-                                                                                        self.message_box.current_message.message_type,
-                                                                                        self.message_box.current_message)
+        new_message = MessageFactory.create(self.message_box.peek_last().data)
+        new_message.decode()
+        self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,
+                                                                                perf_counter(),
+                                                                                new_message.message_type,
+                                                                                new_message)
+        self.message_box.put(new_message)
         self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))

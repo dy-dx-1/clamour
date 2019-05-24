@@ -20,6 +20,9 @@ class UWBMessage(object):
         # elif(self.msgType == 0):
         #     print(" Type ", 0, " data ", self.data)
         pass
+    
+    def __equals__(self, other: UWBMessage):
+        pass
 
 
 class UWBSynchronizationMessage(UWBMessage):
@@ -59,6 +62,9 @@ class UWBTDMAMessage(UWBMessage):
 
     def __repr__(self):
         print(" Type ",self.message_type, " slot ", self.tdmaSlotid, " code ", self.tdmaCode)
+
+    def __equals__(self, other: UWBTDMAMessage):
+        return self.tdmaCode == other.tdmaCode and self.tdmaSlotid == other.tdmaSlotid
 
 
 class UWBCommunicationMessage(UWBMessage):
