@@ -1,22 +1,15 @@
 from .constants import State
 from .tdmaState import TDMAState
-from interfaces import Neighborhood, SlotAssignment, Timing
+from interfaces import SlotAssignment, Timing
 from interfaces.timing import Timing, FCYCLE, SLOT_FOR_RESET, tdmaExcStartTime
-from messages import MessageBox, MessageFactory, UWBCommunicationMessage
-
-from time import perf_counter
-from pypozyx import PozyxSerial, RXInfo
-from pypozyx.definitions.constants import POZYX_DISCOVERY_ALL_DEVICES, POZYX_SUCCESS
-from pypozyx.structures.generic import Data
+from messages import UWBCommunicationMessage
+from messenger import Messenger
 
 class Listen(TDMAState):
-    def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
-                 timing: Timing, message_box: MessageBox, pozyx: PozyxSerial):
-        self.neighborhood = neighborhood
+    def __init__(self, slot_assignment: SlotAssignment, timing: Timing, messenger: Messenger):
         self.slot_assignment = slot_assignment
         self.timing = timing
-        self.message_box = message_box
-        self.pozyx = pozyx
+        self.messenger = messenger
 
     def execute(self) -> State:
         self.timing.update_frame_id()
@@ -38,30 +31,12 @@ class Listen(TDMAState):
             return State.SYNCHRONIZATION
 
     def listen_for_messages(self):
-        sender_id, data = self.obtain_message_from_pozyx()
+        sender_id, data, _ = self.messenger.obtain_message_from_pozyx()
 
-        if message_handler.is_new_message(sender_id, data):
-            self.update_neighbor_dictionary()
-            if isinstance(self.message_box.peek_first(), UWBCommunicationMessage):
+        if self.messenger.is_new_message(sender_id, data):
+            self.messenger.update_neighbor_dictionary()
+            if isinstance(self.messenger.message_box.peek_first(), UWBCommunicationMessage):
                 # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
                 #       such as counting steps using a pedometer
                 pass
         
-
-    def obtain_message_from_pozyx(self):
-        info = RXInfo()
-        data = Data([0], 'i')
-        self.pozyx.getRxInfo(info)
-        self.pozyx.readRXBufferData(data)
-
-        return info[0], data[0]
-    
-    def update_neighbor_dictionary(self):
-        new_message = MessageFactory.create(self.message_box.peek_last().data)
-        new_message.decode()
-        self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,
-                                                                                perf_counter(),
-                                                                                new_message.message_type,
-                                                                                new_message)
-        self.message_box.put(new_message)
-        self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))

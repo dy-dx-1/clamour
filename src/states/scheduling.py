@@ -7,13 +7,12 @@ from pypozyx import PozyxSerial
 
 class Scheduling(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
-                 timing: Timing, anchors: Anchors, id: int, pozyx: PozyxSerial):
+                 timing: Timing, anchors: Anchors, id: int):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.anchors = anchors
         self.timing = timing
         self.id = id
-        self.pozyx = pozyx
 
     def execute(self):
         self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
