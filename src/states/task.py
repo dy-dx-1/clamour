@@ -33,6 +33,7 @@ class Task(TDMAState):
         self.last_measurement = [0, 0, 0]
         self.last_measurement_data = array([0, 0, 0], [0, 0, 0], [0, 0, 0])
         self.acceleration = LinearAcceleration()
+        self.set_IMU()
         self.pozyx = pozyx
         self.neighborhood = neighborhood
         self.last_ekf_step_time = 0
@@ -55,6 +56,14 @@ class Task(TDMAState):
             return State.LISTEN
         else:
             return State.TASK
+
+    def set_IMU(self):
+        """Sets the Initial Measurement Units"""
+
+        _ = self.pozyx.getLinearAcceleration_mg(self.acceleration) # Acceleration passed by reference
+        self.acceleration.x *= 9.81
+        self.acceleration.y *= 9.81
+        self.acceleration.z *= 9.81
 
     def select_localization_method(self) -> None:
         self.localize = self.positioning if self.anchors.available_anchors >= 4 else self.ranging
