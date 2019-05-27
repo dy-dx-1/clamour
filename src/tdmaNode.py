@@ -5,7 +5,6 @@ from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
 from messenger import Messenger
-from mockPozyx import MockPozyx
 from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
 
 
