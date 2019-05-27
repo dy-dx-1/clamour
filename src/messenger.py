@@ -131,8 +131,6 @@ class Messenger():
         return info[0], data[0], status
     
     def update_neighbor_dictionary(self):
-        #TODO: This function should not be here -> untagle dependancies with neighborhood
-
         new_message = MessageFactory.create(self.message_box.peek_last().data)
         new_message.decode()
         self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,

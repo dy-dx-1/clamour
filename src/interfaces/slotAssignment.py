@@ -11,10 +11,9 @@ class SlotAssignment():
         self.subpriority_slots = []
 
     def update_free_slots(self):
-        #TODO: Refactor after MessageHandler is done
         self.non_block.clear()
         self.subpriority_slots.clear()
-        freeSlotCount = 0
+        self.free_slots = 0
 
         for x in range(NB_TASK_SLOTS):
             if self.send_list[x] != -1 or self.receive_list[x] != -1:
@@ -23,6 +22,4 @@ class SlotAssignment():
                 self.non_block.append(x)
                 if self.send_list[x] == -2:
                     self.subpriority_slots.append(0)
-                freeSlotCount += 1
-
-        self.free_slots = freeSlotCount #The amonunt of free slots, one more than slot id.
+                self.free_slots += 1
