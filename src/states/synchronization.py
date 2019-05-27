@@ -4,10 +4,9 @@ from numpy import mean, std
 from pypozyx import POZYX_SUCCESS
 
 from interfaces import Neighborhood, SlotAssignment, Timing
-from messages import (MessageFactory, SynchronisationMessage,
-                      UWBSynchronizationMessage)
+from messages import (MessageFactory, SynchronisationMessage, UWBSynchronizationMessage)
 from messenger import Messenger
-from timing import COMMUNICATION_DELAY, THRESHOLD_SYNTIME, SYNCHRONIZATION_PERIOD
+from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
 from .tdmaState import TDMAState
@@ -15,7 +14,7 @@ from .tdmaState import TDMAState
 
 class Synchronization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
-                timing: Timing, messenger: Messenger, id: int):
+                 timing: Timing, messenger: Messenger, id: int):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.timing = timing
@@ -29,7 +28,7 @@ class Synchronization(TDMAState):
         self.synchronize()
         self.broadcast_synchronization_message()
 
-        if self.timing.synchronization_offset_mean > THRESHOLD_SYNTIME:
+        if self.timing.synchronization_offset_mean > THRESHOLD_SYNCTIME:
             self.timing.synchronized = True
 
         next_state = self.next()
@@ -80,7 +79,8 @@ class Synchronization(TDMAState):
         self.timing.synchronized = False
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
-        sync_msg = SynchronisationMessage(sender_id=sender_id, clock=self.timing.logical_clock.getLogicalTime(), neibLogical=message.syncClock/100000)
+        sync_msg = SynchronisationMessage(sender_id=sender_id, clock=self.timing.logical_clock.getLogicalTime(),
+                                          neibLogical=message.syncClock/100000)
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
@@ -98,8 +98,8 @@ class Synchronization(TDMAState):
             for _, individual_offset in self.neighborhood.neighbor_synchronization_received:
                 total_offset += individual_offset
             
-            offset_corection = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
-            self.timing.logical_clock.correct_logical_offset(offset_corection)
+            offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
+            self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
             self.timing.clock_differential = []

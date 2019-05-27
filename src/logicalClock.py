@@ -1,10 +1,10 @@
 from time import perf_counter
 
 
-class LogicalClock():
-    def __init__(self, logicalRate=0, offset=0):
+class LogicalClock:
+    def __init__(self, logical_rate=0, offset=0):
         self.offset = offset
-        self.logicalRate = logicalRate
+        self.logicalRate = logical_rate
         self.last_hardware_time = perf_counter()
         self.clock = 0
 

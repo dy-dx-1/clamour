@@ -1,8 +1,5 @@
-from pypozyx import PozyxSerial
-
-from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
-from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME,
-                               SCHEDULING_SLOT_DURATION)
+from interfaces import Neighborhood, SlotAssignment, Timing
+from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME, SCHEDULING_SLOT_DURATION)
 from messenger import Messenger
 
 from .constants import State
@@ -22,11 +19,12 @@ class Scheduling(TDMAState):
         self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
         self.slot_assignment.update_free_slots()
 
-        if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES*SCHEDULING_SLOT_DURATION)) / SCHEDULING_SLOT_DURATION) == self.id - 99:
+        if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
+               / SCHEDULING_SLOT_DURATION) == self.id - 99:
             self.messenger.broadcast_control_message()
         else:
             self.messenger.receive_message()
-        
+
         self.slot_assignment.update_free_slots()
         self.update_pure_send_list()
 
@@ -39,5 +37,5 @@ class Scheduling(TDMAState):
             return State.SCHEDULING
 
     def update_pure_send_list(self):
-        self.slot_assignment.pure_send_list = [x for x in range(len(self.slot_assignment.send_list)) 
-                                                 if self.slot_assignment.send_list[x] not in [-1, -2]]
+        self.slot_assignment.pure_send_list = [x for x in range(len(self.slot_assignment.send_list))
+                                               if self.slot_assignment.send_list[x] not in [-1, -2]]

@@ -1,4 +1,4 @@
-class Neighborhood():
+class Neighborhood:
     def __init__(self):
         self.is_alone = True
         self.synchronized_neighbors = []
