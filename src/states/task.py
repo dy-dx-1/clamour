@@ -14,7 +14,7 @@ from ekf import CustomEKF
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 
-from .constants import State
+from .constants import State, GRAVITATIONAL_ACCELERATION
 from .tdmaState import TDMAState
 
 
@@ -62,9 +62,9 @@ class Task(TDMAState):
         """Sets the Initial Measurement Units"""
 
         _ = self.pozyx.getLinearAcceleration_mg(self.acceleration) # Acceleration passed by reference
-        self.acceleration.x *= 9.81
-        self.acceleration.y *= 9.81
-        self.acceleration.z *= 9.81
+        self.acceleration.x *= GRAVITATIONAL_ACCELERATION
+        self.acceleration.y *= GRAVITATIONAL_ACCELERATION
+        self.acceleration.z *= GRAVITATIONAL_ACCELERATION
 
     def select_localization_method(self) -> None:
         self.localize = self.positioning if self.anchors.available_anchors >= 4 else self.ranging

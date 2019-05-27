@@ -7,21 +7,9 @@ class UWBMessage(object):
         self.message_type = message_type
 
     def decode(self):
-        # Is this a posssible state?
-        # elif(self.msgType == 0):
-        #     self.data = 0
         pass
 
     def encode(self):
-        pass
-
-    def __repr__(self):
-        # Is this a posssible state?
-        # elif(self.msgType == 0):
-        #     print(" Type ", 0, " data ", self.data)
-        pass
-    
-    def __equals__(self, other: UWBMessage):
         pass
 
 
