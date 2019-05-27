@@ -1,6 +1,7 @@
 from .timing import NB_TASK_SLOTS
 
-class SlotAssignment():
+
+class SlotAssignment:
     def __init__(self):
         self.block = [-1] * NB_TASK_SLOTS
         self.non_block = []

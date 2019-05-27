@@ -5,10 +5,10 @@ from pypozyx import Coordinates
 
 class CustomEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates):
-        super(CustomEKF, self).__init__(dim_x=9, dim_y=6)
+        super(CustomEKF, self).__init__(dim_x=9, dim_z=6)
 
         self.dt = 0.1
-        self.setQF()
+        self.set_qf()
         self.ps = []
         self.zone_limits = [[0, 800, -100, 600]]
         self.R = array([[15, 0, 0, 0, 0, 0],
@@ -26,18 +26,16 @@ class CustomEKF(ExtendedKalmanFilter):
                              [0, 0, 0, 0, 0, 40]])
 
         # compute Jacobian of H matrix
-        self.H_of_pose = array([[1, 0, 0, 0, 0, 0, 0 ,0 ,0],
-                                [0, 0, 0, 1, 0, 0, 0, 0, 0],
-                                [0, 0, 0, 0, 0, 0, 1, 0, 0],
-                                [0, 0, 1, 0, 0, 0, 0, 0, 0],
-                                [0, 0, 0, 0, 0, 1, 0, 0, 0],
-                                [0, 0, 0, 0, 0, 0, 0, 0, 1]])
+        self.h_of_position = array([[1, 0, 0, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 1, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                                    [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 0, 1]])
         
         self.x = array([position.x/10, 0, 0, position.y/10, 0, 0, position.z/10, 0, 0])
 
-
-
-    def setQF(self):
+    def set_qf(self):
         self.Q = array([[0, 0, 0, 0, 0, 0, 0, 0, 0],
                         [0, self.dt/10, 0, 0, 0, 0, 0, 0, 0],
                         [0, 0, self.dt, 0, 0, 0, 0, 0, 0],
@@ -58,30 +56,32 @@ class CustomEKF(ExtendedKalmanFilter):
                                  [0, 0, 0, 0, 0, 0, 0, 0, self.dt],
                                  [0, 0, 0, 0, 0, 0, 0, 0, 0]])
 
-    def hx_of_pose(self, x):
+    def hx_of_position(self, x):
         """ takes a state variable and returns the measurements that would
         correspond to that state."""
-        return dot(self.H_of_pose(x), x)
+        return dot(self.h_of_position, x)
 
-    def H_of_range(self, x, nei_pose):
+    @staticmethod
+    def h_of_range(x, nei_pose):
         """ compute Jacobian of H matrix for state x """
-        numNei = nei_pose.shape
+        num_nei = nei_pose.shape
         deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
         for i in range(3):
-            if numNei[0] > i:
+            if num_nei[0] > i:
                 norm = linalg.norm([x[0]-nei_pose[i][0], x[3]-nei_pose[i][1], x[6]-nei_pose[i][2]])
                 for j in range(3):
                     deltas[j] = (x[j*3]-nei_pose[i][j])/norm
 
-        return array([[deltas[0], 0, 0, deltas[1], 0, 0, deltas[2] ,0 ,0],
-                      [deltas[3], 0, 0, deltas[4], 0, 0, deltas[5] ,0 ,0],
-                      [deltas[6], 0, 0, deltas[7], 0, 0, deltas[8] ,0 ,0],
+        return array([[deltas[0], 0, 0, deltas[1], 0, 0, deltas[2], 0, 0],
+                      [deltas[3], 0, 0, deltas[4], 0, 0, deltas[5], 0, 0],
+                      [deltas[6], 0, 0, deltas[7], 0, 0, deltas[8], 0, 0],
                       [0, 0, 1, 0, 0, 0, 0, 0, 0],
                       [0, 0, 0, 0, 0, 1, 0, 0, 0],
                       [0, 0, 0, 0, 0, 0, 0, 0, 1]])
 
-    def hx_of_range(self, x, nei_pose):
+    @staticmethod
+    def hx_of_range(x, nei_pose):
         """ takes a state variable and returns the measurements that would
         correspond to that state."""
         nb_neighbors = nei_pose.shape[0]
@@ -94,20 +94,22 @@ class CustomEKF(ExtendedKalmanFilter):
         return hx_out
 
     def pre_update(self, dt):
-        if(dt != self.dt):
+        if dt != self.dt:
             self.dt = dt
-            self.setQF()
+            self.set_qf()
         self.predict()
 
-    def updatePose(self, position, acceleration, dt):
+    def update_position(self, position, acceleration, dt):
         self.pre_update(dt)
-        super(CustomEKF, self).update(asarray([position[0], position[1], position[2], acceleration.x/10, acceleration.y/10, acceleration.z/10]), 
-                                      self.H_of_pose, self.hx_of_pose, self.R)
+        super(CustomEKF, self).update(asarray([position[0], position[1], position[2],
+                                               acceleration.x/10, acceleration.y/10, acceleration.z/10]),
+                                      lambda _: self.h_of_position, self.hx_of_position, self.R)
 
-    def updateRange(self, new_range, nei_pose, acceleration, dt):
+    def update_range(self, new_range, nei_pose, acceleration, dt):
         self.pre_update(dt)
-        super(CustomEKF, self).update(asarray([new_range[0], new_range[1], new_range[2], acceleration.x/10, acceleration.y/10, acceleration.z/10]), 
-                                      self.H_of_range, self.hx_of_range, self.RRange, args=nei_pose, hx_args=nei_pose)
+        super(CustomEKF, self).update(asarray([new_range[0], new_range[1], new_range[2],
+                                               acceleration.x/10, acceleration.y/10, acceleration.z/10]),
+                                      self.h_of_range, self.hx_of_range, self.RRange, args=nei_pose, hx_args=nei_pose)
 
     def check_zone(self, zone):
         if self.x[0] < self.zone_limits[zone][0]:
