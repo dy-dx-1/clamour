@@ -54,9 +54,7 @@ class TDMANode:
         serial_port = get_first_pozyx_serial_port()
 
         if serial_port is None:
-            return MockPozyx()
-            # TODO: put back exception
-            # raise Exception("No Pozyx connected. Check your USB cable or your driver.")
+            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
 
         return PozyxSerial(serial_port)
 
