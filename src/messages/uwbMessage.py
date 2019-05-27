@@ -16,7 +16,7 @@ class UWBMessage(object):
 class UWBSynchronizationMessage(UWBMessage):
     def __init__(self, message_type: MessageType=MessageType.SYNC, data: int=0):
         super(UWBSynchronizationMessage, self).__init__(message_type, data)
-        self.CLOCK_MASK =      0b00111111111111111111111111111111
+        self.CLOCK_MASK = 0b00111111111111111111111111111111
         self.synchronized_clock = -1
 
     def decode(self):
@@ -32,49 +32,51 @@ class UWBSynchronizationMessage(UWBMessage):
 class UWBTDMAMessage(UWBMessage):
     def __init__(self, message_type: MessageType=MessageType.TDMA, data: int=0, slot: int=-1, code: int=-5):
         super(UWBTDMAMessage, self).__init__(message_type, data)
-        self.SLOT_MASK =       0b00111111111111111000000000000000
-        self.TDMACODE_MASK =   0b00000000000000000111111111111111
-        self.tdmaSlotid = slot
+        self.SLOT_MASK = 0b00111111111111111000000000000000
+        self.TDMA_CODE_MASK = 0b00000000000000000111111111111111
+        self.tdma_slot_tid = slot
         self.tdmaCode = code
 
     def decode(self):
-        self.tdmaSlotid = (self.data & self.SLOT_MASK) >> 15
-        self.tdmaCode = self.data & self.TDMACODE_MASK
+        self.tdma_slot_tid = (self.data & self.SLOT_MASK) >> 15
+        self.tdmaCode = self.data & self.TDMA_CODE_MASK
         if self.tdmaCode > 16384:
             self.tdmaCode = 16384 - self.tdmaCode
 
     def encode(self):
         if self.tdmaCode < 0:
             self.tdmaCode = 16384 - self.tdmaCode
-        self.data = (self.message_type << 30) + (self.tdmaSlotid << 15) + self.tdmaCode
+        self.data = (self.message_type << 30) + (self.tdma_slot_tid << 15) + self.tdmaCode
 
     def __repr__(self):
-        print(" Type ",self.message_type, " slot ", self.tdmaSlotid, " code ", self.tdmaCode)
+        print(" Type ", self.message_type, " slot ", self.tdma_slot_tid, " code ", self.tdmaCode)
 
-    def __equals__(self, other: UWBTDMAMessage):
-        return self.tdmaCode == other.tdmaCode and self.tdmaSlotid == other.tdmaSlotid
+    def __equals__(self, other: 'UWBTDMAMessage'):
+        return self.tdmaCode == other.tdmaCode and self.tdma_slot_tid == other.tdma_slot_tid
 
 
 class UWBCommunicationMessage(UWBMessage):
     def __init__(self, message_type: MessageType=MessageType.COMM, data: int=0):
         super(UWBCommunicationMessage, self).__init__(message_type, data)
         self.CONFIDENCE_MASK = 0b001111
-        self.XPOS_MASK =       0b0000001111111111
-        self.YPOS_MASK =       0b00000000000000001111111111
-        self.ZPOS_MASK =       0b00000000000000000000000000111111
-        self.comXpos = -1
-        self.comYpos = -1
-        self.comZpos = -1
-        self.comConfidence = -1
+        self.XPOS_MASK = 0b0000001111111111
+        self.YPOS_MASK = 0b00000000000000001111111111
+        self.ZPOS_MASK = 0b00000000000000000000000000111111
+        self.com_x_pos = -1
+        self.com_y_pos = -1
+        self.com_z_pos = -1
+        self.com_confidence = -1
     
     def decode(self):
-        self.comConfidence = (self.data >> 26) & self.CONFIDENCE_MASK
-        self.comXpos = (self.data >> 16) & self.XPOS_MASK
-        self.comYpos = (self.data >> 6) & self.YPOS_MASK
-        self.comZpos = self.data & self.ZPOS_MASK
+        self.com_confidence = (self.data >> 26) & self.CONFIDENCE_MASK
+        self.com_x_pos = (self.data >> 16) & self.XPOS_MASK
+        self.com_y_pos = (self.data >> 6) & self.YPOS_MASK
+        self.com_z_pos = self.data & self.ZPOS_MASK
 
     def encode(self):
-        self.data = (self.message_type << 30) + (self.comConfidence << 26) + (self.comXpos << 16) + (self.comYpos << 6) + self.comZpos
+        self.data = (self.message_type << 30) + (self.com_confidence << 26) +\
+                    (self.com_x_pos << 16) + (self.com_y_pos << 6) + self.com_z_pos
 
     def __repr__(self):
-        print(" Type ", self.message_type, " confidence ", self.comConfidence," X ", self.comXpos," Y ",self.comYpos," X ",self.comZpos)
+        print(" Type ", self.message_type, " confidence ", self.com_confidence, " X ",
+              self.com_x_pos, " Y ", self.com_y_pos, " X ", self.com_z_pos)

@@ -1,7 +1,7 @@
-from interfaces import SlotAssignment, Timing
-from interfaces.timing import FULL_CYCLE_DURATION, SLOT_FOR_RESET, Timing, TASK_START_TIME
-from messages import UWBCommunicationMessage
-from messenger import Messenger
+from ..interfaces import SlotAssignment, Timing
+from ..interfaces.timing import FULL_CYCLE_DURATION, SLOT_FOR_RESET, Timing, TASK_START_TIME
+from ..messages import UWBCommunicationMessage
+from ..messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -24,7 +24,8 @@ class Listen(TDMAState):
         return next_state
 
     def next(self) -> State:
-        if (self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET) and (self.timing.current_time_in_cycle > TASK_START_TIME):
+        if (self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET) \
+                and (self.timing.current_time_in_cycle > TASK_START_TIME):
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
                 return State.TASK
             else:

@@ -1,10 +1,10 @@
-from logicalClock import LogicalClock
+from ..logicalClock import LogicalClock
 
-COMMUNICATION_DELAY = 0.027 # delay estimation is 0.005s.
+COMMUNICATION_DELAY = 0.027  # delay estimation is 0.005s.
 SLOT_FOR_RESET = 30
-THRESHOLD_SYNTIME=0.01
+THRESHOLD_SYNCTIME = 0.01
 
-SYNCHRONIZATION_PERIOD = 20000 # Time leave for syn (ms)
+SYNCHRONIZATION_PERIOD = 20000  # Time leave for syn (ms)
 NB_NODES = 12
 SCHEDULING_SLOT_DURATION = 30
 
@@ -17,7 +17,8 @@ TASK_START_TIME = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES *
 FULL_CYCLE_DURATION = TASK_START_TIME + TASK_SLOT_DURATION * NB_TASK_SLOTS * NB_FULL_CYCLES
 FRAME_DURATION = TASK_SLOT_DURATION * NB_TASK_SLOTS
 
-class Timing():
+
+class Timing:
     def __init__(self):
         self.synchronization_offset_mean = 20
         self.clock_differential = [0]

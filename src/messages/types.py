@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class MessageType(Enum):
     UNKNOWN: 0
     SYNC: 1

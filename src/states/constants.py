@@ -8,5 +8,6 @@ class State(Enum):
     TASK: 3
     LISTEN: 4
 
+
 JUMP_THRESHOLD = 0.5
 GRAVITATIONAL_ACCELERATION = 9.81
