@@ -1,4 +1,4 @@
-from ..logicalClock import LogicalClock
+from logicalClock import LogicalClock
 
 COMMUNICATION_DELAY = 0.027  # delay estimation is 0.005s.
 SLOT_FOR_RESET = 30

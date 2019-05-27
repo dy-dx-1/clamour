@@ -8,9 +8,9 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ON
                      POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
                      LinearAcceleration, PozyxSerial, SingleRegister)
 
-from ..ekf import CustomEKF
-from ..interfaces import Anchors, Neighborhood, Timing
-from ..interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
+from ekf import CustomEKF
+from interfaces import Anchors, Neighborhood, Timing
+from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 
 from .constants import State, GRAVITATIONAL_ACCELERATION
 from .tdmaState import TDMAState
@@ -32,8 +32,8 @@ class Task(TDMAState):
         self.last_measurement = [0, 0, 0]
         self.last_measurement_data = array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
         self.acceleration = LinearAcceleration()
-        self.set_IMU()
         self.pozyx = pozyx
+        self.set_IMU()
         self.neighborhood = neighborhood
         self.last_ekf_step_time = 0
         self.dimension = POZYX_3D
@@ -60,7 +60,7 @@ class Task(TDMAState):
     def set_IMU(self):
         """Sets the Initial Measurement Units"""
 
-        _ = self.pozyx.getLinearAcceleration_mg(self.acceleration) # Acceleration passed by reference
+        _ = self.pozyx.getLinearAcceleration_mg(self.acceleration)  # Acceleration passed by reference
         self.acceleration.x *= GRAVITATIONAL_ACCELERATION
         self.acceleration.y *= GRAVITATIONAL_ACCELERATION
         self.acceleration.z *= GRAVITATIONAL_ACCELERATION

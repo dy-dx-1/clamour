@@ -1,7 +1,7 @@
-from ..interfaces import SlotAssignment, Timing
-from ..interfaces.timing import FULL_CYCLE_DURATION, SLOT_FOR_RESET, Timing, TASK_START_TIME
-from ..messages import UWBCommunicationMessage
-from ..messenger import Messenger
+from interfaces import SlotAssignment, Timing
+from interfaces.timing import FULL_CYCLE_DURATION, SLOT_FOR_RESET, Timing, TASK_START_TIME
+from messages import UWBCommunicationMessage
+from messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState

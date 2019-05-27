@@ -3,10 +3,10 @@ from time import perf_counter
 from numpy import mean, std
 from pypozyx import POZYX_SUCCESS
 
-from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..messages import (MessageFactory, SynchronisationMessage, UWBSynchronizationMessage)
-from ..messenger import Messenger
-from ..interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
+from interfaces import Neighborhood, SlotAssignment, Timing
+from messages import (MessageFactory, SynchronisationMessage, UWBSynchronizationMessage)
+from messenger import Messenger
+from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
 from .tdmaState import TDMAState

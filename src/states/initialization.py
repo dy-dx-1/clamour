@@ -1,8 +1,8 @@
 from pypozyx import PozyxSerial
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_ALL_DEVICES, POZYX_SUCCESS)
 
-from ..interfaces import Anchors, Neighborhood
-from ..messenger import Messenger
+from interfaces import Anchors, Neighborhood
+from messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState

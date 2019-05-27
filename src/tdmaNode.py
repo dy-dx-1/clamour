@@ -3,9 +3,9 @@ from socket import socket
 from pypozyx import Data, PozyxSerial, get_first_pozyx_serial_port
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
-from .interfaces import Anchors, Neighborhood, SlotAssignment, Timing
-from .messenger import Messenger
-from .states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
+from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
+from messenger import Messenger
+from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
 
 
 class TDMANode:
@@ -32,8 +32,6 @@ class TDMANode:
 
     def __enter__(self):
         self.setup()
-        if self.pozyx is None:
-            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
 
         return self
 
@@ -51,9 +49,15 @@ class TDMANode:
         self.set_id()
 
     @staticmethod
-    def connect_pozyx():
+    def connect_pozyx() -> PozyxSerial:
         serial_port = get_first_pozyx_serial_port()
-        return PozyxSerial(serial_port) if serial_port is not None else None
+
+        if serial_port is None:
+            serial_port = 0
+            # TODO: put back exception
+            # raise Exception("No Pozyx connected. Check your USB cable or your driver.")
+
+        return PozyxSerial(serial_port)
 
     def set_id(self) -> None:
         data = Data([0] * 2)

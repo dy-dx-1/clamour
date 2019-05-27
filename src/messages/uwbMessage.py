@@ -1,4 +1,4 @@
-from .types import MessageType
+from types import MessageType
 
 
 class UWBMessage(object):

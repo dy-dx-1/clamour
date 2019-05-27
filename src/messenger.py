@@ -3,9 +3,9 @@ from time import perf_counter
 
 from pypozyx import POZYX_SUCCESS, Data, PozyxSerial, RXInfo, SingleRegister
 
-from .interfaces import Neighborhood, SlotAssignment
-from .interfaces.timing import NB_TASK_SLOTS
-from .messages import (MessageBox, MessageFactory, MessageType,
+from interfaces import Neighborhood, SlotAssignment
+from interfaces.timing import NB_TASK_SLOTS
+from messages import (MessageBox, MessageFactory, MessageType,
                        TDMAControlMessage, UWBSynchronizationMessage,
                        UWBTDMAMessage)
 

@@ -1,4 +1,4 @@
-from .tdmaNode import TDMANode
+from tdmaNode import TDMANode
 
 
 def main():

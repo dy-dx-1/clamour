@@ -1,6 +1,6 @@
 from queue import Queue
 
-from ..messages import UWBMessage
+from .uwbMessage import UWBMessage
 
 
 class MessageBox(Queue):

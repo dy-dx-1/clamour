@@ -1,6 +1,6 @@
-from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME, SCHEDULING_SLOT_DURATION)
-from ..messenger import Messenger
+from interfaces import Neighborhood, SlotAssignment, Timing
+from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME, SCHEDULING_SLOT_DURATION)
+from messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState
