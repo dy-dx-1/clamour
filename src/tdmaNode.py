@@ -5,6 +5,7 @@ from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
 from messenger import Messenger
+from mockPozyx import MockPozyx
 from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
 
 
@@ -53,7 +54,7 @@ class TDMANode:
         serial_port = get_first_pozyx_serial_port()
 
         if serial_port is None:
-            serial_port = 0
+            return MockPozyx()
             # TODO: put back exception
             # raise Exception("No Pozyx connected. Check your USB cable or your driver.")
 
