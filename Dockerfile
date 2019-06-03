@@ -1,11 +1,21 @@
 FROM balenalib/raspberry-pi-debian-python:3.7.2
 
-# Some base python packages must be install through apt-get because
-# installing them with pip fails.
+
+
+
+# Some base python packages must be installed through 
+# apt-get because installing them with pip fails.
 RUN apt-get update && apt-get install python3-numpy python3-scipy python3-matplotlib
 
+# Some base packages are needed just to install pygame
+RUN apt-get install build-essential python3-dev python3-setuptools python3-numpy python3-opengl \
+    libsdl-image1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev libsmpeg-dev \
+    libsdl1.2-dev libportmidi-dev libswscale-dev libavformat-dev libavcodec-dev \
+    libtiff5-dev libx11-6 libx11-dev fluid-soundfont-gm timgm6mb-soundfont \
+    xfonts-base xfonts-100dpi xfonts-75dpi xfonts-cyrillic fontconfig fonts-freefont-ttf libfreetype6-dev
+
 COPY requirements.txt /
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY /src /src
 WORKDIR /src
