@@ -3,7 +3,7 @@ import unittest
 from src.interfaces.slotAssignment import SlotAssignment, NB_TASK_SLOTS
 
 
-class TestAnchors(unittest.TestCase):
+class TestSlotAssignment(unittest.TestCase):
     def setUp(self):
         self.slots = SlotAssignment()
  
