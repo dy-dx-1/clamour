@@ -51,7 +51,7 @@ class UWBTDMAMessage(UWBMessage):
     def __repr__(self):
         print(" Type ", self.message_type, " slot ", self.tdma_slot_tid, " code ", self.tdmaCode)
 
-    def __equals__(self, other: 'UWBTDMAMessage'):
+    def __eq__(self, other: 'UWBTDMAMessage'):
         return self.tdmaCode == other.tdmaCode and self.tdma_slot_tid == other.tdma_slot_tid
 
 

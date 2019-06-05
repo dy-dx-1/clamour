@@ -4,14 +4,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import unittest
 from testInterface import anchors, neighborhood, slotAssignment, timing
-from testMessages import messageBox, messageFactory, synchronizationMessage
+from testMessages import (messageBox, messageFactory, synchronizationMessage,
+                          tdmaControlMessage)
 
 
 def main():
     suite = unittest.TestSuite()
     loader = unittest.TestLoader()
     modules = [anchors, neighborhood, slotAssignment, timing,
-               messageBox, messageFactory, synchronizationMessage]
+               messageBox, messageFactory, synchronizationMessage,
+               tdmaControlMessage]
 
     for module in modules:
         suite.addTest(loader.loadTestsFromModule(module))
