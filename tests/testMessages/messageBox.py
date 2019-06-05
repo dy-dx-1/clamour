@@ -2,7 +2,7 @@ import unittest
 from src.messages.messageBox import MessageBox
 
 
-class TestAnchors(unittest.TestCase):
+class TestMessageBox(unittest.TestCase):
     def setUp(self):
         self.message_box = MessageBox()
 
