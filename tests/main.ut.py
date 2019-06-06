@@ -6,6 +6,7 @@ import unittest
 from testInterface import anchors, neighborhood, slotAssignment, timing
 from testMessages import (messageBox, messageFactory, synchronizationMessage,
                           tdmaControlMessage, uwbMessage)
+from testOther import logicalClock
 
 
 def main():
@@ -13,7 +14,7 @@ def main():
     loader = unittest.TestLoader()
     modules = [anchors, neighborhood, slotAssignment, timing,
                messageBox, messageFactory, synchronizationMessage,
-               tdmaControlMessage, uwbMessage]
+               tdmaControlMessage, uwbMessage, logicalClock]
 
     for module in modules:
         suite.addTest(loader.loadTestsFromModule(module))
