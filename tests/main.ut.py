@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import unittest
 from testInterface import anchors, neighborhood, slotAssignment, timing
 from testMessages import (messageBox, messageFactory, synchronizationMessage,
-                          tdmaControlMessage)
+                          tdmaControlMessage, uwbMessage)
 
 
 def main():
@@ -13,7 +13,7 @@ def main():
     loader = unittest.TestLoader()
     modules = [anchors, neighborhood, slotAssignment, timing,
                messageBox, messageFactory, synchronizationMessage,
-               tdmaControlMessage]
+               tdmaControlMessage, uwbMessage]
 
     for module in modules:
         suite.addTest(loader.loadTestsFromModule(module))

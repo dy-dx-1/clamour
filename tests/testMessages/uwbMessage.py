@@ -41,16 +41,41 @@ class TestUWBSynchronizationMessage(unittest.TestCase):
 
 class TestUWBTDMAMessage(unittest.TestCase):
     def setUp(self):
-        self.tdma_message = UWBTDMAMessage()
+        self.tdma_message_a = UWBTDMAMessage()
+        self.tdma_message_b = UWBTDMAMessage(code=1)
 
     def test_init(self):
-        self.assertIsNotNone(self.tdma_message)
+        self.assertIsNotNone(self.tdma_message_a)
+        self.assertIsNotNone(self.tdma_message_b)
 
     def test_encode(self):
-        pass
+        # Case 1:
+        self.tdma_message_a.encode()
+        self.assertEqual(self.tdma_message_a.tdmaCode, 16384 + 5)
+        self.assertEqual(self.tdma_message_a.data, (2 << 30) + (-1 << 30) + 16384 + 5)
+
+        # Case 2:
+        self.tdma_message_b.encode()
+        self.assertEqual(self.tdma_message_b.tdmaCode, 1)
+        self.assertEqual(self.tdma_message_b.data, (2 << 30) + (-1 << 30) + 1)
 
     def test_decode(self):
-        pass
+        # Case 1:
+        self.tdma_message_a.decode()
+        self.assertEqual(self.tdma_message_a.tdma_slot_tid, -1)
+        self.assertEqual(self.tdma_message_a.tdmaCode, -5)
+
+        # Case 2:
+        self.tdma_message_b.decode()
+        self.assertEqual(self.tdma_message_a.tdma_slot_tid, -1)
+        self.assertEqual(self.tdma_message_a.tdmaCode, 1)
+
+    def test_equals(self):
+        # Case 1:
+        self.assertFalse(self.tdma_message_a == self.tdma_message_b)
+
+        # Case 2:
+        self.assertTrue(self.tdma_message_a == UWBTDMAMessage())
 
 
 if __name__ == "__main__":
