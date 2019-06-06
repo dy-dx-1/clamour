@@ -11,10 +11,16 @@ class TestUWBCommunicationMessage(unittest.TestCase):
         self.assertIsNotNone(self.communication_message)
 
     def test_encode(self):
-        pass
+        self.communication_message.encode()
+        expected_result = (3 << 30) + (-1 << 26) + (-1 << 16) + (-1 << 6) - 1
+        self.assertEqual(self.communication_message.data, expected_result)
 
     def test_decode(self):
-        pass
+        self.communication_message.decode()
+        self.assertEqual(self.communication_message.com_x_pos, -1)
+        self.assertEqual(self.communication_message.com_y_pos, -1)
+        self.assertEqual(self.communication_message.com_z_pos, -1)
+        self.assertEqual(self.communication_message.com_confidence, -1)
 
 
 class TestUWBSynchronizationMessage(unittest.TestCase):
