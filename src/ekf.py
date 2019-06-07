@@ -62,7 +62,7 @@ class CustomEKF(ExtendedKalmanFilter):
         return dot(self.h_of_position, x)
 
     @staticmethod
-    def h_of_range(x, nei_pose):
+    def h_of_range(x, nei_pose) -> array:
         """ compute Jacobian of H matrix for state x """
         num_nei = nei_pose.shape
         deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0]
