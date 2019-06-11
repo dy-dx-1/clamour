@@ -23,7 +23,7 @@ class Messenger():
         message.synchronized_clock = time
         message.encode()
 
-        self.pozyx.sendData(Data([message.data], "I"))
+        self.pozyx.sendData(destination=0, data=Data([message.data], "I"))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
