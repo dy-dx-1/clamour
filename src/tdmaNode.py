@@ -1,4 +1,4 @@
-from socket import socket
+import socket
 
 from pypozyx import Data, PozyxSerial, get_first_pozyx_serial_port
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
@@ -12,7 +12,7 @@ class TDMANode:
     def __init__(self):
         self.id = 0
         self.pozyx = self.connect_pozyx()
-        self.socket = socket()
+        self.socket = socket.socket()
 
         self.neighborhood = Neighborhood()
         self.slot_assignment = SlotAssignment()
@@ -43,7 +43,13 @@ class TDMANode:
             self.current_state = self.states[self.current_state.execute()]
 
     def setup(self) -> None:
-        self.socket.connect(("192.168.10.2", 10555))
+        try:
+            self.socket.connect((socket.gethostname(), 10555))
+        except ConnectionRefusedError:
+            print("The connection was either refused, or the service you are trying to reach is unavaillable.")
+            self.socket.connect((socket.gethostname(), 8080))
+            print("Redirecting socket to localhost:8080. Some functionalities may not work properly.")
+        
         self.pozyx = self.connect_pozyx()
         self.pozyx.clearDevices()
         self.set_id()
