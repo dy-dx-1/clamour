@@ -46,7 +46,7 @@ class TDMANode:
         try:
             self.socket.connect((socket.gethostname(), 10555))
         except ConnectionRefusedError:
-            print("The connection was either refused, or the service you are trying to reach is unavaillable.")
+            print("The connection was either refused, or the service you are trying to reach is unavailable.")
         
         self.pozyx = self.connect_pozyx()
         self.pozyx.clearDevices()
