@@ -151,4 +151,4 @@ class Task(TDMAState):
                         self.timing.frame_id, self.timing.current_slot_id, positioning_result]
         
         message = struct.pack("%sf" % len(message_data), *message_data)
-        self.socket.send(message)
+        # self.socket.send(message)

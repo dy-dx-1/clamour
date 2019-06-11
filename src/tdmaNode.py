@@ -28,7 +28,7 @@ class TDMANode:
             State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, self.socket, self.pozyx),
             State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger)}
 
-        self.current_state: TDMAState = self.states[State.INITIALIZATION]
+        self.current_state = self.states[State.INITIALIZATION]
 
     def __enter__(self):
         self.setup()
@@ -47,8 +47,6 @@ class TDMANode:
             self.socket.connect((socket.gethostname(), 10555))
         except ConnectionRefusedError:
             print("The connection was either refused, or the service you are trying to reach is unavaillable.")
-            self.socket.connect((socket.gethostname(), 8080))
-            print("Redirecting socket to localhost:8080. Some functionalities may not work properly.")
         
         self.pozyx = self.connect_pozyx()
         self.pozyx.clearDevices()
