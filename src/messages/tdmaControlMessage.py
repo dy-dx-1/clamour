@@ -4,5 +4,5 @@ class TDMAControlMessage:
         self.slot = slot
         self.code = code
 
-    def __equals__(self, other: 'TDMAControlMessage'):
+    def __eq__(self, other: 'TDMAControlMessage'):
         return self.slot == other.slot and self.code == other.code

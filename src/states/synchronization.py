@@ -46,7 +46,8 @@ class Synchronization(TDMAState):
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self):
-        time = int(round(self.timing.logical_clock.get_updated_clock()*100000))
+        self.timing.logical_clock.update_clock()
+        time = int(round(self.timing.logical_clock.clock * 100000))
         self.messenger.broadcast_synchronization_message(time)
 
     def synchronize(self):
