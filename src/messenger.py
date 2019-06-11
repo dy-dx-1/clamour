@@ -147,4 +147,4 @@ class Messenger():
     def handle_error(self) -> None:
         error_code = SingleRegister()
         status = self.pozyx.getErrorCode(error_code)
-        print("Error occurred: " + status)
+        print("Error occurred: " + str(status))
