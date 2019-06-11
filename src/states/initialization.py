@@ -5,7 +5,7 @@ from interfaces import Anchors, Neighborhood
 from messenger import Messenger
 
 from .constants import State
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Initialization(TDMAState):
@@ -17,6 +17,7 @@ class Initialization(TDMAState):
         self.pozyx = pozyx
         self.messenger = messenger
 
+    @print_progress
     def execute(self) -> State:
         self.discover_neighbors()
         return self.next()
