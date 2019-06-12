@@ -9,7 +9,7 @@ from messages import (MessageBox, MessageFactory, MessageType,
                        UWBSynchronizationMessage, UWBTDMAMessage)
 
 
-class Messenger():
+class Messenger:
     def __init__(self, id: int, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assignment: SlotAssignment):
         self.id = id
         self.message_box = MessageBox()
@@ -146,7 +146,7 @@ class Messenger():
                                                                       perf_counter(),
                                                                       new_message.message_type,
                                                                       new_message)
-        self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))
+        self.neighborhood.synchronized_neighbors.append(len(self.neighborhood.current_neighbors))
 
     def handle_error(self) -> None:
         error_code = SingleRegister()
