@@ -91,7 +91,6 @@ class Synchronization(TDMAState):
     
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
-        self.timing.clock_differential.append(message.offset)
         self.timing.clock_differential_stat.append(message.offset)
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
@@ -103,6 +102,5 @@ class Synchronization(TDMAState):
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
-            self.timing.clock_differential = []
 
         self.timing.received_frequency_sample.append(perf_counter())
