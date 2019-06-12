@@ -18,7 +18,7 @@ class Messenger():
         self.slot_assignment = slot_assignment
 
     def broadcast_synchronization_message(self, time: int) -> None:
-        message = UWBSynchronizationMessage()
+        message = UWBSynchronizationMessage(sender_id=self.id)
         message.synchronized_clock = time
         message.encode()
 
@@ -142,11 +142,10 @@ class Messenger():
     def update_neighbor_dictionary(self) -> None:
         new_message = self.message_box.peek_last()
         new_message.decode()
-        self.neighborhood.current_neighbors[self.message_box.peek_last().id] = (self.message_box.peek_last().id,
-                                                                                perf_counter(),
-                                                                                new_message.message_type,
-                                                                                new_message)
-        self.message_box.put(new_message)
+        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id,
+                                                                      perf_counter(),
+                                                                      new_message.message_type,
+                                                                      new_message)
         self.neighborhood.synchronized_active_neighbor_count.append(len(self.neighborhood.current_neighbors))
 
     def handle_error(self) -> None:
@@ -154,7 +153,7 @@ class Messenger():
         message = self.pozyx.getErrorMessage(error_code)
         status = self.pozyx.getErrorCode(error_code)
 
-        if status == POZYX_SUCCESS:
-            print("An empty message was received.")
-        else:
-            print("Error while retrieving message from Pozyx tag: " + str(status) + " occurred: " + message)
+        # if status == POZYX_SUCCESS:
+        #     print("An empty message was received.")
+        # else:
+        #     print("Error while retrieving message from Pozyx tag: " + str(status) + " occurred: " + message)
