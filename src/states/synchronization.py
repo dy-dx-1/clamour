@@ -4,7 +4,7 @@ from numpy import mean, std
 from pypozyx import POZYX_SUCCESS
 
 from interfaces import Neighborhood, SlotAssignment, Timing
-from messages import (MessageFactory, SynchronisationMessage, UWBSynchronizationMessage)
+from messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
 from messenger import Messenger
 from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
@@ -80,8 +80,8 @@ class Synchronization(TDMAState):
         self.timing.synchronized = False
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
-        sync_msg = SynchronisationMessage(sender_id=sender_id, clock=self.timing.logical_clock.getLogicalTime(),
-                                          neibLogical=message.syncClock/100000)
+        sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
+                                          neib_logical=message.synchronized_clock/100000)
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
@@ -89,15 +89,15 @@ class Synchronization(TDMAState):
         else:
             self.collaborative_offset_compensation(sync_msg)
     
-    def collaborative_offset_compensation(self, message: SynchronisationMessage):
+    def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
         self.timing.clock_differential.append(message.offset)
         self.timing.clock_differential_stat.append(message.offset)
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
             total_offset = 0
-            for _, individual_offset in self.neighborhood.neighbor_synchronization_received:
-                total_offset += individual_offset
+            for _, synchronization in self.neighborhood.neighbor_synchronization_received:
+                total_offset += synchronization.offset
             
             offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
             self.timing.logical_clock.correct_logical_offset(offset_correction)

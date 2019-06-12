@@ -1,11 +1,11 @@
 import unittest
 
-from src.messages.synchronizationMessage import SynchronisationMessage
+from src.messages.synchronizationMessage import SynchronizationMessage
 
 
 class TestSynchronizationMessage(unittest.TestCase):
     def setUp(self):
-        self.synchronization_message = SynchronisationMessage(0)
+        self.synchronization_message = SynchronizationMessage(0)
 
     def test_init(self):
         self.assertIsNotNone(self.synchronization_message)
