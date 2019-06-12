@@ -29,7 +29,7 @@ class Synchronization(TDMAState):
         self.synchronize()
         self.broadcast_synchronization_message()
 
-        if self.timing.synchronization_offset_mean > THRESHOLD_SYNCTIME:
+        if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
             self.timing.synchronized = True
 
         next_state = self.next()
@@ -96,7 +96,7 @@ class Synchronization(TDMAState):
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
             total_offset = 0
-            for _, synchronization in self.neighborhood.neighbor_synchronization_received:
+            for _, synchronization in self.neighborhood.neighbor_synchronization_received.items():
                 total_offset += synchronization.offset
             
             offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
