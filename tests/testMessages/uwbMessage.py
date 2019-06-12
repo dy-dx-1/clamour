@@ -82,12 +82,12 @@ class TestUWBTDMAMessage(unittest.TestCase):
     def test_encode(self):
         # Case 1:
         self.tdma_message_a.encode()
-        self.assertEqual(self.tdma_message_a.tdmaCode, 2)
+        self.assertEqual(self.tdma_message_a.code, 2)
         self.assertEqual(self.tdma_message_a.data, (2 << 30) + (2 << 15) + 2)
 
         # Case 2:
         self.tdma_message_b.encode()
-        self.assertEqual(self.tdma_message_b.tdmaCode, 16384 + 1)
+        self.assertEqual(self.tdma_message_b.code, 16384 + 1)
         self.assertEqual(self.tdma_message_b.data, (2 << 30) + (3 << 15) + 16384 + 1)
 
         # Case 3:
@@ -98,14 +98,14 @@ class TestUWBTDMAMessage(unittest.TestCase):
         # Case 1:
         self.tdma_message_a.encode()
         self.tdma_message_a.decode()
-        self.assertEqual(self.tdma_message_a.tdma_slot_tid, 2)
-        self.assertEqual(self.tdma_message_a.tdmaCode, 2)
+        self.assertEqual(self.tdma_message_a.slot, 2)
+        self.assertEqual(self.tdma_message_a.code, 2)
 
         # Case 2:
         self.tdma_message_b.encode()
         self.tdma_message_b.decode()
-        self.assertEqual(self.tdma_message_b.tdma_slot_tid, 3)
-        self.assertEqual(self.tdma_message_b.tdmaCode, -1)
+        self.assertEqual(self.tdma_message_b.slot, 3)
+        self.assertEqual(self.tdma_message_b.code, -1)
 
     def test_equals(self):
         # Case 1:

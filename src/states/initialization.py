@@ -30,9 +30,7 @@ class Initialization(TDMAState):
         
         # We scan the network for messages an arbitrary number of times
         for _ in range(1000):
-            sender_id, data, _ = self.messenger.obtain_message_from_pozyx()
-
-            if self.messenger.is_new_message(sender_id, data):
+            if self.messenger.receive_new_message():
                 self.messenger.update_neighbor_dictionary()
                 self.neighborhood.is_alone = False
         

@@ -9,7 +9,7 @@ from messenger import Messenger
 from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Synchronization(TDMAState):
@@ -21,6 +21,7 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
 
+    @print_progress
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 0 if len(self.timing.clock_differential_stat) == 0  \
                                                     else mean(self.timing.clock_differential_stat)
@@ -53,12 +54,11 @@ class Synchronization(TDMAState):
     def synchronize(self):
         # We listen for synchronization messages an arbitrary number of times
         for _ in range(10):
-            sender_id, data, status = self.messenger.obtain_message_from_pozyx()
-            if status == POZYX_SUCCESS and self.messenger.is_new_message(sender_id, data):
-                message = MessageFactory.create(data)
+            if self.messenger.receive_new_message():
+                message = self.messenger.message_box.peek_last()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
-                    self.update_offset(sender_id, message)
+                    self.update_offset(message.sender_id, message)
                 else:
                     print("Wrong message type")
                 self.messenger.update_neighbor_dictionary()
