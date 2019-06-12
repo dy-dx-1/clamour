@@ -13,7 +13,7 @@ from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 
 from .constants import State, GRAVITATIONAL_ACCELERATION
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Task(TDMAState):
@@ -39,6 +39,7 @@ class Task(TDMAState):
         self.dimension = POZYX_3D
         self.height = 1000
 
+    @print_progress
     def execute(self) -> State:
         if not self.anchors.discovery_done:
             self.discover_anchors()

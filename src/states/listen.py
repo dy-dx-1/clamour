@@ -4,7 +4,7 @@ from messages import UWBCommunicationMessage
 from messenger import Messenger
 
 from .constants import State
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Listen(TDMAState):
@@ -13,6 +13,7 @@ class Listen(TDMAState):
         self.timing = timing
         self.messenger = messenger
 
+    @print_progress
     def execute(self) -> State:
         self.timing.update_frame_id()
         self.timing.update_slot_id()

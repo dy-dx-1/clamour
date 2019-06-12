@@ -3,7 +3,7 @@ from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME
 from messenger import Messenger
 
 from .constants import State
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Scheduling(TDMAState):
@@ -15,6 +15,7 @@ class Scheduling(TDMAState):
         self.id = id
         self.messenger = messenger
 
+    @print_progress
     def execute(self) -> State:
         self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
         self.slot_assignment.update_free_slots()

@@ -70,7 +70,7 @@ class Synchronization(TDMAState):
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
-        self.messenger.queue.clear()
+        self.messenger.message_box.queue.clear()
         self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
         self.slot_assignment.update_free_slots()
 
