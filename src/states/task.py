@@ -91,9 +91,9 @@ class Task(TDMAState):
         status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
 
         self.last_measurement = ([device_range.data[1]/10] + [0, 0])
-        self.last_measurement_data = array([[self.anchors.anchors_dict[self.id][2]/10,
-                                             self.anchors.anchors_dict[self.id][3]/10,
-                                             self.anchors.anchors_dict[self.id][4]/10],
+        self.last_measurement_data = array([[self.anchors.anchors_dict[ranging_target_id][2]/10,
+                                             self.anchors.anchors_dict[ranging_target_id][3]/10,
+                                             self.anchors.anchors_dict[ranging_target_id][4]/10],
                                             [0, 0, 0], [0, 0, 0]])
         
         if status == POZYX_SUCCESS:
