@@ -126,11 +126,13 @@ class Task(TDMAState):
 
     def get_devices(self) -> DeviceList:
         size = SingleRegister()
-        self.pozyx.getDeviceListSize(size)
-
-        print(size[0])
+        status = self.pozyx.getDeviceListSize(size)
         devices = DeviceList(list_size=size[0])
-        self.pozyx.getDeviceIds(devices)
+
+        if status == POZYX_SUCCESS and size[0] > 0:
+            status &= self.pozyx.getDeviceIds(devices)
+        else:
+            print("No anchors available.")
 
         return devices
 
