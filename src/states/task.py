@@ -6,7 +6,7 @@ from time import time
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_POS_ALG_UWB_ONLY,
                      POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
-                     LinearAcceleration, PozyxSerial, SingleRegister)
+                     LinearAcceleration, PozyxSerial, SingleRegister, DeviceCoordinates)
 
 from ekf import CustomEKF
 from interfaces import Anchors, Neighborhood, Timing
@@ -82,8 +82,12 @@ class Task(TDMAState):
 
     def ranging(self) -> int:
         ranging_target_id = self.select_ranging_target()
-        device_range = DeviceRange()
+        if ranging_target_id not in self.anchors.anchors_dict:
+            device_coordinates = Coordinates()
+            self.pozyx.getCoordinates(device_coordinates)
+            self.anchors.anchors_dict[ranging_target_id] = DeviceCoordinates(ranging_target_id, 1, device_coordinates)
 
+        device_range = DeviceRange()
         status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
 
         self.last_measurement = ([device_range.data[1]/10] + [0, 0])
@@ -140,7 +144,9 @@ class Task(TDMAState):
         self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
-            self.pozyx.addDevice(self.anchors.available_anchors[anchor_id])
+            if anchor_id in self.anchors.anchors_dict:
+                # For this step, only the anchors (not the tags) must be selected
+                self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
         
         if len(self.anchors.available_anchors) > 4:
             self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
