@@ -75,20 +75,20 @@ class Messenger:
             self.accept_proposal(message)
         elif self.slot_assignment.send_list[message.slot] == -2:
             self.accept_receiving(message)
-        elif self.slot_assignment.receive_list[message.slot] != message.id:
+        elif self.slot_assignment.receive_list[message.slot] != message.sender_id:
             self.reject_proposal(message)
 
     def accept_proposal(self, message: UWBTDMAMessage) -> None:
         """Assigns requested slot to the message's sender."""
 
-        self.slot_assignment.receive_list[message.slot] = message.id
+        self.slot_assignment.receive_list[message.slot] = message.sender_id
 
     def accept_receiving(self, message: UWBTDMAMessage) -> None:
         """Since this slot is unavailable for sending message,
         the current node will listen while this slot is active."""
 
         self.slot_assignment.send_list[message.slot] = -1
-        self.slot_assignment.receive_list[message.slot] = message.id
+        self.slot_assignment.receive_list[message.slot] = message.sender_id
 
     def reject_proposal(self, message: UWBTDMAMessage) -> None:
         """This slot was already occupied, so the proposal must be rejected."""
