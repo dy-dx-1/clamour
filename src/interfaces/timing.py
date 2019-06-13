@@ -35,6 +35,7 @@ class Timing:
         self.frame_id = 0
 
     def update_current_time(self):
+        self.logical_clock.update_clock()
         self.current_time_in_cycle = int(self.logical_clock.clock * 1000) % FULL_CYCLE_DURATION
 
     def update_frame_id(self):

@@ -25,7 +25,7 @@ class Messenger:
         self.pozyx.sendData(destination=0, data=Data([message.data], "I"))
 
     def broadcast_control_message(self) -> None:
-        if self.message_box.empty():
+        if self.message_box.empty() or not isinstance(self.message_box.peek_last(), UWBTDMAMessage):
             # No priority message to broadcast (such as rejection). Proposal can be made.
             if len(self.slot_assignment.pure_send_list) < \
                     int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
@@ -52,7 +52,7 @@ class Messenger:
         self.broadcast(slot, code)
 
     def broadcast(self, slot: int, code: int) -> None:
-        message = UWBTDMAMessage(slot=slot, code=code)
+        message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
         self.pozyx.sendData(0, Data([message.data], 'I'))
 

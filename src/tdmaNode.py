@@ -36,7 +36,6 @@ class TDMANode:
     def run(self) -> None:
         while True:
             self.timing.update_current_time()
-            print("Time: ", self.timing.current_time_in_cycle)
             self.current_state = self.states[self.current_state.execute()]
 
     def setup(self) -> None:
