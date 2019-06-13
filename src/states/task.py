@@ -66,7 +66,7 @@ class Task(TDMAState):
         self.acceleration.z *= GRAVITATIONAL_ACCELERATION
 
     def select_localization_method(self) -> None:
-        self.localize = self.positioning if self.anchors.available_anchors >= 4 else self.ranging
+        self.localize = self.positioning if len(self.anchors.available_anchors) >= 4 else self.ranging
 
     def positioning(self) -> int:
         status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
