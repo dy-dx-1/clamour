@@ -11,13 +11,46 @@ from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchr
 class TDMANode:
     def __init__(self):
         self.id = 0
-        self.pozyx = self.connect_pozyx()
         self.socket = socket.socket()
 
         self.neighborhood = Neighborhood()
         self.slot_assignment = SlotAssignment()
         self.timing = Timing()
         self.anchors = Anchors()
+
+        # These attributes need to be set after setup
+        self.pozyx = None
+        self.messenger = None
+        self.states = None
+        self.current_state = None
+
+    def __enter__(self):
+        self.setup()
+        self.initialize_states()
+
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.socket.close()
+
+    def run(self) -> None:
+        while True:
+            self.timing.update_current_time()
+            print("Time: ", self.timing.current_time_in_cycle)
+            self.current_state = self.states[self.current_state.execute()]
+
+    def setup(self) -> None:
+        try:
+            print("Attempting connection to a local service...")
+            self.socket.connect((socket.gethostname(), 10555))
+        except ConnectionRefusedError:
+            print("The connection was either refused, or the service you are trying to reach is unavailable.")
+        
+        self.pozyx = self.connect_pozyx()
+        self.pozyx.clearDevices()
+        self.set_id()
+
+    def initialize_states(self) -> None:
         self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment)
 
         self.states = {
@@ -30,29 +63,6 @@ class TDMANode:
 
         self.current_state = self.states[State.INITIALIZATION]
 
-    def __enter__(self):
-        self.setup()
-
-        return self
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        self.socket.close()
-
-    def run(self) -> None:
-        while True:
-            self.timing.update_current_time()
-            self.current_state = self.states[self.current_state.execute()]
-
-    def setup(self) -> None:
-        try:
-            self.socket.connect((socket.gethostname(), 10555))
-        except ConnectionRefusedError:
-            print("The connection was either refused, or the service you are trying to reach is unavailable.")
-        
-        self.pozyx = self.connect_pozyx()
-        self.pozyx.clearDevices()
-        self.set_id()
-
     @staticmethod
     def connect_pozyx() -> PozyxSerial:
         serial_port = get_first_pozyx_serial_port()
@@ -64,5 +74,6 @@ class TDMANode:
 
     def set_id(self) -> None:
         data = Data([0] * 2)
-        self.pozyx.getRead(POZYX_NETWORK_ID, data, None)
+        self.pozyx.getRead(POZYX_NETWORK_ID, data)
         self.id = data[1] * 256 + data[0]
+        print("Device ID: ", self.id)
