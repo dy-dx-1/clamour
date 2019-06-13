@@ -22,7 +22,6 @@ class Task(TDMAState):
         self.timing = timing
         self.anchors = anchors
         self.id = id
-        self.remote_id = None
         self.localize = self.ranging
         self.done = False
         self.position = Coordinates()
@@ -70,8 +69,7 @@ class Task(TDMAState):
         self.localize = self.positioning if self.anchors.available_anchors >= 4 else self.ranging
 
     def positioning(self) -> int:
-        status = self.pozyx.doPositioning(self.position, self.dimension, self.height,
-                                          POZYX_POS_ALG_UWB_ONLY, remote_id=self.remote_id)
+        status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
         scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
 
         if status == POZYX_SUCCESS:
@@ -117,7 +115,7 @@ class Task(TDMAState):
     def discover_anchors(self) -> None:
         self.pozyx.clearDevices()
 
-        if self.pozyx.doDiscovery(POZYX_DISCOVERY_ANCHORS_ONLY, self.remote_id) == POZYX_SUCCESS:
+        if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ANCHORS_ONLY) == POZYX_SUCCESS:
             devices = self.get_devices()
 
             for device_id in devices:
@@ -128,18 +126,19 @@ class Task(TDMAState):
 
     def get_devices(self) -> DeviceList:
         size = SingleRegister()
-        status = self.pozyx.getDeviceListSize(size, self.remote_id)
+        self.pozyx.getDeviceListSize(size)
 
+        print(size[0])
         devices = DeviceList(list_size=size[0])
-        status &= self.pozyx.getDeviceIds(devices, self.remote_id)
+        self.pozyx.getDeviceIds(devices)
 
         return devices
 
     def set_anchors_manually(self) -> None:
-        self.pozyx.clearDevices(self.remote_id)
+        self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
-            self.pozyx.addDevice(self.anchors.available_anchors[anchor_id], self.remote_id)
+            self.pozyx.addDevice(self.anchors.available_anchors[anchor_id])
         
         if len(self.anchors.available_anchors) > 4:
             self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
