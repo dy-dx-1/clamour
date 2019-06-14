@@ -4,12 +4,12 @@ from numpy import mean, std
 from pypozyx import POZYX_SUCCESS
 
 from interfaces import Neighborhood, SlotAssignment, Timing
-from messages import (MessageFactory, SynchronisationMessage, UWBSynchronizationMessage)
+from messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
 from messenger import Messenger
 from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Synchronization(TDMAState):
@@ -21,6 +21,7 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
 
+    @print_progress
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 0 if len(self.timing.clock_differential_stat) == 0  \
                                                     else mean(self.timing.clock_differential_stat)
@@ -28,7 +29,7 @@ class Synchronization(TDMAState):
         self.synchronize()
         self.broadcast_synchronization_message()
 
-        if self.timing.synchronization_offset_mean > THRESHOLD_SYNCTIME:
+        if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
             self.timing.synchronized = True
 
         next_state = self.next()
@@ -46,18 +47,18 @@ class Synchronization(TDMAState):
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self):
-        time = int(round(self.timing.logical_clock.get_updated_clock()*100000))
+        self.timing.logical_clock.update_clock()
+        time = int(round(self.timing.logical_clock.clock * 100000))
         self.messenger.broadcast_synchronization_message(time)
 
     def synchronize(self):
         # We listen for synchronization messages an arbitrary number of times
         for _ in range(10):
-            sender_id, data, status = self.messenger.obtain_message_from_pozyx()
-            if status == POZYX_SUCCESS and self.messenger.is_new_message(sender_id, data):
-                message = MessageFactory.create(data)
+            if self.messenger.receive_new_message():
+                message = self.messenger.message_box.peek_last()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
-                    self.update_offset(sender_id, message)
+                    self.update_offset(message.sender_id, message)
                 else:
                     print("Wrong message type")
                 self.messenger.update_neighbor_dictionary()
@@ -69,7 +70,7 @@ class Synchronization(TDMAState):
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
-        self.messenger.queue.clear()
+        self.messenger.message_box.queue.clear()
         self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
         self.slot_assignment.update_free_slots()
 
@@ -79,8 +80,8 @@ class Synchronization(TDMAState):
         self.timing.synchronized = False
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
-        sync_msg = SynchronisationMessage(sender_id=sender_id, clock=self.timing.logical_clock.getLogicalTime(),
-                                          neibLogical=message.syncClock/100000)
+        sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
+                                          neib_logical=message.synchronized_clock/100000)
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
@@ -88,20 +89,18 @@ class Synchronization(TDMAState):
         else:
             self.collaborative_offset_compensation(sync_msg)
     
-    def collaborative_offset_compensation(self, message: SynchronisationMessage):
+    def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
-        self.timing.clock_differential.append(message.offset)
         self.timing.clock_differential_stat.append(message.offset)
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
             total_offset = 0
-            for _, individual_offset in self.neighborhood.neighbor_synchronization_received:
-                total_offset += individual_offset
+            for _, synchronization in self.neighborhood.neighbor_synchronization_received.items():
+                total_offset += synchronization.offset
             
             offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
-            self.timing.clock_differential = []
 
         self.timing.received_frequency_sample.append(perf_counter())

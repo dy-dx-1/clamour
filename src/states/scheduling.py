@@ -2,7 +2,7 @@ from interfaces import Neighborhood, SlotAssignment, Timing
 from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME, SCHEDULING_SLOT_DURATION)
 from messenger import Messenger
 
-from .constants import State
+from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState
 
 
@@ -20,7 +20,8 @@ class Scheduling(TDMAState):
         self.slot_assignment.update_free_slots()
 
         if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
-               / SCHEDULING_SLOT_DURATION) == self.id - 99:
+               / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK:
+            print("Broadcasting control message...")
             self.messenger.broadcast_control_message()
         else:
             self.messenger.receive_message()
@@ -32,6 +33,8 @@ class Scheduling(TDMAState):
 
     def next(self) -> State:
         if self.timing.current_time_in_cycle > TASK_START_TIME:
+            print("Receive List: ", self.slot_assignment.receive_list)
+            print("Send List: ", self.slot_assignment.pure_send_list)
             return State.LISTEN
         else:
             return State.SCHEDULING

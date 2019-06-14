@@ -62,7 +62,7 @@ class CustomEKF(ExtendedKalmanFilter):
         return dot(self.h_of_position, x)
 
     @staticmethod
-    def h_of_range(x, nei_pose):
+    def h_of_range(x, nei_pose) -> array:
         """ compute Jacobian of H matrix for state x """
         num_nei = nei_pose.shape
         deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -71,7 +71,7 @@ class CustomEKF(ExtendedKalmanFilter):
             if num_nei[0] > i:
                 norm = linalg.norm([x[0]-nei_pose[i][0], x[3]-nei_pose[i][1], x[6]-nei_pose[i][2]])
                 for j in range(3):
-                    deltas[j] = (x[j*3]-nei_pose[i][j])/norm
+                    deltas[i * 3 + j] = 0 if norm == 0 else (x[j * 3] - nei_pose[i][j]) / norm
 
         return array([[deltas[0], 0, 0, deltas[1], 0, 0, deltas[2], 0, 0],
                       [deltas[3], 0, 0, deltas[4], 0, 0, deltas[5], 0, 0],
@@ -88,7 +88,7 @@ class CustomEKF(ExtendedKalmanFilter):
         hx_out = [0, 0, 0, x[2], x[5], x[8]]
 
         for i in range(3):
-            if nb_neighbors[0] > i:
+            if nb_neighbors > i:
                 hx_out[i] = linalg.norm([x[0]-nei_pose[i][0], x[3]-nei_pose[i][1], x[6]-nei_pose[i][2]])
 
         return hx_out

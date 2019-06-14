@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import IntEnum
 
 
-class MessageType(Enum):
+class MessageType(IntEnum):
     UNKNOWN = 0
     SYNC = 1
     TDMA = 2

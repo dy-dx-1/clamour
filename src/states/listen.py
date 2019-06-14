@@ -4,7 +4,7 @@ from messages import UWBCommunicationMessage
 from messenger import Messenger
 
 from .constants import State
-from .tdmaState import TDMAState
+from .tdmaState import TDMAState, print_progress
 
 
 class Listen(TDMAState):
@@ -13,6 +13,7 @@ class Listen(TDMAState):
         self.timing = timing
         self.messenger = messenger
 
+    @print_progress
     def execute(self) -> State:
         self.timing.update_frame_id()
         self.timing.update_slot_id()
@@ -34,11 +35,9 @@ class Listen(TDMAState):
             return State.SYNCHRONIZATION
 
     def listen_for_messages(self):
-        sender_id, data, _ = self.messenger.obtain_message_from_pozyx()
-
-        if self.messenger.is_new_message(sender_id, data):
+        if self.messenger.receive_new_message():
             self.messenger.update_neighbor_dictionary()
-            if isinstance(self.messenger.message_box.peek_first(), UWBCommunicationMessage):
+            if isinstance(self.messenger.message_box.peek_last(), UWBCommunicationMessage):
                 # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
                 #       such as counting steps using a pedometer
                 pass
