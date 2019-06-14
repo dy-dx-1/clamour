@@ -23,6 +23,7 @@ class Initialization(TDMAState):
         return self.next()
 
     def next(self) -> State:
+        print("Entering synchronization...")
         return State.SYNCHRONIZATION
 
     def discover_neighbors(self):

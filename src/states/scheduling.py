@@ -21,7 +21,6 @@ class Scheduling(TDMAState):
 
         if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
                / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK:
-            print("Broadcasting control message...")
             self.messenger.broadcast_control_message()
         else:
             self.messenger.receive_message()
@@ -35,6 +34,8 @@ class Scheduling(TDMAState):
         if self.timing.current_time_in_cycle > TASK_START_TIME:
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send List: ", self.slot_assignment.pure_send_list)
+            print(self.slot_assignment.free_slots)
+            print("Entering listen state...")
             return State.LISTEN
         else:
             return State.SCHEDULING

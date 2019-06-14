@@ -21,9 +21,8 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
 
-    @print_progress
     def execute(self) -> State:
-        self.timing.synchronization_offset_mean = 0 if len(self.timing.clock_differential_stat) == 0  \
+        self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) == 0  \
                                                     else mean(self.timing.clock_differential_stat)
         
         self.synchronize()
@@ -37,6 +36,8 @@ class Synchronization(TDMAState):
             self.reset_scheduling()
             self.timing.clock_differential_dev = std(self.timing.clock_differential_stat)
             self.reset_timing_offsets()
+            print("Offset: ", self.timing.synchronization_offset_mean)
+            print("Entering scheduling...")
 
         return next_state
 
