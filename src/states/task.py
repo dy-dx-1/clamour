@@ -12,7 +12,7 @@ from ekf import CustomEKF
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 
-from .constants import State, GRAVITATIONAL_ACCELERATION
+from .constants import State, GRAVITATIONAL_ACCELERATION, TAG_ID_MASK
 from .tdmaState import TDMAState, print_progress
 
 
@@ -152,9 +152,9 @@ class Task(TDMAState):
             self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
     def broadcast_positioning_result(self, positioning_result) -> None:
-        message_data = [self.id - 99] + self.extended_kalman_filter.x.toList() + \
+        message_data = [self.id & TAG_ID_MASK] + self.extended_kalman_filter.x.toList() + \
                        [self.localize, self.extended_kalman_filter.dt] + \
-                        self.last_measurement + list(self.last_measurement_data.flat) + \
+                        self.last_measurement + self.last_measurement_data.flatten().tolist() + \
                        [self.acceleration.x/10, self.acceleration.y/10, self.acceleration.z/10,
                         self.timing.frame_id, self.timing.current_slot_id, positioning_result]
         

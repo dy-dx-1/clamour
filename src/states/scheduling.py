@@ -2,10 +2,8 @@ from interfaces import Neighborhood, SlotAssignment, Timing
 from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME, SCHEDULING_SLOT_DURATION)
 from messenger import Messenger
 
-from .constants import State
-from .tdmaState import TDMAState, print_progress
-
-TAG_ID_MASK = 0xFF
+from .constants import State, TAG_ID_MASK
+from .tdmaState import TDMAState
 
 
 class Scheduling(TDMAState):
