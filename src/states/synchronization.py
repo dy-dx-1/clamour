@@ -56,11 +56,8 @@ class Synchronization(TDMAState):
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
                     self.update_offset(message.sender_id, message)
-                else:
-                    print("Wrong message type")
+
                 self.messenger.update_neighbor_dictionary()
-            else:
-                self.messenger.handle_error()
 
     def reset_scheduling(self):
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)

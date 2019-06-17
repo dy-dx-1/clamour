@@ -1,7 +1,7 @@
 import random
 from time import perf_counter
 
-from pypozyx import POZYX_SUCCESS, Data, PozyxSerial, RXInfo, SingleRegister
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister
 
 from interfaces import Neighborhood, SlotAssignment
 from interfaces.timing import NB_TASK_SLOTS
@@ -121,9 +121,9 @@ class Messenger:
         is_new_message = False
         sender_id, data, status = self.obtain_message_from_pozyx()
 
-        if status == POZYX_SUCCESS and sender_id != 0 and data != 0:
+        if sender_id != 0 and data != 0:
             received_message = MessageFactory.create(sender_id, data)
-            if self.message_box.empty or received_message == self.message_box.peek_last():
+            if self.message_box.empty or received_message != self.message_box.peek_last():
                 self.message_box.put(MessageFactory.create(sender_id, data))
                 is_new_message = True
         else:
