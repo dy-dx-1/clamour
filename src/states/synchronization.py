@@ -1,7 +1,4 @@
-from time import perf_counter
-
-from numpy import mean, std
-from pypozyx import POZYX_SUCCESS
+from numpy import mean
 
 from interfaces import Neighborhood, SlotAssignment, Timing
 from messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
@@ -9,7 +6,7 @@ from messenger import Messenger
 from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
-from .tdmaState import TDMAState, print_progress
+from .tdmaState import TDMAState
 
 
 class Synchronization(TDMAState):
@@ -34,7 +31,6 @@ class Synchronization(TDMAState):
         next_state = self.next()
         if next_state == State.SCHEDULING:
             self.reset_scheduling()
-            self.timing.clock_differential_dev = std(self.timing.clock_differential_stat)
             self.reset_timing_offsets()
             print("Offset: ", self.timing.synchronization_offset_mean)
             print("Entering scheduling...")
@@ -103,5 +99,3 @@ class Synchronization(TDMAState):
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
-
-        self.timing.received_frequency_sample.append(perf_counter())
