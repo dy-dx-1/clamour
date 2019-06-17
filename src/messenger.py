@@ -54,7 +54,7 @@ class Messenger:
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
-        self.pozyx.sendData(0, Data([message.data], 'i'))
+        self.pozyx.sendData(0, Data([message.data], 'I'))
 
     def receive_message(self) -> None:
         if self.receive_new_message():
