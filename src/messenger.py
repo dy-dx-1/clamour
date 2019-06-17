@@ -22,7 +22,7 @@ class Messenger:
         message.synchronized_clock = time
         message.encode()
 
-        self.pozyx.sendData(destination=0, data=Data([message.data], "I"))
+        self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty() or not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
@@ -54,7 +54,7 @@ class Messenger:
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
-        self.pozyx.sendData(0, Data([message.data], 'I'))
+        self.pozyx.sendData(0, Data([message.data], 'i'))
 
     def receive_message(self) -> None:
         if self.receive_new_message():

@@ -30,9 +30,9 @@ class Synchronization(TDMAState):
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
+            print("Offset: ", self.timing.synchronization_offset_mean)
             self.reset_scheduling()
             self.reset_timing_offsets()
-            print("Offset: ", self.timing.synchronization_offset_mean)
             print("Entering scheduling...")
 
         return next_state
