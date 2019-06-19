@@ -18,8 +18,7 @@ class Scheduling(TDMAState):
     def execute(self) -> State:
         self.slot_assignment.update_free_slots()
 
-        if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
-               / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK:
+        if self.is_broadcast_slot():
             self.messenger.broadcast_control_message()
         else:
             self.messenger.receive_message()
@@ -38,6 +37,10 @@ class Scheduling(TDMAState):
             return State.LISTEN
         else:
             return State.SCHEDULING
+
+    def is_broadcast_slot(self) -> bool:
+        return int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
+                / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
 
     def update_pure_send_list(self):
         self.slot_assignment.pure_send_list = [x for x in range(len(self.slot_assignment.send_list))
