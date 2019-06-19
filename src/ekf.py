@@ -110,16 +110,3 @@ class CustomEKF(ExtendedKalmanFilter):
         super(CustomEKF, self).update(asarray([new_range[0], new_range[1], new_range[2],
                                                acceleration.x/10, acceleration.y/10, acceleration.z/10]),
                                       self.h_of_range, self.hx_of_range, self.RRange, args=nei_pose, hx_args=nei_pose)
-
-    def check_zone(self, zone):
-        if self.x[0] < self.zone_limits[zone][0]:
-            self.x[0] = self.zone_limits[zone][0]
-
-        if self.x[0] > self.zone_limits[zone][1]:
-            self.x[0] = self.zone_limits[zone][1]
-
-        if self.x[3] < self.zone_limits[zone][2]:
-            self.x[3] = self.zone_limits[zone][2]
-
-        if self.x[3] > self.zone_limits[zone][3]:
-            self.x[3] = self.zone_limits[zone][3]
