@@ -53,7 +53,7 @@ class Synchronization(TDMAState):
         # We listen for synchronization messages an arbitrary number of times
         for _ in range(10):
             if self.messenger.receive_new_message():
-                message = self.messenger.message_box.peek_last()
+                message = self.messenger.message_box.pop()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
                     self.update_offset(message.sender_id, message)

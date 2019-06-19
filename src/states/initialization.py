@@ -33,6 +33,7 @@ class Initialization(TDMAState):
         for _ in range(1000):
             if self.messenger.receive_new_message():
                 self.messenger.update_neighbor_dictionary()
+                self.messenger.message_box.pop()  # Discard the message, it will not be needed afterwards
         
         self.reset_discovery_settings()
 

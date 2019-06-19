@@ -40,7 +40,7 @@ class Messenger:
                 # Repetitively broadcast one of own slot. TODO: why?
                 slot = random.choice(self.slot_assignment.pure_send_list)
         else:
-            message = self.message_box.get()
+            message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
@@ -63,8 +63,8 @@ class Messenger:
     def receive_message(self) -> None:
         if self.receive_new_message():
             self.update_neighbor_dictionary()
-            if self.message_box.peek_last().message_type == MessageType.TDMA:
-                self.handle_control_message(self.message_box.peek_last())
+            if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
+                self.handle_control_message(self.message_box.pop())
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
         if control_message.code == -1:
@@ -101,7 +101,7 @@ class Messenger:
         message.id = self.id
 
         if message not in self.message_box:
-            self.message_box.put(message)
+            self.message_box.append(message)
 
     def handle_feedback(self, message: UWBTDMAMessage) -> None:
         """If code == id, it is a feedback from the receiver. 
@@ -110,7 +110,7 @@ class Messenger:
         and to mark this slot as no-sending slot (-2)."""
 
         if message not in self.message_box:
-            self.message_box.put(message)
+            self.message_box.append(message)
 
         self.slot_assignment.send_list[message.slot] = -2
 
@@ -131,8 +131,8 @@ class Messenger:
         try:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
-                if self.message_box.empty or received_message != self.message_box.peek_last():
-                    self.message_box.put(MessageFactory.create(sender_id, data))
+                if self.message_box.empty() or received_message != self.message_box.peek_last():
+                    self.message_box.append(received_message)
                     is_new_message = True
             else:
                 self.handle_error()

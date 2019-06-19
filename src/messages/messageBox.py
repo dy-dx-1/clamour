@@ -1,17 +1,19 @@
-from queue import Queue
+from collections import deque
 
 from .uwbMessage import UWBMessage
 
 
-class MessageBox(Queue):
-    def __contains__(self, message: UWBMessage) -> bool:
-        for m in self.queue:
-            if m == message:
-                return True
-        return False
+class MessageBox(deque):
+    def __init__(self):
+        super(MessageBox, self).__init__()
+        self.last_received_message = None
 
-    def peek_first(self) -> UWBMessage:
-        return self.queue[0]
+    def append(self, message: UWBMessage) -> None:
+        super(MessageBox, self).append(message)
+        self.last_received_message = message  # Necessary since deque does not provide peek operations
 
     def peek_last(self) -> UWBMessage:
-        return self.queue[len(self.queue) - 1]
+        return self.last_received_message
+
+    def empty(self) -> bool:
+        return not bool(self)  # If the queue is empty, converting it to bool will give False.
