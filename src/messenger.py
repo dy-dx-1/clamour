@@ -40,7 +40,7 @@ class Messenger:
                 # Repetitively broadcast one of own slot. TODO: why?
                 slot = random.choice(self.slot_assignment.pure_send_list)
         else:
-            message = self.message_box.popleft()
+            message = self.get_first_scheduling_message()
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
@@ -54,6 +54,18 @@ class Messenger:
         return len(self.slot_assignment.pure_send_list) < \
                2 * (NB_TASK_SLOTS + 1) / (3 * self.neighborhood.synchronized_active_neighbor_count) \
                and len(self.slot_assignment.subpriority_slots) > 1
+
+    def get_first_scheduling_message(self) -> UWBTDMAMessage:
+        """Purges all non UWBTDMAMessages from message box until first such message is found.
+        Returns that message."""
+
+        message = self.message_box.popleft()
+        while not isinstance(message, UWBTDMAMessage):
+            "Cleared non-tdma message"
+            message = self.message_box.popleft()
+        
+        return message
+
 
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
