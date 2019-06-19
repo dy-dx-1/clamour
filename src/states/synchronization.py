@@ -33,6 +33,7 @@ class Synchronization(TDMAState):
             print("Offset: ", self.timing.synchronization_offset_mean)
             self.reset_scheduling()
             self.reset_timing_offsets()
+            self.messenger.message_box.queue.clear()
             print("Entering scheduling...")
 
         return next_state
