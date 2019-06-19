@@ -5,7 +5,7 @@ from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister
 
 from interfaces import Neighborhood, SlotAssignment
 from interfaces.timing import NB_TASK_SLOTS
-from messages import (MessageBox, MessageFactory, MessageType, InvalidMessageTypeException,
+from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
                        UWBSynchronizationMessage, UWBTDMAMessage)
 
 
