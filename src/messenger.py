@@ -27,29 +27,33 @@ class Messenger:
     def broadcast_control_message(self) -> None:
         if self.message_box.empty() or not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
             # No priority message to broadcast (such as rejection). Proposal can be made.
-            if len(self.slot_assignment.pure_send_list) < \
-                    int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
-                    and len(self.slot_assignment.non_block) > 0:
+            code = -1
+            if self.should_chose_from_non_block():
                 # Propose new slot by randomly choosing from non_block
                 slot = random.randint(0, len(self.slot_assignment.non_block))
-                code = -1
                 self.slot_assignment.send_list[slot] = self.id
-            elif len(self.slot_assignment.pure_send_list) < 2 * (NB_TASK_SLOTS + 1) / (
-                    3 * self.neighborhood.synchronized_active_neighbor_count) \
-                    and len(self.slot_assignment.subpriority_slots) > 1:
+            elif self.should_chose_from_subpriority():
                 # Propose new slot by randomly choosing from subpriority_slots
                 slot = random.choice(self.slot_assignment.subpriority_slots)
-                code = -1
                 self.slot_assignment.send_list[slot] = self.id
             else:
                 # Repetitively broadcast one of own slot. TODO: why?
                 slot = random.choice(self.slot_assignment.pure_send_list)
-                code = -1
         else:
             message = self.message_box.get()
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
+
+    def should_chose_from_non_block(self) -> bool:
+        return len(self.slot_assignment.pure_send_list) < \
+               int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
+               and len(self.slot_assignment.non_block) > 0
+
+    def should_chose_from_subpriority(self) -> bool:
+        return len(self.slot_assignment.pure_send_list) < \
+               2 * (NB_TASK_SLOTS + 1) / (3 * self.neighborhood.synchronized_active_neighbor_count) \
+               and len(self.slot_assignment.subpriority_slots) > 1
 
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
