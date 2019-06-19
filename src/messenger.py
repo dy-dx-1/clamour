@@ -93,6 +93,9 @@ class Messenger:
     def reject_proposal(self, message: UWBTDMAMessage) -> None:
         """This slot was already occupied, so the proposal must be rejected."""
 
+        message.code = message.sender_id
+        message.id = self.id
+
         if message not in self.message_box:
             self.message_box.put(message)
 
