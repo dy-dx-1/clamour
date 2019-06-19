@@ -16,7 +16,6 @@ class Scheduling(TDMAState):
         self.messenger = messenger
 
     def execute(self) -> State:
-        self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
         self.slot_assignment.update_free_slots()
 
         if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))

@@ -149,7 +149,6 @@ class Messenger:
                                                                       perf_counter(),
                                                                       new_message.message_type,
                                                                       new_message)
-        self.neighborhood.synchronized_neighbors.append(len(self.neighborhood.current_neighbors))
 
     def handle_error(self) -> None:
         error_code = SingleRegister()
