@@ -1,4 +1,5 @@
 from collections import deque
+from typing import Union
 
 from .uwbMessage import UWBMessage
 
@@ -11,6 +12,9 @@ class MessageBox(deque):
     def append(self, message: UWBMessage) -> None:
         super(MessageBox, self).append(message)
         self.last_received_message = message  # Necessary since deque does not provide peek operations
+
+    def peek_first(self) -> Union[UWBMessage, None]:
+        return None if self.empty() else self[0]
 
     def peek_last(self) -> UWBMessage:
         return self.last_received_message

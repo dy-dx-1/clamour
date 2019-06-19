@@ -25,6 +25,8 @@ class Messenger:
         self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
     def broadcast_control_message(self) -> None:
+        self.clear_non_scheduling_messages()
+
         if self.message_box.empty():
             # No priority message to broadcast (such as rejection). Proposal can be made.
             code = -1
@@ -40,7 +42,7 @@ class Messenger:
                 # Repetitively broadcast one of own slot. TODO: why?
                 slot = random.choice(self.slot_assignment.pure_send_list)
         else:
-            message = self.get_first_scheduling_message()
+            message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
@@ -55,18 +57,11 @@ class Messenger:
                2 * (NB_TASK_SLOTS + 1) / (3 * self.neighborhood.synchronized_active_neighbor_count) \
                and len(self.slot_assignment.subpriority_slots) > 1
 
-    def get_first_scheduling_message(self) -> UWBTDMAMessage:
-        """Purges all non UWBTDMAMessages from message box until first such message is found.
-        Returns that message."""
-
-        message = self.message_box.popleft()
-        while not isinstance(message, UWBTDMAMessage):
-            "Cleared non-tdma message"
-            message = self.message_box.popleft()
+    def clear_non_scheduling_messages(self) -> None:
+        while not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
+            self.message_box.popleft()
+            print("Cleared non-tdma message")
         
-        return message
-
-
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
