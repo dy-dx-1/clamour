@@ -16,6 +16,7 @@ class Scheduling(TDMAState):
         self.messenger = messenger
 
     def execute(self) -> State:
+        self.messenger.clear_non_scheduling_messages()
         self.slot_assignment.update_free_slots()
 
         if self.is_broadcast_slot():

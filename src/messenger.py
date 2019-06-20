@@ -25,8 +25,6 @@ class Messenger:
         self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
     def broadcast_control_message(self) -> None:
-        self.clear_non_scheduling_messages()
-
         if self.message_box.empty():
             # No priority message to broadcast (such as rejection). Proposal can be made.
             code = -1
