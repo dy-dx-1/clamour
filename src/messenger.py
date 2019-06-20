@@ -58,7 +58,7 @@ class Messenger:
                and len(self.slot_assignment.subpriority_slots) > 1
 
     def clear_non_scheduling_messages(self) -> None:
-        while not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
+        while not self.message_box.empty() and not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
             self.message_box.popleft()
             print("Cleared non-tdma message")
         
