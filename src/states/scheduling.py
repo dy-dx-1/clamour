@@ -16,12 +16,10 @@ class Scheduling(TDMAState):
         self.messenger = messenger
 
     def execute(self) -> State:
-        self.neighborhood.neighbor_list = self.neighborhood.synchronized_neighbors
+        self.messenger.clear_non_scheduling_messages()
         self.slot_assignment.update_free_slots()
 
-        if int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
-               / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK:
-            print("Broadcasting control message...")
+        if self.is_broadcast_slot():
             self.messenger.broadcast_control_message()
         else:
             self.messenger.receive_message()
@@ -35,9 +33,15 @@ class Scheduling(TDMAState):
         if self.timing.current_time_in_cycle > TASK_START_TIME:
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send List: ", self.slot_assignment.pure_send_list)
+            print(self.slot_assignment.free_slots)
+            print("Entering listen state...")
             return State.LISTEN
         else:
             return State.SCHEDULING
+
+    def is_broadcast_slot(self) -> bool:
+        return int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
+                / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
 
     def update_pure_send_list(self):
         self.slot_assignment.pure_send_list = [x for x in range(len(self.slot_assignment.send_list))

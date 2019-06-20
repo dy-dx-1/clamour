@@ -28,6 +28,7 @@ class Listen(TDMAState):
         if (self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET) \
                 and (self.timing.current_time_in_cycle > TASK_START_TIME):
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
+                print("Entering task state...")
                 return State.TASK
             else:
                 return State.LISTEN
@@ -37,7 +38,8 @@ class Listen(TDMAState):
     def listen_for_messages(self):
         if self.messenger.receive_new_message():
             self.messenger.update_neighbor_dictionary()
-            if isinstance(self.messenger.message_box.peek_last(), UWBCommunicationMessage):
+            message = self.messenger.message_box.pop()
+            if isinstance(message, UWBCommunicationMessage):
                 # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
                 #       such as counting steps using a pedometer
                 pass

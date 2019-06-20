@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from logicalClock import LogicalClock
 
-COMMUNICATION_DELAY = 0.027  # delay estimation is 0.005s.
+COMMUNICATION_DELAY = 0.01  # delay estimation is 0.005s.
 SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 0.01
 
@@ -25,10 +25,8 @@ FRAME_DURATION = TASK_SLOT_DURATION * NB_TASK_SLOTS
 class Timing:
     def __init__(self):
         self.synchronization_offset_mean = 20
-        self.clock_differential_dev = 10
         self.clock_differential_stat = []
         self.logical_clock = LogicalClock()
-        self.received_frequency_sample = []
         self.current_time_in_cycle = 0
         self.synchronized = False
         self.current_slot_id = -1

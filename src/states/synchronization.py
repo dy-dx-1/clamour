@@ -1,7 +1,4 @@
-from time import perf_counter
-
-from numpy import mean, std
-from pypozyx import POZYX_SUCCESS
+from numpy import mean
 
 from interfaces import Neighborhood, SlotAssignment, Timing
 from messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
@@ -9,7 +6,7 @@ from messenger import Messenger
 from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
 from .constants import JUMP_THRESHOLD, State
-from .tdmaState import TDMAState, print_progress
+from .tdmaState import TDMAState
 
 
 class Synchronization(TDMAState):
@@ -21,9 +18,8 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
 
-    @print_progress
     def execute(self) -> State:
-        self.timing.synchronization_offset_mean = 0 if len(self.timing.clock_differential_stat) == 0  \
+        self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
                                                     else mean(self.timing.clock_differential_stat)
         
         self.synchronize()
@@ -34,9 +30,11 @@ class Synchronization(TDMAState):
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
+            print("Offset: ", self.timing.synchronization_offset_mean)
             self.reset_scheduling()
-            self.timing.clock_differential_dev = std(self.timing.clock_differential_stat)
             self.reset_timing_offsets()
+            self.messenger.message_box.clear()
+            print("Entering scheduling...")
 
         return next_state
 
@@ -55,22 +53,19 @@ class Synchronization(TDMAState):
         # We listen for synchronization messages an arbitrary number of times
         for _ in range(10):
             if self.messenger.receive_new_message():
-                message = self.messenger.message_box.peek_last()
+                message = self.messenger.message_box.pop()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
                     self.update_offset(message.sender_id, message)
-                else:
-                    print("Wrong message type")
+
                 self.messenger.update_neighbor_dictionary()
-            else:
-                self.messenger.handle_error()
 
     def reset_scheduling(self):
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
-        self.messenger.message_box.queue.clear()
+        self.messenger.message_box.clear()
         self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
         self.slot_assignment.update_free_slots()
 
@@ -102,5 +97,3 @@ class Synchronization(TDMAState):
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
-
-        self.timing.received_frequency_sample.append(perf_counter())

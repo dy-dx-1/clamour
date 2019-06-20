@@ -1,11 +1,11 @@
 import random
 from time import perf_counter
 
-from pypozyx import POZYX_SUCCESS, Data, PozyxSerial, RXInfo, SingleRegister
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister
 
 from interfaces import Neighborhood, SlotAssignment
 from interfaces.timing import NB_TASK_SLOTS
-from messages import (MessageBox, MessageFactory, MessageType,
+from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
                        UWBSynchronizationMessage, UWBTDMAMessage)
 
 
@@ -22,35 +22,44 @@ class Messenger:
         message.synchronized_clock = time
         message.encode()
 
-        self.pozyx.sendData(destination=0, data=Data([message.data], "I"))
+        self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
     def broadcast_control_message(self) -> None:
-        if self.message_box.empty() or not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
+        if self.message_box.empty():
             # No priority message to broadcast (such as rejection). Proposal can be made.
-            if len(self.slot_assignment.pure_send_list) < \
-                    int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
-                    and len(self.slot_assignment.non_block) > 0:
+            code = -1
+            if self.should_chose_from_non_block():
                 # Propose new slot by randomly choosing from non_block
                 slot = random.randint(0, len(self.slot_assignment.non_block))
-                code = -1
                 self.slot_assignment.send_list[slot] = self.id
-            elif len(self.slot_assignment.pure_send_list) < 2 * (NB_TASK_SLOTS + 1) / (
-                    3 * self.neighborhood.synchronized_active_neighbor_count) \
-                    and len(self.slot_assignment.subpriority_slots) > 1:
+            elif self.should_chose_from_subpriority():
                 # Propose new slot by randomly choosing from subpriority_slots
                 slot = random.choice(self.slot_assignment.subpriority_slots)
-                code = -1
                 self.slot_assignment.send_list[slot] = self.id
             else:
                 # Repetitively broadcast one of own slot. TODO: why?
                 slot = random.choice(self.slot_assignment.pure_send_list)
-                code = -1
         else:
-            message = self.message_box.get()
+            message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
 
+    def should_chose_from_non_block(self) -> bool:
+        return len(self.slot_assignment.pure_send_list) < \
+               int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
+               and len(self.slot_assignment.non_block) > 0
+
+    def should_chose_from_subpriority(self) -> bool:
+        return len(self.slot_assignment.pure_send_list) < \
+               2 * (NB_TASK_SLOTS + 1) / (3 * self.neighborhood.synchronized_active_neighbor_count) \
+               and len(self.slot_assignment.subpriority_slots) > 1
+
+    def clear_non_scheduling_messages(self) -> None:
+        while not self.message_box.empty() and not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
+            self.message_box.popleft()
+            print("Cleared non-tdma message")
+        
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
@@ -59,8 +68,8 @@ class Messenger:
     def receive_message(self) -> None:
         if self.receive_new_message():
             self.update_neighbor_dictionary()
-            if self.message_box.peek_last().message_type == MessageType.TDMA:
-                self.handle_control_message(self.message_box.peek_last())
+            if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
+                self.handle_control_message(self.message_box.pop())
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
         if control_message.code == -1:
@@ -93,8 +102,11 @@ class Messenger:
     def reject_proposal(self, message: UWBTDMAMessage) -> None:
         """This slot was already occupied, so the proposal must be rejected."""
 
+        message.code = message.sender_id
+        message.id = self.id
+
         if message not in self.message_box:
-            self.message_box.put(message)
+            self.message_box.append(message)
 
     def handle_feedback(self, message: UWBTDMAMessage) -> None:
         """If code == id, it is a feedback from the receiver. 
@@ -103,7 +115,7 @@ class Messenger:
         and to mark this slot as no-sending slot (-2)."""
 
         if message not in self.message_box:
-            self.message_box.put(message)
+            self.message_box.append(message)
 
         self.slot_assignment.send_list[message.slot] = -2
 
@@ -121,13 +133,16 @@ class Messenger:
         is_new_message = False
         sender_id, data, status = self.obtain_message_from_pozyx()
 
-        if status == POZYX_SUCCESS and sender_id != 0 and data != 0:
-            received_message = MessageFactory.create(sender_id, data)
-            if self.message_box.empty or received_message == self.message_box.peek_last():
-                self.message_box.put(MessageFactory.create(sender_id, data))
-                is_new_message = True
-        else:
-            self.handle_error()
+        try:
+            if sender_id != 0 and data != 0:
+                received_message = MessageFactory.create(sender_id, data)
+                if self.message_box.empty() or received_message != self.message_box.peek_last():
+                    self.message_box.append(received_message)
+                    is_new_message = True
+            else:
+                self.handle_error()
+        except InvalidMessageTypeException as e:
+            print(e)
 
         return is_new_message
 
@@ -146,7 +161,6 @@ class Messenger:
                                                                       perf_counter(),
                                                                       new_message.message_type,
                                                                       new_message)
-        self.neighborhood.synchronized_neighbors.append(len(self.neighborhood.current_neighbors))
 
     def handle_error(self) -> None:
         error_code = SingleRegister()
