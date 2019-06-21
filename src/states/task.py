@@ -67,6 +67,7 @@ class Task(TDMAState):
     def positioning(self) -> int:
         status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
         scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
+        print("Position: ", scaled_position)
 
         if status == POZYX_SUCCESS:
             self.dt = time() - self.last_ekf_step_time
@@ -87,6 +88,7 @@ class Task(TDMAState):
         status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
 
         self.last_measurement = ([device_range.data[1]/10] + [0, 0])
+        print("Range: ", self.last_measurement)
         self.last_measurement_data = array([[self.anchors.anchors_dict[ranging_target_id][2]/10,
                                              self.anchors.anchors_dict[ranging_target_id][3]/10,
                                              self.anchors.anchors_dict[ranging_target_id][4]/10],
