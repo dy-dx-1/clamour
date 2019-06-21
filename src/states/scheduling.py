@@ -45,4 +45,5 @@ class Scheduling(TDMAState):
 
     def update_pure_send_list(self):
         self.slot_assignment.pure_send_list = [x for x in range(len(self.slot_assignment.send_list))
-                                               if self.slot_assignment.send_list[x] not in [-1, -2]]
+                                               if self.slot_assignment.send_list[x] not in [-1, -2]
+                                               and self.slot_assignment.receive_list[x] == -1]

@@ -6,7 +6,7 @@ from logicalClock import LogicalClock
 
 COMMUNICATION_DELAY = 0.01  # delay estimation is 0.005s.
 SLOT_FOR_RESET = 30
-THRESHOLD_SYNCTIME = 0.01
+THRESHOLD_SYNCTIME = 0.018
 
 SYNCHRONIZATION_PERIOD = 20000  # Time leave for syn (ms)
 NB_NODES = 35
