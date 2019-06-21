@@ -4,8 +4,8 @@ from socket import socket as Socket
 from time import time
 
 from numpy import array, atleast_2d
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_POS_ALG_UWB_ONLY,
-                     POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
+from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
                      LinearAcceleration, PozyxSerial, SingleRegister, DeviceCoordinates)
 
 from ekf import CustomEKF
@@ -39,13 +39,10 @@ class Task(TDMAState):
         self.height = 1000
 
     def execute(self) -> State:
-        if not self.anchors.discovery_done:
-            self.discover_anchors()
-            self.select_localization_method()
-            self.set_anchors_manually()
-            self.anchors.discovery_done = True
-        else:
-            self.broadcast_positioning_result(self.localize())
+        self.discover_devices()
+        self.select_localization_method()
+        self.set_manually_measured_anchors()
+        self.broadcast_positioning_result(self.localize())
 
         return self.next()
         
@@ -115,17 +112,25 @@ class Task(TDMAState):
         else:
             return -1
 
-    def discover_anchors(self) -> None:
+    def discover_devices(self):
+        """Discovers the devices available for localization/ranging.
+        Prioritizes the anchors because of their smaller measurement uncertainty.
+        If there aren't enough anchors, will use tags as well."""
+
+        self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
+
+        if len(self.anchors.available_anchors) < 3:
+            self.discover(POZYX_DISCOVERY_TAGS_ONLY)
+
+    def discover(self, discovery_type: int) -> None:
         self.pozyx.clearDevices()
 
-        if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ANCHORS_ONLY) == POZYX_SUCCESS:
+        if self.pozyx.doDiscovery(discovery_type=discovery_type) == POZYX_SUCCESS:
             devices = self.get_devices()
 
             for device_id in devices:
                 if device_id not in self.anchors.available_anchors:
                     self.anchors.available_anchors.append(device_id)
-            
-            self.anchors.discovery_done = True
 
     def get_devices(self) -> DeviceList:
         size = SingleRegister()
@@ -139,7 +144,10 @@ class Task(TDMAState):
 
         return devices
 
-    def set_anchors_manually(self) -> None:
+    def set_manually_measured_anchors(self) -> None:
+        """If a discovered anchor's coordinates are known (i.e. were manually measured),
+        they will be added to the pozyx."""
+
         self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
