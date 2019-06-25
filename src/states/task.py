@@ -119,14 +119,13 @@ class Task(TDMAState):
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""
 
+        self.pozyx.clearDevices()
         self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
 
         if len(self.anchors.available_anchors) < 3:
             self.discover(POZYX_DISCOVERY_TAGS_ONLY)
 
     def discover(self, discovery_type: int) -> None:
-        self.pozyx.clearDevices()
-
         if self.pozyx.doDiscovery(discovery_type=discovery_type) == POZYX_SUCCESS:
             devices = self.get_devices()
 
@@ -154,8 +153,12 @@ class Task(TDMAState):
 
         for anchor_id in self.anchors.available_anchors:
             if anchor_id in self.anchors.anchors_dict:
-                # For this step, only the anchors (not the tags) must be selected
+                # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+            else:
+                device_coordinates = Coordinates()
+                self.pozyx.getCoordinates(device_coordinates)
+                self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
         
         if len(self.anchors.available_anchors) > 4:
             self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
