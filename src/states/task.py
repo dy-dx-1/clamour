@@ -4,8 +4,8 @@ from socket import socket as Socket
 from time import time
 
 from numpy import array, atleast_2d
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_POS_ALG_UWB_ONLY,
-                     POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
+from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
                      LinearAcceleration, PozyxSerial, SingleRegister, DeviceCoordinates)
 
 from ekf import CustomEKF
@@ -39,13 +39,10 @@ class Task(TDMAState):
         self.height = 1000
 
     def execute(self) -> State:
-        if not self.anchors.discovery_done:
-            self.discover_anchors()
-            self.select_localization_method()
-            self.set_anchors_manually()
-            self.anchors.discovery_done = True
-        else:
-            self.broadcast_positioning_result(self.localize())
+        self.discover_devices()
+        self.select_localization_method()
+        self.set_manually_measured_anchors()
+        self.broadcast_positioning_result(self.localize())
 
         return self.next()
         
@@ -70,6 +67,7 @@ class Task(TDMAState):
     def positioning(self) -> int:
         status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
         scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
+        print("Position: ", scaled_position)
 
         if status == POZYX_SUCCESS:
             self.dt = time() - self.last_ekf_step_time
@@ -90,6 +88,7 @@ class Task(TDMAState):
         status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
 
         self.last_measurement = ([device_range.data[1]/10] + [0, 0])
+        print("Range to ", ranging_target_id, " :", self.last_measurement)
         self.last_measurement_data = array([[self.anchors.anchors_dict[ranging_target_id][2]/10,
                                              self.anchors.anchors_dict[ranging_target_id][3]/10,
                                              self.anchors.anchors_dict[ranging_target_id][4]/10],
@@ -115,17 +114,24 @@ class Task(TDMAState):
         else:
             return -1
 
-    def discover_anchors(self) -> None:
-        self.pozyx.clearDevices()
+    def discover_devices(self):
+        """Discovers the devices available for localization/ranging.
+        Prioritizes the anchors because of their smaller measurement uncertainty.
+        If there aren't enough anchors, will use tags as well."""
 
-        if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ANCHORS_ONLY) == POZYX_SUCCESS:
+        self.pozyx.clearDevices()
+        self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
+
+        if len(self.anchors.available_anchors) < 3:
+            self.discover(POZYX_DISCOVERY_TAGS_ONLY)
+
+    def discover(self, discovery_type: int) -> None:
+        if self.pozyx.doDiscovery(discovery_type=discovery_type) == POZYX_SUCCESS:
             devices = self.get_devices()
 
             for device_id in devices:
                 if device_id not in self.anchors.available_anchors:
                     self.anchors.available_anchors.append(device_id)
-            
-            self.anchors.discovery_done = True
 
     def get_devices(self) -> DeviceList:
         size = SingleRegister()
@@ -139,13 +145,20 @@ class Task(TDMAState):
 
         return devices
 
-    def set_anchors_manually(self) -> None:
+    def set_manually_measured_anchors(self) -> None:
+        """If a discovered anchor's coordinates are known (i.e. were manually measured),
+        they will be added to the pozyx."""
+
         self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
             if anchor_id in self.anchors.anchors_dict:
-                # For this step, only the anchors (not the tags) must be selected
+                # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+            else:
+                device_coordinates = Coordinates()
+                self.pozyx.getCoordinates(device_coordinates)
+                self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
         
         if len(self.anchors.available_anchors) > 4:
             self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))

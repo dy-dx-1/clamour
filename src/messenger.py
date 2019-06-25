@@ -142,7 +142,7 @@ class Messenger:
             else:
                 self.handle_error()
         except InvalidMessageTypeException as e:
-            print(e)
+            pass  # TODO: print(e)
 
         return is_new_message
 
