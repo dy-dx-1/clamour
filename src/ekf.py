@@ -99,14 +99,12 @@ class CustomEKF(ExtendedKalmanFilter):
             self.set_qf()
         self.predict()
 
-    def update_position(self, position, acceleration, dt):
+    def update_position(self, position, dt):
         self.pre_update(dt)
-        super(CustomEKF, self).update(asarray([position[0], position[1], position[2],
-                                               acceleration.x/10, acceleration.y/10, acceleration.z/10]),
+        super(CustomEKF, self).update(asarray([position[0], position[1], position[2]]),
                                       lambda _: self.h_of_position, self.hx_of_position, self.R)
 
-    def update_range(self, new_range, nei_pose, acceleration, dt):
+    def update_range(self, new_range, nei_pose, dt):
         self.pre_update(dt)
-        super(CustomEKF, self).update(asarray([new_range[0], new_range[1], new_range[2],
-                                               acceleration.x/10, acceleration.y/10, acceleration.z/10]),
+        super(CustomEKF, self).update(asarray([new_range[0], new_range[1], new_range[2]]),
                                       self.h_of_range, self.hx_of_range, self.RRange, args=nei_pose, hx_args=nei_pose)
