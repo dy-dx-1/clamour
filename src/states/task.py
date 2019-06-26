@@ -57,14 +57,13 @@ class Task(TDMAState):
     def positioning(self) -> int:
         status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
         scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
-        print("Position: ", scaled_position)
 
         if status == POZYX_SUCCESS:
             self.dt = time() - self.last_ekf_step_time
             self.extended_kalman_filter.update_position(scaled_position, self.dt)
             self.last_ekf_step_time = time()
             self.extended_kalman_filter.dt = self.dt
-            print(self.extended_kalman_filter.x[0], self.extended_kalman_filter.x[3], self.extended_kalman_filter.x[6])
+            print(self.extended_kalman_filter.x[0], self.extended_kalman_filter.x[2], self.extended_kalman_filter.x[4])
 
         return status
 
