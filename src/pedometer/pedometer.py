@@ -14,8 +14,18 @@ class Pedometer:
             self.pozyx.getAcceleration_mg(linear_acceleration)
             self.pozyx.getEulerAngles_deg(euler_angles)
 
-            print(f"Linear acceleration: {linear_acceleration.data}; Euler angles: {euler_angles.data}")
+            # print(f"Linear acceleration: {linear_acceleration.data}; Euler angles: {euler_angles.data}")
+            self.detect_mode()
             sleep(0.5)
+
+    def detect_mode(self):
+        gravity = LinearAcceleration()
+        self.pozyx.getGravityVector_mg(gravity)
+
+        if abs(gravity[0]) > 400:
+            print("Swing")
+        else:
+            print("Holding")
 
     @staticmethod
     def connect_pozyx() -> PozyxSerial:
