@@ -3,7 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration
-from time import perf_counter
+from time import perf_counter, sleep
 
 
 class Point:
@@ -15,7 +15,16 @@ class Point:
         return self.y > other.y
 
     def __ge__(self, other):
-        return self.y > other.y
+        return self.y >= other.y
+
+    def __le__(self, other):
+        return self.y <= other.y
+
+    def __lt__(self, other):
+        return self.y < other.y
+
+    def __eq__(self, other):
+        return self.y == other.y
 
 
 class Pedometer:
@@ -42,18 +51,21 @@ class Pedometer:
         axes.scatter(acc_times, acc_vals, s=10, c='b', marker="s", label='accelerations')
         axes.scatter(peak_times, peak_vals, s=10, c='r', marker="o", label='peaks')
         plt.legend(loc='upper left')
+        plt.grid()
         plt.show()
 
     def get_acceleration_samples(self):
         accelerations = np.array([], dtype=np.object)
         start_time = perf_counter()
 
-        for _ in range(40000):
+        for _ in range(1500):
             linear_acceleration = LinearAcceleration()
             self.pozyx.getAcceleration_mg(linear_acceleration)
 
             current_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
             accelerations = np.append(accelerations, [Point(perf_counter() - start_time, current_acceleration)])
+
+            sleep(0.01)
 
         return accelerations
 
@@ -64,8 +76,7 @@ class Pedometer:
         next_step = Pedometer.next_index(accelerations, accelerations[current_step])
 
         while next_step:
-            subsample = accelerations[current_step:next_step]
-            peaks.append(subsample.max())
+            peaks.append(accelerations[next_step])
 
             current_step = next_step
             next_step = Pedometer.next_index(accelerations, accelerations[current_step])
@@ -73,12 +84,24 @@ class Pedometer:
         return peaks
 
     @staticmethod
-    def next_index(accelerations, current) -> int:
-        min_delay = 0.175
+    def next_index(accelerations: np.ndarray, current: Point) -> int:
+        min_delay = 0.15
 
         for i, acc in enumerate(accelerations):
-            if acc.x >= current.x + min_delay and acc.y > 1.15:
+            local_accelerations = accelerations[i-4:i+5]
+            if acc.x >= current.x + min_delay and acc.y > 1.15 and Pedometer.zero_crossing(local_accelerations, i):
+                print(acc.x, acc.y)
                 return i
+
+    @staticmethod
+    def zero_crossing(local_accelerations: np.ndarray, current_index: int) -> bool:
+        if current_index < 4:
+            return False
+
+        previous_smaller = [previous.y < local_accelerations[4].y for previous in local_accelerations[1:4]]
+        subsequent_smaller = [subsequent.y < local_accelerations[4].y for subsequent in local_accelerations[5:8]]
+
+        return all(previous_smaller) and all(subsequent_smaller)
 
     def holding_angle(self) -> float:
         gravity = LinearAcceleration()
