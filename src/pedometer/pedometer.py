@@ -2,14 +2,18 @@ import math
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration
+
+from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles
+from scipy.signal import butter, lfilter, freqz
+from scipy.fftpack import fft
 from time import perf_counter, sleep
 
 
 class Point:
-    def __init__(self, x, y):
+    def __init__(self, x, y, z):
         self.x = x
         self.y = y
+        self.z = z
 
     def __gt__(self, other):
         return self.y > other.y
@@ -26,10 +30,15 @@ class Point:
     def __eq__(self, other):
         return self.y == other.y
 
+    def __repr__(self):
+        return f"x: {round(self.x, 3)} y: {round(self.y, 3)} z: {round(self.z, 3)}"
+
 
 class Pedometer:
     def __init__(self):
         self.pozyx = self.connect_pozyx()
+        self.position = Point(0, 0, 0)
+        self.positions = []
 
     def run(self):
         print("Getting samples...")
@@ -38,19 +47,29 @@ class Pedometer:
         peaks = self.get_peaks_from_accelerations(accelerations)
         print(f"Done. {len(peaks)} steps detected.")
 
+        self.calculate_trajectory(peaks)
+
         self.display(accelerations, peaks)
 
-    @staticmethod
-    def display(accelerations, peaks):
+    def display(self, accelerations, peaks):
         fig = plt.figure()
-        axes = fig.add_subplot(111)
+        # axes = fig.add_subplot(111)
+        #
+        # acc_times, acc_vals = [acc.x for acc in accelerations], [acc.y for acc in accelerations]
+        # peak_times, peak_vals = [acc.x for acc in peaks], [acc.y for acc in peaks]
+        #
+        # axes.scatter(acc_times, acc_vals, s=10, c='b', marker="s", label='accelerations')
+        # axes.scatter(peak_times, peak_vals, s=10, c='r', marker="o", label='peaks')
+        # plt.legend(loc='upper left')
+        # plt.grid()
+        # plt.show()
 
-        acc_times, acc_vals = [acc.x for acc in accelerations], [acc.y for acc in accelerations]
-        peak_times, peak_vals = [acc.x for acc in peaks], [acc.y for acc in peaks]
+        axes = plt.gca()
+        axes.set_ylim([-10, 370])
 
-        axes.scatter(acc_times, acc_vals, s=10, c='b', marker="s", label='accelerations')
-        axes.scatter(peak_times, peak_vals, s=10, c='r', marker="o", label='peaks')
-        plt.legend(loc='upper left')
+        angle_times, angles = [pos.x for pos in accelerations], [pos.z for pos in accelerations]
+
+        plt.scatter(angle_times, angles, s=10, c='r', marker="o")
         plt.grid()
         plt.show()
 
@@ -58,16 +77,40 @@ class Pedometer:
         accelerations = np.array([], dtype=np.object)
         start_time = perf_counter()
 
-        for _ in range(1500):
+        previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
+
+        for i in range(2000):
             linear_acceleration = LinearAcceleration()
             self.pozyx.getAcceleration_mg(linear_acceleration)
 
+            angles = EulerAngles()
+            self.pozyx.getEulerAngles_deg(angles)
+            yaw = angles[0]
+
+            if self.jump(previous_angles[-1], yaw):
+                previous_angles = [yaw] * 4
+
+            filtered_yaw = self.filter(previous_angles, yaw) \
+                if self.jump(previous_angles[-1], yaw) and i >= len(previous_angles) - 1 \
+                else yaw
+            previous_angles = np.append(previous_angles[1:], filtered_yaw)
+
             current_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
-            accelerations = np.append(accelerations, [Point(perf_counter() - start_time, current_acceleration)])
+            accelerations = np.append(accelerations, [Point(perf_counter() - start_time, current_acceleration, yaw)])
 
             sleep(0.01)
 
         return accelerations
+
+    @staticmethod
+    def jump(prev, new):
+        return abs(prev - new) > 20
+
+    @staticmethod
+    def filter(previous_yaws: np.ndarray, new_yaw: float):
+        filtering_weights = np.array([0.02, 0.03, 0.05, 0.15, 0.75])
+
+        return np.dot(filtering_weights, np.append(previous_yaws, new_yaw))
 
     @staticmethod
     def get_peaks_from_accelerations(accelerations):
@@ -85,12 +128,11 @@ class Pedometer:
 
     @staticmethod
     def next_index(accelerations: np.ndarray, current: Point) -> int:
-        min_delay = 0.15
+        min_delay = 0.175
 
         for i, acc in enumerate(accelerations):
             local_accelerations = accelerations[i-4:i+5]
-            if acc.x >= current.x + min_delay and acc.y > 1.15 and Pedometer.zero_crossing(local_accelerations, i):
-                print(acc.x, acc.y)
+            if acc.x >= current.x + min_delay and acc.y > 1.175 and Pedometer.zero_crossing(local_accelerations, i):
                 return i
 
     @staticmethod
@@ -107,13 +149,22 @@ class Pedometer:
         gravity = LinearAcceleration()
         self.pozyx.getGravityVector_mg(gravity)
 
-        return math.atan(abs(gravity[2]/gravity[1]))
+        return math.atan(abs(gravity[2]/gravity[1])) if gravity[1] != 0 else 0
 
     @staticmethod
     def vertical_acceleration(holding_angle: float, user_acceleration: LinearAcceleration) -> float:
         """Calculates the vertical acceleration of the device in (g), minus Earth gravitation"""
 
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
+
+    def calculate_trajectory(self, steps: list):
+        step_length = 0.75
+
+        for step in steps:
+            self.position.x += step_length * math.cos(step.z)
+            self.position.y += step_length * math.sin(step.z)
+
+            self.positions.append(Point(self.position.x, self.position.y, self.position.z))
 
     @staticmethod
     def connect_pozyx() -> PozyxSerial:
