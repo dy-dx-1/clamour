@@ -42,5 +42,6 @@ This is to verify if multiple devices (up to 10) can share the network correctly
 5. Do some walks
 6. Compare measured positions with ground truth
 
+## This is the floorplan that wil be used for phases 1 and 4
 
 ![Testing floorplan](testing_floorplan.png)
