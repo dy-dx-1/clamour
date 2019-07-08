@@ -7,6 +7,7 @@ from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration
 from scipy.signal import butter, lfilter, freqz
 from scipy.fftpack import fft
 from time import perf_counter, sleep
+from mpl_toolkits.mplot3d import Axes3D
 
 
 class Point:
@@ -53,6 +54,7 @@ class Pedometer:
 
     def display(self, accelerations, peaks):
         fig = plt.figure()
+        ax = fig.gca(projection='3d')
         # axes = fig.add_subplot(111)
         #
         # acc_times, acc_vals = [acc.x for acc in accelerations], [acc.y for acc in accelerations]
@@ -64,12 +66,12 @@ class Pedometer:
         # plt.grid()
         # plt.show()
 
-        axes = plt.gca()
-        axes.set_ylim([-10, 370])
+        x, y, time = [pos.x for pos in self.positions], [pos.y for pos in self.positions], [peak.x for peak in peaks]
 
-        angle_times, angles = [pos.x for pos in accelerations], [pos.z for pos in accelerations]
-
-        plt.scatter(angle_times, angles, s=10, c='r', marker="o")
+        ax.scatter(x, y, time, s=10, c='r', marker="o")
+        ax.set_xlabel('X coordinate')
+        ax.set_ylabel('Y coordinate')
+        ax.set_zlabel('Time')
         plt.grid()
         plt.show()
 
@@ -79,12 +81,13 @@ class Pedometer:
 
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
 
-        for i in range(2000):
+        for i in range(4000):
             linear_acceleration = LinearAcceleration()
             self.pozyx.getAcceleration_mg(linear_acceleration)
 
             angles = EulerAngles()
             self.pozyx.getEulerAngles_deg(angles)
+            # print(angles.data)
             yaw = angles[0]
 
             if self.jump(previous_angles[-1], yaw):
@@ -108,7 +111,7 @@ class Pedometer:
 
     @staticmethod
     def filter(previous_yaws: np.ndarray, new_yaw: float):
-        filtering_weights = np.array([0.02, 0.03, 0.05, 0.15, 0.75])
+        filtering_weights = np.array([0.02, 0.03, 0.05, 0.05, 0.85])
 
         return np.dot(filtering_weights, np.append(previous_yaws, new_yaw))
 
@@ -161,8 +164,8 @@ class Pedometer:
         step_length = 0.75
 
         for step in steps:
-            self.position.x += step_length * math.cos(step.z)
-            self.position.y += step_length * math.sin(step.z)
+            self.position.x += step_length * -math.cos(math.radians(step.z))
+            self.position.y += step_length * math.sin(math.radians(step.z))
 
             self.positions.append(Point(self.position.x, self.position.y, self.position.z))
 
