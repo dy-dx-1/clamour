@@ -37,7 +37,7 @@ class Messenger:
                 slot = random.choice(self.slot_assignment.subpriority_slots)
                 self.slot_assignment.send_list[slot] = self.id
             else:
-                # Repetitively broadcast one of own slot. TODO: why?
+                # Repetitively broadcast one of own slot. TODO: why? reply@yanjun: because in real case, their maybe some wrone schedule because of communication, so if no slot need to be proposed, the node simply repeat his schedule again to make sure its slots are right. Or else the slot will be reject somehow.
                 slot = random.choice(self.slot_assignment.pure_send_list)
         else:
             message = self.message_box.popleft()
@@ -157,7 +157,7 @@ class Messenger:
     def update_neighbor_dictionary(self) -> None:
         new_message = self.message_box.peek_last()
         new_message.decode()
-        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id,
+        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id, #todo @yanjun: the neighborhood from which does not receive msg for a long time should be deleted. A garbage collection mechanism for neighborhood hood.
                                                                       perf_counter(),
                                                                       new_message.message_type,
                                                                       new_message)

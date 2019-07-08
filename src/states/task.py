@@ -114,7 +114,7 @@ class Task(TDMAState):
         else:
             return -1
 
-    def discover_devices(self):
+    def discover_devices(self):  # todo @yanjun: This pozys.doDiscover can not be done in every task slot because it is too time consuming. We do it once in all the FRAME_DURATION * NB_FULL_CYCLES.
         """Discovers the devices available for localization/ranging.
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""
