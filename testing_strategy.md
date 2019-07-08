@@ -41,3 +41,6 @@ This is to verify if multiple devices (up to 10) can share the network correctly
 4. Place audio guides in some rooms (first iteration: static, second iteration: moving)
 5. Do some walks
 6. Compare measured positions with ground truth
+
+
+![Testing floorplan](testing_floorplan.png)
