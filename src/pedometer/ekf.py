@@ -1,5 +1,5 @@
 from filterpy.kalman import ExtendedKalmanFilter
-from numpy import array, asarray, dot, eye, linalg
+from numpy import array, asarray, dot, eye
 from pypozyx import Coordinates
 
 
@@ -13,10 +13,6 @@ class PedometerEKF(ExtendedKalmanFilter):
         self.R = array([[15, 0, 0],
                         [0, 15, 0],
                         [0, 0, 15]])
-
-        self.RRange = array([[2, 0, 0],
-                             [0, 2, 0],
-                             [0, 0, 2]])
 
         # compute Jacobian of H matrix
         self.h_of_position = array([[1, 0, 0, 0, 0, 0],
@@ -45,35 +41,6 @@ class PedometerEKF(ExtendedKalmanFilter):
         correspond to that state."""
         return dot(self.h_of_position, x)
 
-    @staticmethod
-    def h_of_range(x, nei_pose) -> array:
-        """ compute Jacobian of H matrix for state x """
-        num_nei = nei_pose.shape
-        deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-        for i in range(3):
-            if num_nei[0] > i:
-                norm = linalg.norm([x[0] - nei_pose[i][0], x[2] - nei_pose[i][1], x[4] - nei_pose[i][2]])
-                for j in range(3):
-                    deltas[i * 3 + j] = 0 if norm == 0 else (x[j * 2] - nei_pose[i][j]) / norm
-
-        return array([[deltas[0], 0, deltas[1], 0, deltas[2], 0],
-                      [deltas[3], 0, deltas[4], 0, deltas[5], 0],
-                      [deltas[6], 0, deltas[7], 0, deltas[8], 0]])
-
-    @staticmethod
-    def hx_of_range(x, nei_pose):
-        """ takes a state variable and returns the measurements that would
-        correspond to that state."""
-        nb_neighbors = nei_pose.shape[0]
-        hx_out = [0, 0, 0, x[1], x[3], x[5]]
-
-        for i in range(3):
-            if nb_neighbors > i:
-                hx_out[i] = linalg.norm([x[0] - nei_pose[i][0], x[3] - nei_pose[i][1], x[6] - nei_pose[i][2]])
-
-        return hx_out
-
     def pre_update(self, dt):
         if dt != self.dt:
             self.dt = dt
@@ -84,8 +51,3 @@ class PedometerEKF(ExtendedKalmanFilter):
         self.pre_update(dt)
         super(PedometerEKF, self).update(asarray([position[0], position[1], position[2]]),
                                          lambda _: self.h_of_position, self.hx_of_position, self.R)
-
-    def update_range(self, new_range, nei_pose, dt):
-        self.pre_update(dt)
-        super(PedometerEKF, self).update(asarray([new_range[0], new_range[1], new_range[2]]),
-                                         self.h_of_range, self.hx_of_range, self.RRange, args=nei_pose, hx_args=nei_pose)

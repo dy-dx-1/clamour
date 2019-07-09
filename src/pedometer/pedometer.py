@@ -8,6 +8,7 @@ from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
 
 
+
 class Point:
     def __init__(self, x, y, z):
         self.x = x
