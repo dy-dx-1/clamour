@@ -64,7 +64,7 @@ class Pedometer:
         start_time = perf_counter()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
 
-        for i in range(200):
+        for i in range(100):
             for j in range(20):
                 linear_acceleration = self.get_acceleration_measurement()
                 yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
@@ -151,7 +151,7 @@ class Pedometer:
 
         time_between_steps = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
 
-        self.ekf.update_position(self.position, time_between_steps)
+        self.ekf.update_position(self.position, self.steps[-1].z, time_between_steps)
         self.ekf_positions.append(Point(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
 
         self.positions.append(Point(self.position.x, self.position.y, self.position.z))

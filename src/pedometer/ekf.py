@@ -5,41 +5,46 @@ from pypozyx import Coordinates
 
 class PedometerEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates):
-        super(PedometerEKF, self).__init__(dim_x=6, dim_z=3)
+        super(PedometerEKF, self).__init__(dim_x=8, dim_z=4)
 
         self.dt = 0.1
         self.set_qf()
         self.ps = []
-        self.R = array([[15, 0, 0],
-                        [0, 15, 0],
-                        [0, 0, 15]])
+        self.R = array([[15, 0, 0, 0],
+                        [0, 15, 0, 0],
+                        [0, 0, 15, 0],
+                        [0, 0, 0, 40]])
 
-        # compute Jacobian of H matrix
-        self.h_of_position = array([[1, 0, 0, 0, 0, 0],
-                                    [0, 0, 1, 0, 0, 0],
-                                    [0, 0, 0, 0, 1, 0]])
+        self.observation_matrix = array([[1, 0, 0, 0, 0, 0, 0, 0],
+                                         [0, 0, 1, 0, 0, 0, 0, 0],
+                                         [0, 0, 0, 0, 1, 0, 0, 0],
+                                         [0, 0, 0, 0, 0, 0, 1, 0]])
 
-        self.x = array([position.x / 10, 0, position.y / 10, 0, position.z / 10, 0])
+        self.x = array([position.x / 10, 0, position.y / 10, 0, position.z / 10, 0, 0, 0])
 
     def set_qf(self):
-        self.Q = array([[0, 0, 0, 0, 0, 0],
-                        [0, self.dt / 10, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, self.dt / 10, 0, 0],
-                        [0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, self.dt / 10]])
+        self.Q = array([[0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, self.dt / 10, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, self.dt / 10, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, self.dt / 10, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, self.dt / 5]])
 
-        self.F = eye(6) + array([[0, self.dt, 0, 0, 0, 0],
-                                 [0, 0, 0, 0, 0, 0],
-                                 [0, 0, 0, self.dt, 0, 0],
-                                 [0, 0, 0, 0, 0, 0],
-                                 [0, 0, 0, 0, 0, self.dt],
-                                 [0, 0, 0, 0, 0, 0]])
+        self.F = eye(8) + array([[0, self.dt, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, self.dt, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, self.dt, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0, 0],
+                                 [0, 0, 0, 0, 0, 0, 0, self.dt],
+                                 [0, 0, 0, 0, 0, 0, 0, 0]])
 
     def hx_of_position(self, x):
         """ takes a state variable and returns the measurements that would
         correspond to that state."""
-        return dot(self.h_of_position, x)
+        return dot(self.observation_matrix, x)
 
     def pre_update(self, dt):
         if dt != self.dt:
@@ -47,7 +52,7 @@ class PedometerEKF(ExtendedKalmanFilter):
             self.set_qf()
         self.predict()
 
-    def update_position(self, position, time_between_steps):
+    def update_position(self, position, yaw: float, time_between_steps: float):
         self.pre_update(time_between_steps)
-        super(PedometerEKF, self).update(asarray([position.x, position.y, position.z]),
-                                         lambda _: self.h_of_position, self.hx_of_position, self.R)
+        super(PedometerEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
+                                         lambda _: self.observation_matrix, self.hx_of_position, self.R)
