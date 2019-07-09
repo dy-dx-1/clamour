@@ -3,10 +3,10 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles
+from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
-
+from ekf import PedometerEKF
 
 
 class Point:
@@ -41,15 +41,19 @@ class Pedometer:
         self.positions = []
         self.steps = []
         self.buffer = np.array([Point(0, 0, 0)] * 20)
+        self.ekf = PedometerEKF(Coordinates())
+        self.ekf_positions = []
 
     def display(self):
         fig = plt.figure()
         ax = fig.gca(projection='3d')
 
         x, y, t = [pos.x for pos in self.positions], [pos.y for pos in self.positions], [step.x for step in self.steps]
-        print(len(x), len(y), len(t))
+        ekf_x, ekf_y = [pos.x for pos in self.ekf_positions], [pos.y for pos in self.ekf_positions]
 
         ax.scatter(x, y, t, s=10, c='r', marker="o")
+        ax.scatter(ekf_x, ekf_y, t, s=10, c='b', marker="o")
+
         ax.set_xlabel('X coordinate')
         ax.set_ylabel('Y coordinate')
         ax.set_zlabel('Time')
@@ -61,7 +65,7 @@ class Pedometer:
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
 
         for i in range(200):
-            for j in range(10):
+            for j in range(20):
                 linear_acceleration = self.get_acceleration_measurement()
                 yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
 
@@ -115,9 +119,8 @@ class Pedometer:
         delta_time = local_max.x - last_time
 
         if local_max.y > min_acc and delta_time >= min_delay and self.zero_crossing(self.buffer, local_max_index):
-            print("step")
             self.steps.append(local_max)
-            self.update_trajectory(local_max)
+            self.update_trajectory()
 
     @staticmethod
     def zero_crossing(local_acc: np.ndarray, local_max: int) -> bool:
@@ -140,11 +143,16 @@ class Pedometer:
 
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
 
-    def update_trajectory(self, step: Point):
+    def update_trajectory(self):
         step_length = 0.75
 
-        self.position.x += step_length * -math.cos(math.radians(step.z))
-        self.position.y += step_length * math.sin(math.radians(step.z))
+        self.position.x += step_length * -math.cos(math.radians(self.steps[-1].z))
+        self.position.y += step_length * math.sin(math.radians(self.steps[-1].z))
+
+        time_between_steps = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
+
+        self.ekf.update_position(self.position, time_between_steps)
+        self.ekf_positions.append(Point(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
 
         self.positions.append(Point(self.position.x, self.position.y, self.position.z))
 

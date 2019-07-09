@@ -47,7 +47,7 @@ class PedometerEKF(ExtendedKalmanFilter):
             self.set_qf()
         self.predict()
 
-    def update_position(self, position, dt):
-        self.pre_update(dt)
-        super(PedometerEKF, self).update(asarray([position[0], position[1], position[2]]),
+    def update_position(self, position, time_between_steps):
+        self.pre_update(time_between_steps)
+        super(PedometerEKF, self).update(asarray([position.x, position.y, position.z]),
                                          lambda _: self.h_of_position, self.hx_of_position, self.R)
