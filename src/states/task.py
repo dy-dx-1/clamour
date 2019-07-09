@@ -30,9 +30,7 @@ class Task(TDMAState):
         self.dt = 0
         self.last_measurement = [0, 0, 0]
         self.last_measurement_data = array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
-        self.acceleration = LinearAcceleration()
         self.pozyx = pozyx
-        self.set_IMU()
         self.neighborhood = neighborhood
         self.last_ekf_step_time = 0
         self.dimension = POZYX_3D
@@ -53,27 +51,19 @@ class Task(TDMAState):
         else:
             return State.TASK
 
-    def set_IMU(self):
-        """Sets the Initial Measurement Units"""
-
-        _ = self.pozyx.getLinearAcceleration_mg(self.acceleration)  # Acceleration passed by reference
-        self.acceleration.x *= GRAVITATIONAL_ACCELERATION
-        self.acceleration.y *= GRAVITATIONAL_ACCELERATION
-        self.acceleration.z *= GRAVITATIONAL_ACCELERATION
-
     def select_localization_method(self) -> None:
         self.localize = self.positioning if len(self.anchors.available_anchors) >= 4 else self.ranging
 
     def positioning(self) -> int:
         status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
         scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
-        print("Position: ", scaled_position)
 
         if status == POZYX_SUCCESS:
             self.dt = time() - self.last_ekf_step_time
-            self.extended_kalman_filter.update_position(scaled_position, self.acceleration, self.dt)
+            self.extended_kalman_filter.update_position(scaled_position, self.dt)
             self.last_ekf_step_time = time()
             self.extended_kalman_filter.dt = self.dt
+            print(self.extended_kalman_filter.x[0], self.extended_kalman_filter.x[2], self.extended_kalman_filter.x[4])
 
         return status
 
@@ -97,7 +87,7 @@ class Task(TDMAState):
         if status == POZYX_SUCCESS:
             self.dt = time() - self.last_ekf_step_time
             self.extended_kalman_filter.update_range(self.last_measurement, atleast_2d(self.last_measurement_data[0]),
-                                                     self.acceleration, int(self.dt * 100) / 100)
+                                                     int(self.dt * 100) / 100)
             self.last_ekf_step_time = time()
             self.extended_kalman_filter.dt = self.dt
 
@@ -114,7 +104,7 @@ class Task(TDMAState):
         else:
             return -1
 
-    def discover_devices(self):
+    def discover_devices(self):  # todo @yanjun: This pozys.doDiscover can not be done in every task slot because it is too time consuming. We do it once in all the FRAME_DURATION * NB_FULL_CYCLES.
         """Discovers the devices available for localization/ranging.
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""

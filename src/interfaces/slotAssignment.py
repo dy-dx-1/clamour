@@ -22,5 +22,5 @@ class SlotAssignment:
             else:
                 self.non_block.append(x)
                 if self.send_list[x] == -2:
-                    self.subpriority_slots.append(0)
+                    self.subpriority_slots.append(0) # todo @yanjun, does here should be append(x)?
                 self.free_slots += 1

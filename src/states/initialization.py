@@ -26,7 +26,7 @@ class Initialization(TDMAState):
         print("Entering synchronization...")
         return State.SYNCHRONIZATION
 
-    def discover_neighbors(self):
+    def discover_neighbors(self):  # todo @yanjun: By receiving msgs? If in this case, who is sending? If by pozyx.doDiscovery, then need to do at different time. I used sleeping for a period related with id to randomize this process?
         self.clear_known_devices()
         
         # We scan the network for messages an arbitrary number of times
@@ -44,6 +44,6 @@ class Initialization(TDMAState):
     def reset_discovery_settings(self):
         self.pozyx.clearDevices()
 
-        if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES) == POZYX_SUCCESS:
+        if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES) == POZYX_SUCCESS: # todo @yanjun: update neighbood tags here.
             self.pozyx.printDeviceList()
             self.anchors.discovery_done = False

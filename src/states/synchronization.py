@@ -50,7 +50,7 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(time)
 
     def synchronize(self):
-        # We listen for synchronization messages an arbitrary number of times
+        # We listen for synchronization messages an arbitrary number of times  # todo @Yanjun, how this arbitrary number works?
         for _ in range(10):
             if self.messenger.receive_new_message():
                 message = self.messenger.message_box.pop()
