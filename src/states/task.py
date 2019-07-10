@@ -18,7 +18,7 @@ from .tdmaState import TDMAState
 
 class Task(TDMAState):
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood,
-                 id: int, socket: Socket, pozyx: PozyxSerial):
+                 id: int, socket: Socket, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock):
         self.timing = timing
         self.anchors = anchors
         self.id = id
@@ -30,7 +30,8 @@ class Task(TDMAState):
         self.dt = 0
         self.last_measurement = [0, 0, 0]
         self.last_measurement_data = array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
-        self.pozyx = pozyx
+        self.pozyx = shared_pozyx
+        self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.last_ekf_step_time = 0
         self.dimension = POZYX_3D
@@ -55,7 +56,9 @@ class Task(TDMAState):
         self.localize = self.positioning if len(self.anchors.available_anchors) >= 4 else self.ranging
 
     def positioning(self) -> int:
-        status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
+        with self.pozyx_lock:
+            status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
+        
         scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
 
         if status == POZYX_SUCCESS:
@@ -71,11 +74,14 @@ class Task(TDMAState):
         ranging_target_id = self.select_ranging_target()
         if ranging_target_id not in self.anchors.anchors_dict:
             device_coordinates = Coordinates()
-            self.pozyx.getCoordinates(device_coordinates)
+            with self.pozyx_lock:
+                self.pozyx.getCoordinates(device_coordinates)
+            
             self.anchors.anchors_dict[ranging_target_id] = DeviceCoordinates(ranging_target_id, 1, device_coordinates)
 
         device_range = DeviceRange()
-        status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
+        with self.pozyx_lock:
+            status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
 
         self.last_measurement = ([device_range.data[1]/10] + [0, 0])
         print("Range to ", ranging_target_id, " :", self.last_measurement)
@@ -109,14 +115,19 @@ class Task(TDMAState):
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""
 
-        self.pozyx.clearDevices()
+        with self.pozyx_lock:
+            self.pozyx.clearDevices()
+        
         self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
 
         if len(self.anchors.available_anchors) < 3:
             self.discover(POZYX_DISCOVERY_TAGS_ONLY)
 
     def discover(self, discovery_type: int) -> None:
-        if self.pozyx.doDiscovery(discovery_type=discovery_type) == POZYX_SUCCESS:
+        with self.pozyx_lock:
+            discovery_status = self.pozyx.doDiscovery(discovery_type=discovery_type)
+        
+        if discovery_status == POZYX_SUCCESS:
             devices = self.get_devices()
 
             for device_id in devices:
@@ -125,11 +136,14 @@ class Task(TDMAState):
 
     def get_devices(self) -> DeviceList:
         size = SingleRegister()
-        status = self.pozyx.getDeviceListSize(size)
+        with self.pozyx_lock:
+            status = self.pozyx.getDeviceListSize(size)
+        
         devices = DeviceList(list_size=size[0])
 
         if status == POZYX_SUCCESS and size[0] > 0:
-            status &= self.pozyx.getDeviceIds(devices)
+            with self.pozyx_lock:
+                status &= self.pozyx.getDeviceIds(devices)
         else:
             print("No anchors available.")
 
@@ -139,19 +153,23 @@ class Task(TDMAState):
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
 
-        self.pozyx.clearDevices()
+        with self.pozyx_lock:
+            self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
             if anchor_id in self.anchors.anchors_dict:
                 # For this step, only the anchors (not the tags) must be selected to use their predefined position
-                self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+                with self.pozyx_lock:
+                    self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
             else:
                 device_coordinates = Coordinates()
-                self.pozyx.getCoordinates(device_coordinates)
-                self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
+                with self.pozyx_lock:
+                    self.pozyx.getCoordinates(device_coordinates)
+                    self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
         
         if len(self.anchors.available_anchors) > 4:
-            self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+            with self.pozyx_lock:
+                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
     def broadcast_positioning_result(self, positioning_result) -> None:
         """Commented function because broadcast via socket deactivated anyway,

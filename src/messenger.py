@@ -1,4 +1,5 @@
 import random
+from multiprocessing import Lock
 from time import perf_counter
 
 from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister
@@ -10,10 +11,12 @@ from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
 
 
 class Messenger:
-    def __init__(self, id: int, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assignment: SlotAssignment):
+    def __init__(self, id: int, shared_pozyx: PozyxSerial, neighborhood: Neighborhood,
+                 slot_assignment: SlotAssignment, shared_pozyx_lock: Lock):
         self.id = id
         self.message_box = MessageBox()
-        self.pozyx = pozyx
+        self.pozyx = shared_pozyx
+        self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
 
@@ -22,7 +25,8 @@ class Messenger:
         message.synchronized_clock = time
         message.encode()
 
-        self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
+        with self.pozyx_lock:
+            self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -63,7 +67,9 @@ class Messenger:
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
-        self.pozyx.sendData(0, Data([message.data], 'I'))
+
+        with self.pozyx_lock:
+            self.pozyx.sendData(0, Data([message.data], 'I'))
 
     def receive_message(self) -> None:
         if self.receive_new_message():
@@ -149,8 +155,10 @@ class Messenger:
     def obtain_message_from_pozyx(self) -> (int, int, int):
         info = RXInfo()
         data = Data([0], 'i')
-        self.pozyx.getRxInfo(info)
-        status = self.pozyx.readRXBufferData(data)
+
+        with self.pozyx_lock:
+            self.pozyx.getRxInfo(info)
+            status = self.pozyx.readRXBufferData(data)
 
         return info[0], data[0], status
 
@@ -164,8 +172,10 @@ class Messenger:
 
     def handle_error(self) -> None:
         error_code = SingleRegister()
-        message = self.pozyx.getErrorMessage(error_code)
-        status = self.pozyx.getErrorCode(error_code)
+
+        with self.pozyx_lock:
+            message = self.pozyx.getErrorMessage(error_code)
+            status = self.pozyx.getErrorCode(error_code)
 
         # if status == POZYX_SUCCESS:
         #     print("An empty message was received.")

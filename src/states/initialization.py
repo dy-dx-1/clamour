@@ -1,3 +1,4 @@
+from multiprocessing import Lock
 from pypozyx import PozyxSerial
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_ALL_DEVICES, POZYX_SUCCESS)
 
@@ -11,11 +12,12 @@ from .tdmaState import TDMAState, print_progress
 class Initialization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, anchors: Anchors, 
                  id: int, pozyx: PozyxSerial, messenger: Messenger,
-                 multiprocess_communication_queue):
+                 multiprocess_communication_queue, shared_pozyx_lock: Lock):
         self.neighborhood = neighborhood
         self.anchors = anchors
         self.id = id
         self.pozyx = pozyx
+        self.pozyx_lock = shared_pozyx_lock
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
@@ -44,8 +46,9 @@ class Initialization(TDMAState):
         self.anchors.available_anchors = []
 
     def reset_discovery_settings(self):
-        self.pozyx.clearDevices()
+        with self.pozyx_lock:
+            self.pozyx.clearDevices()
 
-        if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES) == POZYX_SUCCESS: # todo @yanjun: update neighbood tags here.
-            self.pozyx.printDeviceList()
-            self.anchors.discovery_done = False
+            if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES) == POZYX_SUCCESS: # todo @yanjun: update neighbood tags here.
+                self.pozyx.printDeviceList()
+                self.anchors.discovery_done = False
