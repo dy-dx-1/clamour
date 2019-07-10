@@ -20,7 +20,7 @@ class Synchronization(TDMAState):
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
     def execute(self) -> State:
-        self.multiprocess_communication_queue.put("synchronization")
+        print(self.multiprocess_communication_queue.get())
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
                                                     else mean(self.timing.clock_differential_stat)

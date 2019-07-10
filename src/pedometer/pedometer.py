@@ -71,9 +71,6 @@ class Pedometer:
 
         for i in range(2000):
             for j in range(20):
-                current_state = self.communication_queue.get()
-                print(current_state)
-
                 linear_acceleration = self.get_acceleration_measurement()
                 yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
 
@@ -167,3 +164,5 @@ class Pedometer:
         self.ekf_positions.append(Point(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
 
         self.positions.append(Point(self.position.x, self.position.y, self.position.z))
+
+        self.communication_queue.put("X: " + str(self.position.x) + " Y: " + str(self.position.y))
