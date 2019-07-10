@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import numpy as np
 
+from multiprocessing import Lock
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
@@ -35,9 +36,10 @@ class Point:
 
 
 class Pedometer:
-    def __init__(self, communication_queue):
+    def __init__(self, communication_queue, pozyx: PozyxSerial, pozyx_lock: Lock):
         print("init pedometer")
-        self.pozyx = self.connect_pozyx()
+        self.pozyx = pozyx
+        self.pozyx_lock = pozyx_lock
         self.position = Point(0, 0, 0)
         self.positions = []
         self.steps = []
@@ -86,13 +88,15 @@ class Pedometer:
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
-        self.pozyx.getAcceleration_mg(linear_acceleration)
+        with self.pozyx_lock:
+            self.pozyx.getAcceleration_mg(linear_acceleration)
 
         return linear_acceleration
 
     def get_filtered_yaw_measurement(self, previous_angles: np.ndarray, i: int) -> (np.ndarray, np.ndarray):
         angles = EulerAngles()
-        self.pozyx.getEulerAngles_deg(angles)
+        with self.pozyx_lock:
+            self.pozyx.getEulerAngles_deg(angles)
         yaw = angles[0]
 
         if self.jump(previous_angles[-1], yaw):
@@ -140,7 +144,8 @@ class Pedometer:
 
     def holding_angle(self) -> float:
         gravity = LinearAcceleration()
-        self.pozyx.getGravityVector_mg(gravity)
+        with self.pozyx_lock:
+            self.pozyx.getGravityVector_mg(gravity)
 
         return math.atan(abs(gravity[2]/gravity[1])) if gravity[1] != 0 else 0
 
@@ -162,14 +167,3 @@ class Pedometer:
         self.ekf_positions.append(Point(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
 
         self.positions.append(Point(self.position.x, self.position.y, self.position.z))
-
-        self.communication_queue.put(self.position)
-
-    @staticmethod
-    def connect_pozyx() -> PozyxSerial:
-        serial_port = get_first_pozyx_serial_port()
-
-        if serial_port is None:
-            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
-
-        return PozyxSerial(serial_port)
