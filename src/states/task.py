@@ -1,18 +1,19 @@
 import random
 import struct
+from multiprocessing import Lock
 from socket import socket as Socket
 from time import time
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
-                     LinearAcceleration, PozyxSerial, SingleRegister, DeviceCoordinates)
+                     PozyxSerial, SingleRegister, DeviceCoordinates)
 
 from ekf import CustomEKF
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 
-from .constants import State, GRAVITATIONAL_ACCELERATION, TAG_ID_MASK
+from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState
 
 

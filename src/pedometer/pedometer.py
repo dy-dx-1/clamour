@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from multiprocessing import Lock
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles, Coordinates
+from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
 from .ekf import PedometerEKF

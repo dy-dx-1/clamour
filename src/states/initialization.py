@@ -6,7 +6,7 @@ from interfaces import Anchors, Neighborhood
 from messenger import Messenger
 
 from .constants import State
-from .tdmaState import TDMAState, print_progress
+from .tdmaState import TDMAState
 
 
 class Initialization(TDMAState):
