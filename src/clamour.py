@@ -23,22 +23,19 @@ def connect_pozyx() -> PozyxSerial:
 
 
 def main():
+    # The different levels of context managers are required to ensure everything starts and stops cleanly.
+
     with ContextManagedQueue() as multiprocess_communication_queue:
         shared_pozyx = connect_pozyx()
         shared_pozyx_lock = Lock()
 
         pedometer = Pedometer(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock)
 
-        process = Process(target=pedometer.run)
-        process.start()
+        with ContextManagedProcess(target=pedometer.run) as side_process:
+            side_process.start()
 
-        # with ContextManagedProcess(target=pedometer.run) as side_process:
-        #     side_process.start()
-
-        with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock) as node:
-            node.run()
-
-        process.join()
+            with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock) as node:
+                node.run()
 
 
 if __name__ == "__main__":
