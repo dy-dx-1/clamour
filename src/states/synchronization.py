@@ -11,14 +11,17 @@ from .tdmaState import TDMAState
 
 class Synchronization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
-                 timing: Timing, messenger: Messenger, id: int):
+                 timing: Timing, messenger: Messenger, id: int, multiprocess_communication_queue):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.timing = timing
         self.id = id
         self.messenger = messenger
+        self.multiprocess_communication_queue = multiprocess_communication_queue
 
     def execute(self) -> State:
+        self.multiprocess_communication_queue.put("synchronization")
+
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
                                                     else mean(self.timing.clock_differential_stat)
         

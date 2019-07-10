@@ -10,15 +10,17 @@ from .tdmaState import TDMAState, print_progress
 
 class Initialization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, anchors: Anchors, 
-                 id: int, pozyx: PozyxSerial, messenger: Messenger):
+                 id: int, pozyx: PozyxSerial, messenger: Messenger,
+                 multiprocess_communication_queue):
         self.neighborhood = neighborhood
         self.anchors = anchors
         self.id = id
         self.pozyx = pozyx
         self.messenger = messenger
+        self.multiprocess_communication_queue = multiprocess_communication_queue
 
-    @print_progress
     def execute(self) -> State:
+        self.multiprocess_communication_queue.put("initialization")
         self.discover_neighbors()
         return self.next()
 

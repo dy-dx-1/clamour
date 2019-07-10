@@ -9,9 +9,9 @@ from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchr
 
 
 class TDMANode:
-    def __init__(self):
+    def __init__(self, multiprocess_communication_queue):
         self.id = 0
-        self.socket = socket.socket()
+        self.multiprocess_communication_queue = multiprocess_communication_queue
 
         self.neighborhood = Neighborhood()
         self.slot_assignment = SlotAssignment()
@@ -25,13 +25,14 @@ class TDMANode:
         self.current_state = None
 
     def __enter__(self):
+        print("Setting up TDMA node...")
         self.setup()
         self.initialize_states()
 
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        self.socket.close()
+        print("Finished with TDMA node.")
 
     def run(self) -> None:
         while True:
@@ -39,12 +40,6 @@ class TDMANode:
             self.current_state = self.states[self.current_state.execute()]
 
     def setup(self) -> None:
-        try:
-            print("Attempting connection to a local service...")
-            self.socket.connect((socket.gethostname(), 10555))
-        except ConnectionRefusedError:
-            print("The connection was either refused, or the service you are trying to reach is unavailable.")
-        
         self.pozyx = self.connect_pozyx()
         self.pozyx.clearDevices()
         self.set_id()
@@ -53,11 +48,12 @@ class TDMANode:
         self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment)
 
         self.states = {
-            State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx, self.messenger),
+            State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx,
+                                                 self.messenger, self.multiprocess_communication_queue),
             State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.messenger,
-                                                   self.id),
+                                                   self.id, self.multiprocess_communication_queue),
             State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.timing, self.id, self.messenger),
-            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, self.socket, self.pozyx),
+            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, None, self.pozyx),
             State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger)}
 
         self.current_state = self.states[State.INITIALIZATION]

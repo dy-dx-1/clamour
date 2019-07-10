@@ -6,7 +6,7 @@ import numpy as np
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
-from ekf import PedometerEKF
+from .ekf import PedometerEKF
 
 
 class Point:
@@ -36,6 +36,7 @@ class Point:
 
 class Pedometer:
     def __init__(self, communication_queue):
+        print("init pedometer")
         self.pozyx = self.connect_pozyx()
         self.position = Point(0, 0, 0)
         self.positions = []
@@ -62,11 +63,15 @@ class Pedometer:
         plt.show()
 
     def run(self):
+        print("running pedometer")
         start_time = perf_counter()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
 
-        for i in range(10):
+        for i in range(2000):
             for j in range(20):
+                current_state = self.communication_queue.get()
+                print(current_state)
+
                 linear_acceleration = self.get_acceleration_measurement()
                 yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
 
@@ -111,7 +116,7 @@ class Pedometer:
         return np.dot(filtering_weights, np.append(previous_yaws, new_yaw))
 
     def detect_step(self) -> None:
-        min_delay = 0.175
+        min_delay = 0.2
         min_acc = 1.175
 
         local_max_index = np.argmax(self.buffer)
