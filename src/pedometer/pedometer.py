@@ -1,12 +1,10 @@
 import math
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from multiprocessing import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
-from mpl_toolkits.mplot3d import Axes3D
 from .ekf import CustomEKF
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
@@ -29,30 +27,20 @@ class Pedometer:
         self.ekf_positions = []
         self.communication_queue = communication_queue
 
-    def display(self):
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-
-        t = [step.x for step in self.steps]
-        ekf_x, ekf_y = [pos.x for pos in self.ekf_positions], [pos.y for pos in self.ekf_positions]
-
-        ax.scatter(ekf_x, ekf_y, t, s=10, c='b', marker="o")
-
-        ax.set_xlabel('X coordinate')
-        ax.set_ylabel('Y coordinate')
-        ax.set_zlabel('Time')
-        plt.grid()
-        plt.show()
-
     def run(self):
         print("running pedometer")
         start_time = perf_counter()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
+        nb_measurements = 0
 
-        for i in range(2000):
+        while True:
             linear_acceleration = self.get_acceleration_measurement()
-            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
+            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
             vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
+
+            # Only used to verify if previous_angles has been filled before using it for smoothing.
+            if nb_measurements < 5:
+                nb_measurements += 1
 
             self.buffer = np.append(self.buffer[1:],
                                     [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
@@ -61,8 +49,6 @@ class Pedometer:
             self.process_latest_state_info()
             sleep(0.01)
 
-        self.display()
-
     def process_latest_state_info(self):
         # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
         if not self.communication_queue.empty():
@@ -70,6 +56,8 @@ class Pedometer:
 
             if message.update_type == UpdateType.PEDOMETER:
                 self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
+                print(f"X: {self.ekf.x[0]}, Y: {self.ekf.x[0]}")
+
             elif message.update_type == UpdateType.TRILATERATION:
                 self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
             elif message.update_type == UpdateType.RANGING:
@@ -156,5 +144,3 @@ class Pedometer:
 
         message = UpdateMessage(UpdateType.PEDOMETER, measured_position, delta_time, measured_yaw)
         self.communication_queue.put(UpdateMessage.save(message))
-
-        self.ekf_positions.append(Coordinates(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
