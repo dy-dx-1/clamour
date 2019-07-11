@@ -62,11 +62,11 @@ class Pedometer:
         message = UpdateMessage.load(self.communication_queue.get())
 
         if message.update_type == UpdateType.PEDOMETER:
-            self.ekf.pedometer_update(*message)
+            self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
         elif message.update_type == UpdateType.TRILATERATION:
-            self.ekf.trilateration_update(*message)
+            self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
         elif message.update_type == UpdateType.RANGING:
-            self.ekf.ranging_update(*message)
+            self.ekf.ranging_update(message.measured_xyz, message.delta_time, message.neighbors)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()

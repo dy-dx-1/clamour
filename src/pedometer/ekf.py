@@ -1,5 +1,5 @@
 from filterpy.kalman import ExtendedKalmanFilter
-from numpy import array, asarray, dot, eye
+from numpy import array, asarray, ndarray, dot, eye
 from pypozyx import Coordinates
 
 
@@ -62,13 +62,13 @@ class PedometerEKF(ExtendedKalmanFilter):
             self.set_qf()
         self.predict()
 
-    def pedometer_update(self, position, yaw: float, time_between_steps: float):
-        self.pre_update(time_between_steps)
+    def pedometer_update(self, position: Coordinates, yaw: float, delta_time: float):
+        self.pre_update(delta_time)
         super(PedometerEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                          lambda _: self.observation_matrix, self.hx_of_position, self.R_pedometer)
 
-    def trilateration_update(self):
+    def trilateration_update(self, position: Coordinates, delta_time: float):
         pass
 
-    def ranging_update(self):
+    def ranging_update(self, distance: Coordinates, delta_time: float, neighbor_position: ndarray):
         pass
