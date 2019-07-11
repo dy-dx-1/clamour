@@ -12,7 +12,7 @@ class UpdateMessage:
         self.update_type = update_type
         self.measured_xyz = measured_xyz
         self.measured_yaw = measured_yaw
-        self.last_measurement_time = delta_time
+        self.delta_time = delta_time
         self.neighbors = neighbors if neighbors is not None else []
 
     @staticmethod

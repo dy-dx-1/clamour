@@ -66,7 +66,7 @@ class Pedometer:
     def process_latest_state_info(self):
         # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
         if not self.communication_queue.empty():
-            message = UpdateMessage.load(self.communication_queue.get_nowait())
+            message = UpdateMessage.load(*self.communication_queue.get_nowait())
 
             if message.update_type == UpdateType.PEDOMETER:
                 self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
