@@ -19,7 +19,13 @@ class Pedometer:
         self.pozyx_lock = pozyx_lock
         self.steps = []
         self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
-        self.ekf = CustomEKF(Coordinates(), 0)
+
+        # TODO: Initialize EKF properly
+        initial_angles = EulerAngles()
+        with self.pozyx_lock:
+            self.pozyx.getEulerAngles_deg(initial_angles)
+        self.ekf = CustomEKF(Coordinates(), initial_angles[0])
+
         self.ekf_positions = []
         self.communication_queue = communication_queue
 
