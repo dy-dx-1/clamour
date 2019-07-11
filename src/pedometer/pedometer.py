@@ -9,7 +9,7 @@ from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
 from .ekf import CustomEKF
 from messages import UpdateMessage, UpdateType
-from pedometerMeasurement import PedometerMeasurement
+from .pedometerMeasurement import PedometerMeasurement
 
 
 class Pedometer:
@@ -65,14 +65,15 @@ class Pedometer:
 
     def process_latest_state_info(self):
         # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
-        message = UpdateMessage.load(self.communication_queue.get_nowait())
+        if not self.communication_queue.empty():
+            message = UpdateMessage.load(self.communication_queue.get_nowait())
 
-        if message.update_type == UpdateType.PEDOMETER:
-            self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
-        elif message.update_type == UpdateType.TRILATERATION:
-            self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
-        elif message.update_type == UpdateType.RANGING:
-            self.ekf.ranging_update(message.measured_xyz, message.delta_time, message.neighbors)
+            if message.update_type == UpdateType.PEDOMETER:
+                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
+            elif message.update_type == UpdateType.TRILATERATION:
+                self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
+            elif message.update_type == UpdateType.RANGING:
+                self.ekf.ranging_update(message.measured_xyz, message.delta_time, message.neighbors)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
