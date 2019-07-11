@@ -10,10 +10,20 @@ class PedometerEKF(ExtendedKalmanFilter):
         self.dt = 0.1
         self.set_qf()
         self.ps = []
-        self.R = array([[15, 0, 0, 0],
-                        [0, 15, 0, 0],
-                        [0, 0, 15, 0],
-                        [0, 0, 0, 40]])
+        self.R_pedometer = array([[15, 0, 0, 0],
+                                  [0, 15, 0, 0],
+                                  [0, 0, 15, 0],
+                                  [0, 0, 0, 40]])
+
+        self.R_trilateration = array([[15, 0, 0, 0],
+                                      [0, 15, 0, 0],
+                                      [0, 0, 15, 0],
+                                      [0, 0, 0, 40]])
+
+        self.R_ranging = array([[15, 0, 0, 0],
+                                [0, 15, 0, 0],
+                                [0, 0, 15, 0],
+                                [0, 0, 0, 40]])
 
         self.observation_matrix = array([[1, 0, 0, 0, 0, 0, 0, 0],
                                          [0, 0, 1, 0, 0, 0, 0, 0],
@@ -52,7 +62,13 @@ class PedometerEKF(ExtendedKalmanFilter):
             self.set_qf()
         self.predict()
 
-    def update_position(self, position, yaw: float, time_between_steps: float):
+    def pedometer_update(self, position, yaw: float, time_between_steps: float):
         self.pre_update(time_between_steps)
         super(PedometerEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
-                                         lambda _: self.observation_matrix, self.hx_of_position, self.R)
+                                         lambda _: self.observation_matrix, self.hx_of_position, self.R_pedometer)
+
+    def trilateration_update(self):
+        pass
+
+    def ranging_update(self):
+        pass

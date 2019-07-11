@@ -8,31 +8,8 @@ from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
 from .ekf import PedometerEKF
-
-
-class Point:
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __gt__(self, other):
-        return self.y > other.y
-
-    def __ge__(self, other):
-        return self.y >= other.y
-
-    def __le__(self, other):
-        return self.y <= other.y
-
-    def __lt__(self, other):
-        return self.y < other.y
-
-    def __eq__(self, other):
-        return self.y == other.y
-
-    def __repr__(self):
-        return f"x: {round(self.x, 3)} y: {round(self.y, 3)} z: {round(self.z, 3)}"
+from messages import UpdateMessage, UpdateType
+from pedometerMeasurement import PedometerMeasurement
 
 
 class Pedometer:
@@ -40,10 +17,8 @@ class Pedometer:
         print("init pedometer")
         self.pozyx = pozyx
         self.pozyx_lock = pozyx_lock
-        self.position = Point(0, 0, 0)
-        self.positions = []
         self.steps = []
-        self.buffer = np.array([Point(0, 0, 0)] * 20)
+        self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
         self.ekf = PedometerEKF(Coordinates())
         self.ekf_positions = []
         self.communication_queue = communication_queue
@@ -52,10 +27,9 @@ class Pedometer:
         fig = plt.figure()
         ax = fig.gca(projection='3d')
 
-        x, y, t = [pos.x for pos in self.positions], [pos.y for pos in self.positions], [step.x for step in self.steps]
+        t = [step.x for step in self.steps]
         ekf_x, ekf_y = [pos.x for pos in self.ekf_positions], [pos.y for pos in self.ekf_positions]
 
-        ax.scatter(x, y, t, s=10, c='r', marker="o")
         ax.scatter(ekf_x, ekf_y, t, s=10, c='b', marker="o")
 
         ax.set_xlabel('X coordinate')
@@ -73,15 +47,26 @@ class Pedometer:
             for j in range(20):
                 linear_acceleration = self.get_acceleration_measurement()
                 yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
-
                 vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
-                self.buffer = np.append(self.buffer[1:], [Point(perf_counter() - start_time, vertical_acceleration, yaw)])
+
+                self.buffer = np.append(self.buffer[1:],
+                                        [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
 
                 self.detect_step()
                 sleep(0.01)
 
-        self.communication_queue.put(False)  # Signal writer that the walk is done
         self.display()
+
+    def process_latest_state_info(self):
+        # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
+        message = UpdateMessage.load(self.communication_queue.get())
+
+        if message.update_type == UpdateType.PEDOMETER:
+            self.ekf.pedometer_update(*message)
+        elif message.update_type == UpdateType.TRILATERATION:
+            self.ekf.trilateration_update(*message)
+        elif message.update_type == UpdateType.RANGING:
+            self.ekf.ranging_update(*message)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
@@ -155,14 +140,12 @@ class Pedometer:
     def update_trajectory(self):
         step_length = 0.75
 
-        self.position.x += step_length * -math.cos(math.radians(self.steps[-1].z))
-        self.position.y += step_length * math.sin(math.radians(self.steps[-1].z))
+        delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z))
+        delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z))
+
+        measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
 
         time_between_steps = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
 
-        self.ekf.update_position(self.position, self.steps[-1].z, time_between_steps)
-        self.ekf_positions.append(Point(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
-
-        self.positions.append(Point(self.position.x, self.position.y, self.position.z))
-
-        self.communication_queue.put("X: " + str(self.position.x) + " Y: " + str(self.position.y))
+        self.ekf.pedometer_update(measured_position, self.steps[-1].z, time_between_steps)
+        self.ekf_positions.append(Coordinates(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))

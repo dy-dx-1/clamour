@@ -10,7 +10,7 @@ from contextManagedQueue import ContextManagedQueue
 from contextManagedProcess import ContextManagedProcess
 from pedometer import Pedometer
 
-from multiprocessing import Process, Lock
+from multiprocessing import Lock
 
 
 def connect_pozyx() -> PozyxSerial:

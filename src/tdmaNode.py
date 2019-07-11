@@ -46,7 +46,8 @@ class TDMANode:
         self.set_id()
 
     def initialize_states(self) -> None:
-        self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment, self.pozyx_lock)
+        self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment,
+                                   self.pozyx_lock, self.multiprocess_communication_queue)
 
         self.states = {
             State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx,
@@ -55,7 +56,8 @@ class TDMANode:
             State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.messenger,
                                                    self.id, self.multiprocess_communication_queue),
             State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.timing, self.id, self.messenger),
-            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, None, self.pozyx, self.pozyx_lock),
+            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id,
+                             self.pozyx, self.pozyx_lock, self.messenger),
             State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger)}
 
         self.current_state = self.states[State.INITIALIZATION]

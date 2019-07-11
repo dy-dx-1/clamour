@@ -1,7 +1,5 @@
 import random
-import struct
 from multiprocessing import Lock
-from socket import socket as Socket
 from time import time
 
 from numpy import array, atleast_2d
@@ -9,9 +7,10 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ON
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
                      PozyxSerial, SingleRegister, DeviceCoordinates)
 
-from ekf import CustomEKF
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
+from messages import UpdateMessage, UpdateType
+from messenger import Messenger
 
 from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState
@@ -19,24 +18,17 @@ from .tdmaState import TDMAState
 
 class Task(TDMAState):
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood,
-                 id: int, socket: Socket, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock):
+                 id: int, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, messenger: Messenger):
         self.timing = timing
         self.anchors = anchors
         self.id = id
         self.localize = self.ranging
-        self.done = False
-        self.position = Coordinates()
-        self.extended_kalman_filter = CustomEKF(self.position)
-        self.socket = socket
         self.dt = 0
-        self.last_measurement = [0, 0, 0]
-        self.last_measurement_data = array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
+        self.messenger = messenger
         self.last_ekf_step_time = 0
-        self.dimension = POZYX_3D
-        self.height = 1000
 
     def execute(self) -> State:
         self.discover_devices()
@@ -57,17 +49,17 @@ class Task(TDMAState):
         self.localize = self.positioning if len(self.anchors.available_anchors) >= 4 else self.ranging
 
     def positioning(self) -> int:
+        position = Coordinates()
+        dimension = POZYX_3D
+        height = 1000
+
         with self.pozyx_lock:
-            status = self.pozyx.doPositioning(self.position, self.dimension, self.height, POZYX_POS_ALG_UWB_ONLY)
+            status = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
         
-        scaled_position = [self.position.x/10, self.position.y/10, self.position.z/10]
+        scaled_position = Coordinates(position.x/10, position.y/10, position.z/10)
 
         if status == POZYX_SUCCESS:
-            self.dt = time() - self.last_ekf_step_time
-            self.extended_kalman_filter.update_position(scaled_position, self.dt)
-            self.last_ekf_step_time = time()
-            self.extended_kalman_filter.dt = self.dt
-            print(self.extended_kalman_filter.x[0], self.extended_kalman_filter.x[2], self.extended_kalman_filter.x[4])
+            self.update(UpdateType.TRILATERATION, scaled_position)
 
         return status
 
@@ -84,21 +76,20 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
 
-        self.last_measurement = ([device_range.data[1]/10] + [0, 0])
-        print("Range to ", ranging_target_id, " :", self.last_measurement)
-        self.last_measurement_data = array([[self.anchors.anchors_dict[ranging_target_id][2]/10,
-                                             self.anchors.anchors_dict[ranging_target_id][3]/10,
-                                             self.anchors.anchors_dict[ranging_target_id][4]/10],
-                                            [0, 0, 0], [0, 0, 0]])
+        measured_position = Coordinates(device_range.data[1]/10, 0, 0)
+        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2]/10,
+                                   self.anchors.anchors_dict[ranging_target_id][3]/10,
+                                   self.anchors.anchors_dict[ranging_target_id][4]/10])
         
         if status == POZYX_SUCCESS:
-            self.dt = time() - self.last_ekf_step_time
-            self.extended_kalman_filter.update_range(self.last_measurement, atleast_2d(self.last_measurement_data[0]),
-                                                     int(self.dt * 100) / 100)
-            self.last_ekf_step_time = time()
-            self.extended_kalman_filter.dt = self.dt
+            self.update(UpdateType.RANGING, measured_position, atleast_2d(neighbor_position))
 
         return status
+
+    def update(self, update_type: UpdateType, measured_position: Coordinates, neighbors: list = None):
+        self.dt = time() - self.last_ekf_step_time
+        self.messenger.send_new_measurement(update_type, measured_position, self.dt, neighbors)
+        self.last_ekf_step_time = time()
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
