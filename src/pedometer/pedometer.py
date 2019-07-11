@@ -7,7 +7,7 @@ from multiprocessing import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
 from mpl_toolkits.mplot3d import Axes3D
-from .ekf import PedometerEKF
+from .ekf import CustomEKF
 from messages import UpdateMessage, UpdateType
 from pedometerMeasurement import PedometerMeasurement
 
@@ -19,7 +19,7 @@ class Pedometer:
         self.pozyx_lock = pozyx_lock
         self.steps = []
         self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
-        self.ekf = PedometerEKF(Coordinates())
+        self.ekf = CustomEKF(Coordinates(), 0)
         self.ekf_positions = []
         self.communication_queue = communication_queue
 
