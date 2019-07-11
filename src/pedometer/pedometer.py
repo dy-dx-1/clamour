@@ -44,16 +44,15 @@ class Pedometer:
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
 
         for i in range(2000):
-            for j in range(20):
-                linear_acceleration = self.get_acceleration_measurement()
-                yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
-                vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
+            linear_acceleration = self.get_acceleration_measurement()
+            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
+            vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
 
-                self.buffer = np.append(self.buffer[1:],
-                                        [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
+            self.buffer = np.append(self.buffer[1:],
+                                    [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
 
-                self.detect_step()
-                sleep(0.01)
+            self.detect_step()
+            sleep(0.01)
 
         self.display()
 
