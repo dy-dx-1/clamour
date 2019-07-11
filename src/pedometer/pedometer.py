@@ -144,8 +144,10 @@ class Pedometer:
         delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z))
 
         measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
+        measured_yaw = self.steps[-1].z
+        delta_time = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
 
-        time_between_steps = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
+        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, delta_time, measured_yaw)
+        self.communication_queue.put(UpdateMessage.save(message))
 
-        self.ekf.pedometer_update(measured_position, self.steps[-1].z, time_between_steps)
         self.ekf_positions.append(Coordinates(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))

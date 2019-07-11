@@ -7,12 +7,12 @@ from .types import UpdateType
 
 
 class UpdateMessage:
-    def __init__(self, update_type: UpdateType, measured_xyz: Coordinates, last_measurement_time: float,
+    def __init__(self, update_type: UpdateType, measured_xyz: Coordinates, delta_time: float,
                  measured_yaw: float = None, neighbors: list = None):
         self.update_type = update_type
         self.measured_xyz = measured_xyz
         self.measured_yaw = measured_yaw
-        self.last_measurement_time = last_measurement_time
+        self.last_measurement_time = delta_time
         self.neighbors = neighbors if neighbors is not None else []
 
     @staticmethod
