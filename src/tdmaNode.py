@@ -1,6 +1,5 @@
-import socket
-
-from pypozyx import Data, PozyxSerial, get_first_pozyx_serial_port
+from multiprocessing import Lock
+from pypozyx import Data, PozyxSerial
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
@@ -9,9 +8,11 @@ from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchr
 
 
 class TDMANode:
-    def __init__(self):
+    def __init__(self, multiprocess_communication_queue, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock):
         self.id = 0
-        self.socket = socket.socket()
+        self.multiprocess_communication_queue = multiprocess_communication_queue
+        self.pozyx = shared_pozyx
+        self.pozyx_lock = shared_pozyx_lock
 
         self.neighborhood = Neighborhood()
         self.slot_assignment = SlotAssignment()
@@ -19,19 +20,19 @@ class TDMANode:
         self.anchors = Anchors()
 
         # These attributes need to be set after setup
-        self.pozyx = None
         self.messenger = None
         self.states = None
         self.current_state = None
 
     def __enter__(self):
+        print("Setting up TDMA node...")
         self.setup()
         self.initialize_states()
 
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        self.socket.close()
+        print("Finished with TDMA node.")
 
     def run(self) -> None:
         while True:
@@ -39,40 +40,32 @@ class TDMANode:
             self.current_state = self.states[self.current_state.execute()]
 
     def setup(self) -> None:
-        try:
-            print("Attempting connection to a local service...")
-            self.socket.connect((socket.gethostname(), 10555))
-        except ConnectionRefusedError:
-            print("The connection was either refused, or the service you are trying to reach is unavailable.")
-        
-        self.pozyx = self.connect_pozyx()
-        self.pozyx.clearDevices()
+        with self.pozyx_lock:
+            self.pozyx.clearDevices()
+
         self.set_id()
 
     def initialize_states(self) -> None:
-        self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment)
+        self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment,
+                                   self.pozyx_lock, self.multiprocess_communication_queue)
 
         self.states = {
-            State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx, self.messenger),
+            State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx,
+                                                 self.messenger, self.multiprocess_communication_queue,
+                                                 self.pozyx_lock),
             State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.messenger,
-                                                   self.id),
+                                                   self.id, self.multiprocess_communication_queue),
             State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.timing, self.id, self.messenger),
-            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id, self.socket, self.pozyx),
+            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id,
+                             self.pozyx, self.pozyx_lock, self.messenger),
             State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger)}
 
         self.current_state = self.states[State.INITIALIZATION]
 
-    @staticmethod
-    def connect_pozyx() -> PozyxSerial:
-        serial_port = get_first_pozyx_serial_port()
-
-        if serial_port is None:
-            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
-
-        return PozyxSerial(serial_port)
-
     def set_id(self) -> None:
         data = Data([0] * 2)
-        self.pozyx.getRead(POZYX_NETWORK_ID, data)
+        with self.pozyx_lock:
+            self.pozyx.getRead(POZYX_NETWORK_ID, data)
+
         self.id = data[1] * 256 + data[0]
         print("Device ID: ", self.id)

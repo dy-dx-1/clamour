@@ -1,28 +1,40 @@
 import random
+from multiprocessing import Lock
 from time import perf_counter
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
 
+from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
-                       UWBSynchronizationMessage, UWBTDMAMessage)
+                      UWBSynchronizationMessage, UWBTDMAMessage,
+                      UpdateMessage, UpdateType)
 
 
 class Messenger:
-    def __init__(self, id: int, pozyx: PozyxSerial, neighborhood: Neighborhood, slot_assignment: SlotAssignment):
+    def __init__(self, id: int, shared_pozyx: PozyxSerial, neighborhood: Neighborhood,
+                 slot_assignment: SlotAssignment, shared_pozyx_lock: Lock,
+                 multiprocess_communication_queue: ContextManagedQueue):
         self.id = id
         self.message_box = MessageBox()
-        self.pozyx = pozyx
+        self.pozyx = shared_pozyx
+        self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
+        self.multiprocess_communication_queue = multiprocess_communication_queue
+
+    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, dt: float, neighbors: list) -> None:
+        message = UpdateMessage(update_type, measured_position, dt, neighbors, measured_yaw=None)
+        self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, time: int) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id)
         message.synchronized_clock = time
         message.encode()
 
-        self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
+        with self.pozyx_lock:
+            self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -63,7 +75,9 @@ class Messenger:
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
-        self.pozyx.sendData(0, Data([message.data], 'I'))
+
+        with self.pozyx_lock:
+            self.pozyx.sendData(0, Data([message.data], 'I'))
 
     def receive_message(self) -> None:
         if self.receive_new_message():
@@ -149,23 +163,27 @@ class Messenger:
     def obtain_message_from_pozyx(self) -> (int, int, int):
         info = RXInfo()
         data = Data([0], 'i')
-        self.pozyx.getRxInfo(info)
-        status = self.pozyx.readRXBufferData(data)
+
+        with self.pozyx_lock:
+            self.pozyx.getRxInfo(info)
+            status = self.pozyx.readRXBufferData(data)
 
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self) -> None:
         new_message = self.message_box.peek_last()
         new_message.decode()
-        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id, #todo @yanjun: the neighborhood from which does not receive msg for a long time should be deleted. A garbage collection mechanism for neighborhood hood.
+        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id,  # todo @yanjun: the neighborhood from which does not receive msg for a long time should be deleted. A garbage collection mechanism for neighborhood hood.
                                                                       perf_counter(),
                                                                       new_message.message_type,
                                                                       new_message)
 
     def handle_error(self) -> None:
         error_code = SingleRegister()
-        message = self.pozyx.getErrorMessage(error_code)
-        status = self.pozyx.getErrorCode(error_code)
+
+        with self.pozyx_lock:
+            message = self.pozyx.getErrorMessage(error_code)
+            status = self.pozyx.getErrorCode(error_code)
 
         # if status == POZYX_SUCCESS:
         #     print("An empty message was received.")

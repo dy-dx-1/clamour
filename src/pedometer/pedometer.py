@@ -1,93 +1,79 @@
 import math
 
-import matplotlib.pyplot as plt
 import numpy as np
 
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port, LinearAcceleration, EulerAngles, Coordinates
+from multiprocessing import Lock
+from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
 from time import perf_counter, sleep
-from mpl_toolkits.mplot3d import Axes3D
-from ekf import PedometerEKF
-
-
-class Point:
-    def __init__(self, x, y, z):
-        self.x = x
-        self.y = y
-        self.z = z
-
-    def __gt__(self, other):
-        return self.y > other.y
-
-    def __ge__(self, other):
-        return self.y >= other.y
-
-    def __le__(self, other):
-        return self.y <= other.y
-
-    def __lt__(self, other):
-        return self.y < other.y
-
-    def __eq__(self, other):
-        return self.y == other.y
-
-    def __repr__(self):
-        return f"x: {round(self.x, 3)} y: {round(self.y, 3)} z: {round(self.z, 3)}"
+from .ekf import CustomEKF
+from messages import UpdateMessage, UpdateType
+from .pedometerMeasurement import PedometerMeasurement
 
 
 class Pedometer:
-    def __init__(self, communication_queue):
-        self.pozyx = self.connect_pozyx()
-        self.position = Point(0, 0, 0)
-        self.positions = []
+    def __init__(self, communication_queue, pozyx: PozyxSerial, pozyx_lock: Lock):
+        print("init pedometer")
+        self.pozyx = pozyx
+        self.pozyx_lock = pozyx_lock
         self.steps = []
-        self.buffer = np.array([Point(0, 0, 0)] * 20)
-        self.ekf = PedometerEKF(Coordinates())
+        self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
+
+        # TODO: Initialize EKF properly
+        initial_angles = EulerAngles()
+        with self.pozyx_lock:
+            self.pozyx.getEulerAngles_deg(initial_angles)
+        self.ekf = CustomEKF(Coordinates(), initial_angles[0])
+
         self.ekf_positions = []
         self.communication_queue = communication_queue
 
-    def display(self):
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-
-        x, y, t = [pos.x for pos in self.positions], [pos.y for pos in self.positions], [step.x for step in self.steps]
-        ekf_x, ekf_y = [pos.x for pos in self.ekf_positions], [pos.y for pos in self.ekf_positions]
-
-        ax.scatter(x, y, t, s=10, c='r', marker="o")
-        ax.scatter(ekf_x, ekf_y, t, s=10, c='b', marker="o")
-
-        ax.set_xlabel('X coordinate')
-        ax.set_ylabel('Y coordinate')
-        ax.set_zlabel('Time')
-        plt.grid()
-        plt.show()
-
     def run(self):
+        print("running pedometer")
         start_time = perf_counter()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
+        nb_measurements = 0
 
-        for i in range(10):
-            for j in range(20):
-                linear_acceleration = self.get_acceleration_measurement()
-                yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, i)
+        while True:
+            linear_acceleration = self.get_acceleration_measurement()
+            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
+            vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
 
-                vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
-                self.buffer = np.append(self.buffer[1:], [Point(perf_counter() - start_time, vertical_acceleration, yaw)])
+            # Only used to verify if previous_angles has been filled before using it for smoothing.
+            if nb_measurements < 5:
+                nb_measurements += 1
 
-                self.detect_step()
-                sleep(0.01)
+            self.buffer = np.append(self.buffer[1:],
+                                    [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
 
-        self.communication_queue.put(False)  # Signal writer that the walk is done
-        self.display()
+            self.detect_step()
+            self.process_latest_state_info()
+            sleep(0.01)
+
+    def process_latest_state_info(self):
+        # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
+        if not self.communication_queue.empty():
+            message = UpdateMessage.load(*self.communication_queue.get_nowait())
+
+            if message.update_type == UpdateType.PEDOMETER:
+                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
+                print(f"X: {self.ekf.x[0]}, Y: {self.ekf.x[0]}")
+
+            elif message.update_type == UpdateType.TRILATERATION:
+                self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
+            elif message.update_type == UpdateType.RANGING:
+                self.ekf.ranging_update(message.measured_xyz, message.delta_time, message.neighbors)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
-        self.pozyx.getAcceleration_mg(linear_acceleration)
+        with self.pozyx_lock:
+            self.pozyx.getAcceleration_mg(linear_acceleration)
 
         return linear_acceleration
 
     def get_filtered_yaw_measurement(self, previous_angles: np.ndarray, i: int) -> (np.ndarray, np.ndarray):
         angles = EulerAngles()
-        self.pozyx.getEulerAngles_deg(angles)
+        with self.pozyx_lock:
+            self.pozyx.getEulerAngles_deg(angles)
         yaw = angles[0]
 
         if self.jump(previous_angles[-1], yaw):
@@ -111,7 +97,7 @@ class Pedometer:
         return np.dot(filtering_weights, np.append(previous_yaws, new_yaw))
 
     def detect_step(self) -> None:
-        min_delay = 0.175
+        min_delay = 0.2
         min_acc = 1.175
 
         local_max_index = np.argmax(self.buffer)
@@ -135,7 +121,8 @@ class Pedometer:
 
     def holding_angle(self) -> float:
         gravity = LinearAcceleration()
-        self.pozyx.getGravityVector_mg(gravity)
+        with self.pozyx_lock:
+            self.pozyx.getGravityVector_mg(gravity)
 
         return math.atan(abs(gravity[2]/gravity[1])) if gravity[1] != 0 else 0
 
@@ -148,23 +135,12 @@ class Pedometer:
     def update_trajectory(self):
         step_length = 0.75
 
-        self.position.x += step_length * -math.cos(math.radians(self.steps[-1].z))
-        self.position.y += step_length * math.sin(math.radians(self.steps[-1].z))
+        delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z))
+        delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z))
 
-        time_between_steps = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
+        measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
+        measured_yaw = self.steps[-1].z
+        delta_time = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
 
-        self.ekf.update_position(self.position, self.steps[-1].z, time_between_steps)
-        self.ekf_positions.append(Point(self.ekf.x[0], self.ekf.x[2], self.ekf.x[3]))
-
-        self.positions.append(Point(self.position.x, self.position.y, self.position.z))
-
-        self.communication_queue.put(self.position)
-
-    @staticmethod
-    def connect_pozyx() -> PozyxSerial:
-        serial_port = get_first_pozyx_serial_port()
-
-        if serial_port is None:
-            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
-
-        return PozyxSerial(serial_port)
+        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, delta_time, measured_yaw)
+        self.communication_queue.put(UpdateMessage.save(message))
