@@ -4,12 +4,6 @@ pipeline {
     agent any
 
     stages {
-        stage("Installs / Updates") {
-            steps {
-                sh "/usr/local/bin/pip3 --no-cache-dir install -r requirements.txt"
-            }
-        }
-
         stage("Tests") {
             steps {
                 script {
