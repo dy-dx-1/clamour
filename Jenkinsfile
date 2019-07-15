@@ -7,7 +7,7 @@ pipeline {
         stage("Tests") {
             steps {
                 script {
-                    rc = sh(script: "python3 tests/tests.ut.py -v", returnStatus: true)
+                    rc = sh(script: "python3 tests/main.ut.py -v", returnStatus: true)
 
                     if(rc != 0) {
                         error("Tests failed")
