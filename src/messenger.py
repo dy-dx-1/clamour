@@ -145,7 +145,7 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data, status = self.obtain_message_from_pozyx()
+        sender_id, data, _ = self.obtain_message_from_pozyx()
 
         try:
             if sender_id != 0 and data != 0:
@@ -173,10 +173,7 @@ class Messenger:
     def update_neighbor_dictionary(self) -> None:
         new_message = self.message_box.peek_last()
         new_message.decode()
-        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id,  # todo @yanjun: the neighborhood from which does not receive msg for a long time should be deleted. A garbage collection mechanism for neighborhood hood.
-                                                                      perf_counter(),
-                                                                      new_message.message_type,
-                                                                      new_message)
+        self.neighborhood.current_neighbors[new_message.sender_id] = ([], perf_counter())
 
     def handle_error(self) -> None:
         error_code = SingleRegister()
