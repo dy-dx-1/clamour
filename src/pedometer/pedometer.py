@@ -59,9 +59,9 @@ class Pedometer:
                 print(f"X: {self.ekf.x[0]}, Y: {self.ekf.x[0]}")
 
             elif message.update_type == UpdateType.TRILATERATION:
-                self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
+                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.delta_time)
             elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.delta_time, message.neighbors)
+                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.delta_time, message.neighbors)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()

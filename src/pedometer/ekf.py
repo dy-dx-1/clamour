@@ -100,19 +100,17 @@ class CustomEKF(ExtendedKalmanFilter):
                                       lambda _: self.observation_matrix,
                                       self.hx_pedometer, self.R_pedometer)
 
-    def trilateration_update(self, position: Coordinates, delta_time: float):
+    def trilateration_update(self, position: Coordinates, yaw: float, delta_time: float):
         self.pre_update(delta_time)
-        calculated_yaw = atan2(position.x - self.x[0], position.y - self.x[2])
 
-        super(CustomEKF, self).update(asarray([position.x, position.y, position.y, calculated_yaw]),
+        super(CustomEKF, self).update(asarray([position.x, position.y, position.y, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_trilateration, self.R_trilateration)
 
-    def ranging_update(self, distance: Coordinates, delta_time: float, neighbor_position: ndarray):
+    def ranging_update(self, distance: Coordinates, yaw: float, delta_time: float, neighbor_position: ndarray):
         self.pre_update(delta_time)
-        calculated_yaw = atan2(distance.x - self.x[0], distance.y - self.x[2])
 
-        super(CustomEKF, self).update(asarray([distance.x, distance.y, distance.z, calculated_yaw]),
+        super(CustomEKF, self).update(asarray([distance.x, distance.y, distance.z, yaw]),
                                       self.h_ranging, self.hx_ranging, self.R_ranging,
                                       args=neighbor_position,
-                                      hx_args=(neighbor_position, calculated_yaw))
+                                      hx_args=(neighbor_position, yaw))

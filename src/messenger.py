@@ -24,7 +24,7 @@ class Messenger:
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, dt: float, neighbors: list) -> None:
+    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, dt: float, neighbors: list) -> None:
         message = UpdateMessage(update_type, measured_position, dt, neighbors, measured_yaw=None)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
