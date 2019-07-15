@@ -29,6 +29,7 @@ class Pedometer:
 
     def run(self):
         print("running pedometer")
+        self.write_csv_states_headers()
         start_time = time()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
@@ -49,6 +50,11 @@ class Pedometer:
             self.process_latest_state_info()
             sleep(0.01)
 
+    @staticmethod
+    def write_csv_states_headers():
+        with open("states.csv", "w") as states:
+            states.write("X;Y:Z;Theta\n")
+
     def process_latest_state_info(self):
         # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
         if not self.communication_queue.empty():
@@ -56,12 +62,13 @@ class Pedometer:
 
             if message.update_type == UpdateType.PEDOMETER:
                 self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
-                print(f"X: {self.ekf.x[0]}, Y: {self.ekf.x[0]}")
-
             elif message.update_type == UpdateType.TRILATERATION:
                 self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
             elif message.update_type == UpdateType.RANGING:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.timestamp, message.neighbors)
+
+            with open("states.csv", "a") as states:
+                states.write(f"{self.ekf.x[0]};{self.ekf.x[2]};{self.ekf.x[4]};{self.ekf.x[6]}\n")
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
