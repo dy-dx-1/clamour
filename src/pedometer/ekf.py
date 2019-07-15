@@ -13,17 +13,17 @@ class CustomEKF(ExtendedKalmanFilter):
         self.R_pedometer = array([[20, 0, 0, 0],
                                   [0, 20, 0, 0],
                                   [0, 0, 20, 0],
-                                  [0, 0, 0, 30]])
+                                  [0, 0, 0, 10]])
 
         self.R_trilateration = array([[15, 0, 0, 0],
                                       [0, 15, 0, 0],
                                       [0, 0, 15, 0],
-                                      [0, 0, 0, 40]])
+                                      [0, 0, 0, 10]])
 
         self.R_ranging = array([[25, 0, 0, 0],
                                 [0, 25, 0, 0],
                                 [0, 0, 25, 0],
-                                [0, 0, 0, 40]])
+                                [0, 0, 0, 10]])
 
         self.observation_matrix = array([[1, 0, 0, 0, 0, 0, 0, 0],
                                          [0, 0, 1, 0, 0, 0, 0, 0],
@@ -40,7 +40,7 @@ class CustomEKF(ExtendedKalmanFilter):
                         [0, 0, 0, 0, 0, 0, 0, 0],
                         [0, 0, 0, 0, 0, self.dt / 10, 0, 0],
                         [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, self.dt / 5]])
+                        [0, 0, 0, 0, 0, 0, 0, self.dt / 10]])
 
         self.F = eye(8) + array([[0, self.dt, 0, 0, 0, 0, 0, 0],
                                  [0, 0, 0, 0, 0, 0, 0, 0],
