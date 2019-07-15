@@ -8,8 +8,8 @@ pipeline {
             steps {
                 // The 'unittest' package is not included in the requirements.txt, 
                 // because it is only required for testing and should not be included in the image.
-                sh "/usr/bin/pip3 install unittest"
-                sh "/usr/bin/pip3 install -r requirements.txt"
+                sh "/usr/local/bin/pip3 install unittest"
+                sh "/usr/local/bin/pip3 install -r requirements.txt"
             }
         }
 
