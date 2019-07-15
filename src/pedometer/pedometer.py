@@ -4,7 +4,7 @@ import numpy as np
 
 from multiprocessing import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
-from time import perf_counter, sleep
+from time import sleep, time
 from .ekf import CustomEKF
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
@@ -29,7 +29,7 @@ class Pedometer:
 
     def run(self):
         print("running pedometer")
-        start_time = perf_counter()
+        start_time = time()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
 
@@ -43,7 +43,7 @@ class Pedometer:
                 nb_measurements += 1
 
             self.buffer = np.append(self.buffer[1:],
-                                    [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
+                                    [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
 
             self.detect_step()
             self.process_latest_state_info()
@@ -55,13 +55,13 @@ class Pedometer:
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
 
             if message.update_type == UpdateType.PEDOMETER:
-                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
+                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
                 print(f"X: {self.ekf.x[0]}, Y: {self.ekf.x[0]}")
 
             elif message.update_type == UpdateType.TRILATERATION:
-                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.delta_time)
+                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
             elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.delta_time, message.neighbors)
+                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.timestamp, message.neighbors)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
@@ -140,7 +140,6 @@ class Pedometer:
 
         measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
         measured_yaw = self.steps[-1].z
-        delta_time = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
 
-        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, delta_time, measured_yaw)
+        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, time(), measured_yaw)
         self.communication_queue.put(UpdateMessage.save(message))

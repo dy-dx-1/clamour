@@ -1,6 +1,6 @@
 import random
 from multiprocessing import Lock
-from time import perf_counter
+from time import perf_counter, time
 
 from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
 
@@ -24,8 +24,8 @@ class Messenger:
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, dt: float, neighbors: list) -> None:
-        message = UpdateMessage(update_type, measured_position, dt, neighbors, measured_yaw=None)
+    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None) -> None:
+        message = UpdateMessage(update_type, measured_position, yaw, time(), neighbors)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, time: int) -> None:

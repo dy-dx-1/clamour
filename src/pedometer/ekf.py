@@ -9,6 +9,7 @@ class CustomEKF(ExtendedKalmanFilter):
         super(CustomEKF, self).__init__(dim_x=8, dim_z=4)
 
         self.dt = 0.1
+        self.last_measurement_time = 0
         self.set_qf()
         self.R_pedometer = array([[20, 0, 0, 0],
                                   [0, 20, 0, 0],
@@ -87,28 +88,30 @@ class CustomEKF(ExtendedKalmanFilter):
                       [deltas[6], 0, deltas[7], 0, deltas[8], 0, 0, 0],
                       [0, 0, 0, 0, 0, 0, 1, 0]])
 
-    def pre_update(self, dt):
-        if dt != self.dt:
-            self.dt = dt
+    def pre_update(self, timestamp: float) -> None:
+        if timestamp > self.last_measurement_time:
+            self.dt = timestamp - self.last_measurement_time
             self.set_qf()
+        else:
+            print("Received message with bad timestamp.")
         self.predict()
 
-    def pedometer_update(self, position: Coordinates, yaw: float, delta_time: float):
-        self.pre_update(delta_time)
+    def pedometer_update(self, position: Coordinates, yaw: float, timestamp: float):
+        self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_pedometer, self.R_pedometer)
 
-    def trilateration_update(self, position: Coordinates, yaw: float, delta_time: float):
-        self.pre_update(delta_time)
+    def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float):
+        self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.y, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_trilateration, self.R_trilateration)
 
-    def ranging_update(self, distance: Coordinates, yaw: float, delta_time: float, neighbor_position: ndarray):
-        self.pre_update(delta_time)
+    def ranging_update(self, distance: Coordinates, yaw: float, timestamp: float, neighbor_position: ndarray):
+        self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([distance.x, distance.y, distance.z, yaw]),
                                       self.h_ranging, self.hx_ranging, self.R_ranging,

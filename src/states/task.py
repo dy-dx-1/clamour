@@ -1,6 +1,5 @@
 import random
 from multiprocessing import Lock
-from time import time
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
@@ -23,12 +22,10 @@ class Task(TDMAState):
         self.anchors = anchors
         self.id = id
         self.localize = self.ranging
-        self.dt = 0
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.messenger = messenger
-        self.last_ekf_step_time = 0
 
     def execute(self) -> State:
         self.discover_devices()
@@ -58,11 +55,12 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
             status &= self.pozyx.getEulerAngles_deg(angles)
+        yaw = angles[0]
         
         scaled_position = Coordinates(position.x/10, position.y/10, position.z/10)
 
         if status == POZYX_SUCCESS:
-            self.update(UpdateType.TRILATERATION, scaled_position, yaw)
+            self.messenger.send_new_measurement(UpdateType.TRILATERATION, scaled_position, yaw)
 
         return status
 
@@ -90,14 +88,10 @@ class Task(TDMAState):
                                    self.anchors.anchors_dict[ranging_target_id][4]/10])
         
         if status == POZYX_SUCCESS:
-            self.update(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
+            self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
         return status
 
-    def update(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None):
-        self.dt = time() - self.last_ekf_step_time
-        self.messenger.send_new_measurement(update_type, measured_position, yaw, self.dt, neighbors)
-        self.last_ekf_step_time = time()
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
