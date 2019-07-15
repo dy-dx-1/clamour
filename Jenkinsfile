@@ -1,13 +1,5 @@
-#!groovy
-
 pipeline {
     agent any
-
-    environment {
-        CONTAINER_NAME = "clamour"
-        CONTAINER_TAG = "latest"
-        DOCKER_HUB_CREDENTIALS = credentials("docker_hub")
-    }
 
     stages {
         stage("Installs / Updates") {
@@ -33,8 +25,8 @@ pipeline {
 
         stage("Deployment") {
             steps {
-                buildImage(CONTAINER_NAME, CONTAINER_TAG)
-                pushImage(CONTAINER_NAME, CONTAINER_TAG, DOCKER_HUB_CREDENTIALS_USR, DOCKER_HUB_CREDENTIALS_PSW)
+                buildImage("clamour", "latest")
+                pushImage("clamour", "latest", "samsei", "pz9sQ9tUMQy5ZFU")
             }
         }
     }
