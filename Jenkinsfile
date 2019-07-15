@@ -6,7 +6,7 @@ pipeline {
     stages {
         stage("Installs / Updates") {
             steps {
-                sh "/usr/local/bin/pip3 install -r requirements.txt"
+                sh "/usr/local/bin/pip3 --no-cache-dir install -r requirements.txt"
             }
         }
 
