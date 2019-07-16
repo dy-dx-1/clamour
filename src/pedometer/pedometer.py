@@ -68,7 +68,7 @@ class Pedometer:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.timestamp, message.neighbors)
 
             with open("states.csv", "a") as states:
-                states.write(f"{self.ekf.x[0]};{self.ekf.x[2]};{self.ekf.x[4]};{self.ekf.x[6]}\n")
+                states.write(str(self.ekf.x[0]) + "; " + str(self.ekf.x[2]) + "; " + str(self.ekf.x[4]) + "; " + str(self.ekf.x[6]) + "\n")
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()

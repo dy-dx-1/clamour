@@ -20,4 +20,4 @@ class PedometerMeasurement:
         return self.y == other.y
 
     def __repr__(self):
-        return f"x: {round(self.x, 3)} y: {round(self.y, 3)} z: {round(self.z, 3)}"
+        return "x: " + str(round(self.x, 3)) + " y: " + str(round(self.y, 3)) + " z: " + str(round(self.z, 3))
