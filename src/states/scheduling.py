@@ -24,13 +24,7 @@ class Scheduling(TDMAState):
         if self.neighborhood.is_alone():
             self.alone_slot_assignment()
         else:
-            if self.is_broadcast_slot():
-                self.messenger.broadcast_control_message()
-            else:
-                self.messenger.receive_message()
-
-            self.slot_assignment.update_free_slots()
-            self.update_pure_send_list()
+            self.community_slot_assignment()
 
         return self.next()
 
@@ -44,6 +38,19 @@ class Scheduling(TDMAState):
         else:
             return State.SCHEDULING
 
+    def community_slot_assignment(self):
+        if self.is_broadcast_slot():
+            self.messenger.broadcast_control_message()
+        else:
+            self.messenger.receive_message()
+
+        self.slot_assignment.update_free_slots()
+        self.update_pure_send_list()
+
+    def alone_slot_assignment(self):
+        random_slots = choice(range(len(NB_TASK_SLOTS), 2 * NB_TASK_SLOTS / 3))  # We must leave some free slots
+        self.slot_assignment = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
+
     def is_broadcast_slot(self) -> bool:
         return int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
                 / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
@@ -53,6 +60,4 @@ class Scheduling(TDMAState):
                                                if self.slot_assignment.send_list[x] not in [-1, -2]
                                                and self.slot_assignment.receive_list[x] == -1]
 
-    def alone_slot_assignment(self):
-        random_slots = choice(range(len(NB_TASK_SLOTS), 2 * NB_TASK_SLOTS / 3))  # We must leave some free slots
-        self.slot_assignment = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
+
