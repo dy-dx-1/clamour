@@ -22,7 +22,7 @@ class Pedometer:
         initial_angles = EulerAngles()
         with self.pozyx_lock:
             self.pozyx.getEulerAngles_deg(initial_angles)
-        self.ekf = CustomEKF(Coordinates(), initial_angles[0])
+        self.ekf = None
 
         self.ekf_positions = []
         self.communication_queue = communication_queue
@@ -33,6 +33,8 @@ class Pedometer:
         start_time = time()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
+
+        self.initialize_ekf()
 
         while True:
             linear_acceleration = self.get_acceleration_measurement()
@@ -55,8 +57,15 @@ class Pedometer:
         with open("states.csv", "w") as states:
             states.write("X;Y:Z;Theta\n")
 
+    def initialize_ekf(self):
+        while self.ekf is None:
+            if not self.communication_queue.empty():
+                message = UpdateMessage.load(*self.communication_queue.get_nowait())
+                if message.update_type == UpdateType.TRILATERATION:
+                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw)
+                    self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+                    
     def process_latest_state_info(self):
-        # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
 
