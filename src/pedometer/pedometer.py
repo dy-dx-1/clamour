@@ -67,6 +67,7 @@ class Pedometer:
             elif message.update_type == UpdateType.RANGING:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.timestamp, message.neighbors)
 
+            print(str(self.ekf.x[0]) + "; " + str(self.ekf.x[2]) + "; " + str(self.ekf.x[4]) + "; " + str(self.ekf.x[6]) + "\n")
             with open("states.csv", "a") as states:
                 states.write(str(self.ekf.x[0]) + "; " + str(self.ekf.x[2]) + "; " + str(self.ekf.x[4]) + "; " + str(self.ekf.x[6]) + "\n")
 

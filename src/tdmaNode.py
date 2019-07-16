@@ -32,6 +32,9 @@ class TDMANode:
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
+        print(exception_type)
+        print(exception_value)
+        print(traceback)
         print("Finished with TDMA node.")
 
     def run(self) -> None:

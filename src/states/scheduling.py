@@ -2,7 +2,7 @@ from interfaces import Neighborhood, SlotAssignment, Timing
 from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME,
                                SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS)
 from messenger import Messenger
-from random import choice
+from random import sample
 
 from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState
@@ -48,8 +48,8 @@ class Scheduling(TDMAState):
         self.update_pure_send_list()
 
     def alone_slot_assignment(self):
-        random_slots = choice(range(len(NB_TASK_SLOTS), 2 * NB_TASK_SLOTS / 3))  # We must leave some free slots
-        self.slot_assignment = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
+        random_slots = sample(range(NB_TASK_SLOTS), int(2 * NB_TASK_SLOTS / 3))  # We must leave some free slots
+        self.slot_assignment.pure_send_list = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
 
     def is_broadcast_slot(self) -> bool:
         return int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
