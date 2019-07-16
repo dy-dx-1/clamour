@@ -29,7 +29,7 @@ class Task(TDMAState):
 
     def execute(self) -> State:
         self.discover_devices()
-        self.neighborhood.collect_garbage(self.timing.current_time)
+        self.neighborhood.collect_garbage()
         self.select_localization_method()
         self.set_manually_measured_anchors()
         self.broadcast_positioning_result(self.localize())
