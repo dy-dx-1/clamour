@@ -57,7 +57,7 @@ class Task(TDMAState):
             status &= self.pozyx.getEulerAngles_deg(angles)
         yaw = angles[0]
         
-        scaled_position = Coordinates(position.x/10, position.y/10, position.z/10)
+        scaled_position = Coordinates(position.x, position.y, position.z)
 
         if status == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, scaled_position, yaw)
