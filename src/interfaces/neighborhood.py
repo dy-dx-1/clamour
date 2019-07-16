@@ -10,3 +10,6 @@ class Neighborhood:
         for id, data in self.current_neighbors.items():
             if data[1] < current_time - OBSOLESCENCE_DELAY:
                 del self.current_neighbors[id]
+
+    def is_alone(self):
+        return len(self.current_neighbors) == 0
