@@ -35,7 +35,7 @@ class Task(TDMAState):
         self.broadcast_positioning_result(self.localize())
 
         return self.next()
-        
+
     def next(self) -> State:
         if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION +
                                                 (self.timing.current_slot_id + 1) * TASK_SLOT_DURATION):
@@ -79,18 +79,18 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
             status &= self.pozyx.getEulerAngles_deg(angles)
+
         yaw = angles.heading
 
-        measured_position = Coordinates(device_range.data[1]/10, 0, 0)
-        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2]/10,
-                                   self.anchors.anchors_dict[ranging_target_id][3]/10,
-                                   self.anchors.anchors_dict[ranging_target_id][4]/10])
+        measured_position = Coordinates(device_range.data[1], 0, 0)
+        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
+                                   self.anchors.anchors_dict[ranging_target_id][3],
+                                   self.anchors.anchors_dict[ranging_target_id][4]])
 
         if status == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
         return status
-
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
@@ -110,7 +110,7 @@ class Task(TDMAState):
 
         with self.pozyx_lock:
             self.pozyx.clearDevices()
-        
+
         self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
 
         if len(self.anchors.available_anchors) < 3:
@@ -119,7 +119,7 @@ class Task(TDMAState):
     def discover(self, discovery_type: int) -> None:
         with self.pozyx_lock:
             discovery_status = self.pozyx.doDiscovery(discovery_type=discovery_type)
-        
+
         if discovery_status == POZYX_SUCCESS:
             devices = self.get_devices()
 
@@ -131,7 +131,7 @@ class Task(TDMAState):
         size = SingleRegister()
         with self.pozyx_lock:
             status = self.pozyx.getDeviceListSize(size)
-        
+
         devices = DeviceList(list_size=size[0])
 
         if status == POZYX_SUCCESS and size[0] > 0:
@@ -159,7 +159,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.getCoordinates(device_coordinates)
                     self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
-        
+
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
                 self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))

@@ -31,7 +31,7 @@ class CustomEKF(ExtendedKalmanFilter):
                                          [0, 0, 0, 0, 1, 0, 0, 0],
                                          [0, 0, 0, 0, 0, 0, 1, 0]])
 
-        self.x = array([position.x / 10, 0, position.y / 10, 0, position.z / 10, 0, yaw, 0])
+        self.x = array([position.x, 0, position.y, 0, position.z, 0, yaw, 0])
 
     def set_qf(self):
         self.Q = array([[0, 0, 0, 0, 0, 0, 0, 0],
