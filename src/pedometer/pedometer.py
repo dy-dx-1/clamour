@@ -84,7 +84,8 @@ class Pedometer:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - YAW_OFFSET,
                                         message.timestamp, message.neighbors)
 
-            print(str(round(self.ekf.x[0], 3)) + "; " + str(round(self.ekf.x[2], 3)) + "; " + str(round(self.ekf.x[4], 3)) + "; " + str(round(self.ekf.x[6], 3)) + "\n")
+            print(math.cos(math.radians(self.ekf.x[6])), math.sin(math.radians(self.ekf.x[6])))
+            # print(str(round(self.ekf.x[0], 3)) + "; " + str(round(self.ekf.x[2], 3)) + "; " + str(round(self.ekf.x[4], 3)) + "; " + str(round(self.ekf.x[6], 3)) + "\n")
             with open("states.csv", "a") as states:
                 states.write(str(self.ekf.x[0]) + "; " + str(self.ekf.x[2]) + "; " + str(self.ekf.x[4]) + "; " + str(self.ekf.x[6]) + "\n")
 
@@ -163,8 +164,10 @@ class Pedometer:
         delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z - YAW_OFFSET))
         delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z - YAW_OFFSET))
 
-        measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
-        measured_yaw = self.steps[-1].z
+        measured_position = Coordinates(self.ekf.x[0] + delta_position_x,
+                                        self.ekf.x[2] + delta_position_y,
+                                        self.ekf.x[4])  # The pedometer cannot measure height; we assumed it is constant
+        measured_yaw = self.steps[-1].z - YAW_OFFSET
 
         message = UpdateMessage(UpdateType.PEDOMETER, measured_position, measured_yaw, time())
         self.communication_queue.put(UpdateMessage.save(message))
