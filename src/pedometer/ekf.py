@@ -34,14 +34,15 @@ class CustomEKF(ExtendedKalmanFilter):
         self.x = array([position.x, 0, position.y, 0, position.z, 0, yaw, 0])
 
     def set_qf(self):
-        self.Q = array([[0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, self.dt / 10, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, self.dt / 10, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, self.dt / 10, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, 0],
-                        [0, 0, 0, 0, 0, 0, 0, self.dt / 10]])
+        # As we integrate to find position, we lose precision. Thus we trust x less than dx/dt, hence the dt*2 vs dt.
+        self.Q = array([[self.dt * 2, 0, 0, 0, 0, 0, 0, 0],
+                        [0, self.dt, 0, 0, 0, 0, 0, 0],
+                        [0, 0, self.dt * 2, 0, 0, 0, 0, 0],
+                        [0, 0, 0, self.dt, 0, 0, 0, 0],
+                        [0, 0, 0, 0, self.dt * 2, 0, 0, 0],
+                        [0, 0, 0, 0, 0, self.dt, 0, 0],
+                        [0, 0, 0, 0, 0, 0, self.dt * 2, 0],
+                        [0, 0, 0, 0, 0, 0, 0, self.dt]])
 
         self.F = eye(8) + array([[0, self.dt, 0, 0, 0, 0, 0, 0],
                                  [0, 0, 0, 0, 0, 0, 0, 0],
