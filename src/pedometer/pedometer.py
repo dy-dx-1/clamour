@@ -62,7 +62,7 @@ class Pedometer:
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
-                    
+
     def process_latest_state_info(self):
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
@@ -70,14 +70,14 @@ class Pedometer:
 
             # Only trilateration and ranging yaws need to be corrected with an offset,
             # because the pedometer yaw is corrected in update_trajectory()
-            if message.update_type == UpdateType.PEDOMETER:
-                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
-            elif message.update_type == UpdateType.TRILATERATION:
+            #if message.update_type == UpdateType.PEDOMETER:
+            #    self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+            if message.update_type == UpdateType.TRILATERATION:
                 self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                               message.timestamp)
-            elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
-                                        message.timestamp, message.neighbors)
+            #elif message.update_type == UpdateType.RANGING:
+            #    self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
+            #                            message.timestamp, message.neighbors)
 
             # print(math.cos(math.radians(self.ekf.x[6])), math.sin(math.radians(self.ekf.x[6])))
             print(str(round(self.ekf.x[0], 3)) + "; "
