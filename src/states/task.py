@@ -55,12 +55,12 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
             status &= self.pozyx.getEulerAngles_deg(angles)
-        yaw = angles[0]
-        
-        scaled_position = Coordinates(position.x, position.y, position.z)
+        yaw = angles.heading
+
+        position = Coordinates(position.x, position.y, position.z)
 
         if status == POZYX_SUCCESS:
-            self.messenger.send_new_measurement(UpdateType.TRILATERATION, scaled_position, yaw)
+            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
         return status
 
@@ -70,7 +70,7 @@ class Task(TDMAState):
             device_coordinates = Coordinates()
             with self.pozyx_lock:
                 self.pozyx.getCoordinates(device_coordinates)
-            
+
             self.anchors.anchors_dict[ranging_target_id] = DeviceCoordinates(ranging_target_id, 1, device_coordinates)
 
         device_range = DeviceRange()
@@ -79,14 +79,13 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
             status &= self.pozyx.getEulerAngles_deg(angles)
-        yaw = angles[0]
-
+        yaw = angles.heading
 
         measured_position = Coordinates(device_range.data[1]/10, 0, 0)
         neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2]/10,
                                    self.anchors.anchors_dict[ranging_target_id][3]/10,
                                    self.anchors.anchors_dict[ranging_target_id][4]/10])
-        
+
         if status == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
