@@ -6,6 +6,7 @@ from multiprocessing import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
 from time import sleep, time
 from .ekf import CustomEKF
+from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
@@ -30,23 +31,26 @@ class Pedometer:
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
 
-        self.initialize_ekf()
+        with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
+            self.initialize_ekf()
+            socket.send(self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P))
 
-        while True:
-            linear_acceleration = self.get_acceleration_measurement()
-            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
-            vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
+            while True:
+                linear_acceleration = self.get_acceleration_measurement()
+                yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
+                vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
 
-            # Only used to verify if previous_angles has been filled before using it for smoothing.
-            if nb_measurements < 5:
-                nb_measurements += 1
+                # Only used to verify if previous_angles has been filled before using it for smoothing.
+                if nb_measurements < 5:
+                    nb_measurements += 1
 
-            self.buffer = np.append(self.buffer[1:],
-                                    [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
+                self.buffer = np.append(self.buffer[1:],
+                                        [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
 
-            self.detect_step()
-            self.process_latest_state_info()
-            sleep(0.01)
+                self.detect_step()
+                self.process_latest_state_info()
+                socket.send(self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P))
+                sleep(0.01)
 
     @staticmethod
     def write_csv_states_headers():
