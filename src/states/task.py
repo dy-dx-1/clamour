@@ -81,17 +81,15 @@ class Task(TDMAState):
             status &= self.pozyx.getEulerAngles_deg(angles)
         yaw = angles[0]
 
-
-        measured_position = Coordinates(device_range.data[1]/10, 0, 0)
-        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2]/10,
-                                   self.anchors.anchors_dict[ranging_target_id][3]/10,
-                                   self.anchors.anchors_dict[ranging_target_id][4]/10])
+        measured_position = Coordinates(device_range.data[1], 0, 0)
+        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
+                                   self.anchors.anchors_dict[ranging_target_id][3],
+                                   self.anchors.anchors_dict[ranging_target_id][4]])
         
         if status == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
         return status
-
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.

@@ -84,10 +84,16 @@ class Pedometer:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                         message.timestamp, message.neighbors)
 
-            print(math.cos(math.radians(self.ekf.x[6])), math.sin(math.radians(self.ekf.x[6])))
-            # print(str(round(self.ekf.x[0], 3)) + "; " + str(round(self.ekf.x[2], 3)) + "; " + str(round(self.ekf.x[4], 3)) + "; " + str(round(self.ekf.x[6], 3)) + "\n")
+            # print(math.cos(math.radians(self.ekf.x[6])), math.sin(math.radians(self.ekf.x[6])))
+            print(str(round(self.ekf.x[0], 3)) + "; "
+                  + str(round(self.ekf.x[2], 3)) + "; "
+                  + str(round(self.ekf.x[4], 3)) + "; "
+                  + str(round(self.ekf.x[6], 3)) + "\n")
             with open("states.csv", "a") as states:
-                states.write(str(self.ekf.x[0]) + "; " + str(self.ekf.x[2]) + "; " + str(self.ekf.x[4]) + "; " + str(self.ekf.x[6]) + "\n")
+                states.write(str(self.ekf.x[0]) + "; "
+                             + str(self.ekf.x[2]) + "; "
+                             + str(self.ekf.x[4]) + "; "
+                             + str(self.ekf.x[6]) + "\n")
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
