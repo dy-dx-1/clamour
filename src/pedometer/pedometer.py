@@ -9,6 +9,8 @@ from .ekf import CustomEKF
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
+YAW_OFFSET = 5.25  # Measured  in degrees relative to global coordinates X-Axis
+
 
 class Pedometer:
     def __init__(self, communication_queue, pozyx: PozyxSerial, pozyx_lock: Lock):
@@ -63,7 +65,6 @@ class Pedometer:
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
                     print("Initial measurements: ", message.measured_xyz, message.measured_yaw)
-                    exit()
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
                     
@@ -72,12 +73,16 @@ class Pedometer:
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             print(message.update_type)
 
+            # Only trilateration and ranging yaws need to be corrected with an offset,
+            # because the pedometer yaw is corrected in update_trajectory()
             if message.update_type == UpdateType.PEDOMETER:
                 self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
             elif message.update_type == UpdateType.TRILATERATION:
-                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - YAW_OFFSET,
+                                              message.timestamp)
             elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw, message.timestamp, message.neighbors)
+                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - YAW_OFFSET,
+                                        message.timestamp, message.neighbors)
 
             print(str(round(self.ekf.x[0], 3)) + "; " + str(round(self.ekf.x[2], 3)) + "; " + str(round(self.ekf.x[4], 3)) + "; " + str(round(self.ekf.x[6], 3)) + "\n")
             with open("states.csv", "a") as states:
@@ -94,7 +99,7 @@ class Pedometer:
         angles = EulerAngles()
         with self.pozyx_lock:
             self.pozyx.getEulerAngles_deg(angles)
-        yaw = angles[0]
+        yaw = angles.heading
 
         if self.jump(previous_angles[-1], yaw):
             previous_angles = [yaw] * 4
@@ -153,10 +158,10 @@ class Pedometer:
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
 
     def update_trajectory(self):
-        step_length = 0.75
+        step_length = 750  # millimeters
 
-        delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z))
-        delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z))
+        delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z - YAW_OFFSET))
+        delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z - YAW_OFFSET))
 
         measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
         measured_yaw = self.steps[-1].z
