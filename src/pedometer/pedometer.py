@@ -50,7 +50,9 @@ class Pedometer:
 
     @staticmethod
     def write_csv_states_headers():
-        with open("states.csv", "w") as states:
+        with open("states_ekf.csv", "w") as states:
+            states.write("X;Y:Z;Theta\n")
+        with open("states_unfiltered.csv", "w") as states:
             states.write("X;Y:Z;Theta\n")
 
     def initialize_ekf(self):
@@ -84,11 +86,17 @@ class Pedometer:
                   + str(round(self.ekf.x[2], 3)) + "; "
                   + str(round(self.ekf.x[4], 3)) + "; "
                   + str(round(self.ekf.x[6], 3)) + "\n")
-            with open("states.csv", "a") as states:
+            with open("states_ekf.csv", "a") as states:
                 states.write(str(self.ekf.x[0]) + "; "
                              + str(self.ekf.x[2]) + "; "
                              + str(self.ekf.x[4]) + "; "
                              + str(self.ekf.x[6]) + "\n")
+            with open("states_unfiltered.csv", "a") as states:
+                states.write(str(message.measured_xyz.x) + "; "
+                             + str(message.measured_xyz.y) + "; "
+                             + str(message.measured_xyz.z) + "; "
+                             + str(message.measured_yaw) + "\n")
+
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
