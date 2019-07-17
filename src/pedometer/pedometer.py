@@ -19,12 +19,7 @@ class Pedometer:
         self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
 
-        # TODO: Initialize EKF properly
-        initial_angles = EulerAngles()
-        with self.pozyx_lock:
-            self.pozyx.getEulerAngles_deg(initial_angles)
         self.ekf = None
-
         self.ekf_positions = []
         self.communication_queue = communication_queue
 
