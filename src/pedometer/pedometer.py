@@ -9,8 +9,6 @@ from .ekf import CustomEKF
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
-YAW_OFFSET = 5.25  # Measured  in degrees relative to global coordinates X-Axis
-
 
 class Pedometer:
     def __init__(self, communication_queue, pozyx: PozyxSerial, pozyx_lock: Lock):
@@ -19,6 +17,7 @@ class Pedometer:
         self.pozyx_lock = pozyx_lock
         self.steps = []
         self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
+        self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
 
         # TODO: Initialize EKF properly
         initial_angles = EulerAngles()
@@ -65,7 +64,8 @@ class Pedometer:
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
                     print("Initial measurements: ", message.measured_xyz, message.measured_yaw)
-                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - YAW_OFFSET)
+                    self.yaw_offset = message.measured_yaw
+                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
                     
     def process_latest_state_info(self):
@@ -78,10 +78,10 @@ class Pedometer:
             if message.update_type == UpdateType.PEDOMETER:
                 self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
             elif message.update_type == UpdateType.TRILATERATION:
-                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - YAW_OFFSET,
+                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                               message.timestamp)
             elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - YAW_OFFSET,
+                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                         message.timestamp, message.neighbors)
 
             print(math.cos(math.radians(self.ekf.x[6])), math.sin(math.radians(self.ekf.x[6])))
@@ -161,13 +161,13 @@ class Pedometer:
     def update_trajectory(self):
         step_length = 750  # millimeters
 
-        delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z - YAW_OFFSET))
-        delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z - YAW_OFFSET))
+        delta_position_x = step_length * math.cos(math.radians(self.steps[-1].z - self.yaw_offset))
+        delta_position_y = step_length * -math.sin(math.radians(self.steps[-1].z - self.yaw_offset))
 
         measured_position = Coordinates(self.ekf.x[0] + delta_position_x,
                                         self.ekf.x[2] + delta_position_y,
                                         self.ekf.x[4])  # The pedometer cannot measure height; we assumed it is constant
-        measured_yaw = self.steps[-1].z - YAW_OFFSET
+        measured_yaw = self.steps[-1].z - self.yaw_offset
 
         message = UpdateMessage(UpdateType.PEDOMETER, measured_position, measured_yaw, time())
         self.communication_queue.put(UpdateMessage.save(message))
