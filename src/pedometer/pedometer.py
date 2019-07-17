@@ -62,12 +62,15 @@ class Pedometer:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
+                    print("Initial measurements: ", message.measured_xyz, message.measured_yaw)
+                    exit()
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
                     
     def process_latest_state_info(self):
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
+            print(message.update_type)
 
             if message.update_type == UpdateType.PEDOMETER:
                 self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
