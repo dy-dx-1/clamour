@@ -25,8 +25,7 @@ class Pedometer:
         self.communication_queue = communication_queue
 
     def run(self):
-        print("running pedometer")
-        self.write_csv_states_headers()
+        print("Running pedometer")
         start_time = time()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
@@ -50,13 +49,6 @@ class Pedometer:
                 self.detect_step()
                 self.process_latest_state_info(socket)
                 sleep(0.01)
-
-    @staticmethod
-    def write_csv_states_headers():
-        with open("states_ekf.csv", "w") as states:
-            states.write("X;Y:Z;Theta\n")
-        with open("states_unfiltered.csv", "w") as states:
-            states.write("X;Y:Z;Theta\n")
 
     def initialize_ekf(self):
         while self.ekf is None:
@@ -90,17 +82,6 @@ class Pedometer:
                   + str(round(self.ekf.x[2], 3)) + "; "
                   + str(round(self.ekf.x[4], 3)) + "; "
                   + str(round(self.ekf.x[6], 3)) + "\n")
-            with open("states_ekf.csv", "a") as states:
-                states.write(str(self.ekf.x[0]) + "; "
-                             + str(self.ekf.x[2]) + "; "
-                             + str(self.ekf.x[4]) + "; "
-                             + str(self.ekf.x[6]) + "\n")
-            with open("states_unfiltered.csv", "a") as states:
-                states.write(str(message.measured_xyz.x) + "; "
-                             + str(message.measured_xyz.y) + "; "
-                             + str(message.measured_xyz.z) + "; "
-                             + str(message.measured_yaw) + "\n")
-
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
