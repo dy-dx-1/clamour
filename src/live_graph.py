@@ -13,13 +13,13 @@ MAX_INDEX = 12
 CSV_FOLDER = "./EKFlogs"
 
 
-class Line():
+class Line:
     def __init__(self):
         self.line = None
         self.xdata, self.ydata = [], []
 
 
-class Animation():
+class Animation:
     def __init__(self):
         self._fig, self._ax = plt.subplots()
         self._lines = []
@@ -33,8 +33,7 @@ class Animation():
         self._max_points = 15
         self._queue = None
         self.stop = False
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        self._csvfile = open("{}/log_{}.csv".format(CSV_FOLDER, timestr), 'w')
+        self._csvfile = open("{}/log_{}.csv".format(CSV_FOLDER, time.strftime("%Y%m%d-%H%M%S")), 'w')
         self._writer = csv.writer(self._csvfile, delimiter=',', lineterminator='\n')
 
     def data_gen(self):
@@ -121,7 +120,7 @@ class Animation():
         self._csvfile.close()
 
 
-class Stopper():
+class Stopper:
     def __init__(self):
         self.stop = False
 
@@ -134,7 +133,7 @@ def client_thread(connection, queue, stopper):
         queue.put(data)
 
 
-class Connector():
+class Connector:
     def __init__(self, host, port, receive_queue):
         self._host = host
         self._port = port
