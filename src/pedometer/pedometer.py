@@ -48,8 +48,7 @@ class Pedometer:
                                         [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
 
                 self.detect_step()
-                self.process_latest_state_info()
-                socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
+                self.process_latest_state_info(socket)
                 sleep(0.01)
 
     @staticmethod
@@ -69,7 +68,7 @@ class Pedometer:
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
 
-    def process_latest_state_info(self):
+    def process_latest_state_info(self, socket: ContextManagedSocket):
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             print(message.update_type)
@@ -81,6 +80,7 @@ class Pedometer:
             if message.update_type == UpdateType.TRILATERATION:
                 self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                               message.timestamp)
+                socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
             #elif message.update_type == UpdateType.RANGING:
             #    self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
             #                            message.timestamp, message.neighbors)
