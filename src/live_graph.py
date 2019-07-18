@@ -140,28 +140,34 @@ class Connector:
         self._socket = None
         self._connection = None
         self._queue = receive_queue
-        self.stop = False
+        self._stop = False
         self._stopper = Stopper()
 
     def run(self):
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._socket.bind((HOST, PORT))
-        self._socket.listen(5)
-
-        while not self.stop:
+        while not self._stop:
             connection, address = self._socket.accept()
-            ip, port = str(address[0]), str(address[1])
-            print("Connected with " + ip + ":" + port)
+            remote_ip, remote_port = str(address[0]), str(address[1])
+            print("Connected with " + remote_ip + ":" + remote_port)
 
             try:
                 Thread(target=client_thread, args=(connection, self._queue, self._stopper)).start()
             except:
                 print("Thread did not start.")
 
+    def stop(self):
+        self._stop = True
+
+    def __enter__(self):
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._socket.bind((self._host, self._port))
+        self._socket.listen(5)
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self._stopper.stop = True
 
-    def __del__(self):
         if self._connection:
             self._connection.close()
 
@@ -170,14 +176,14 @@ class Connector:
 
 
 if __name__ == '__main__':
-    HOST = ''  # Symbolic name meaning all available interfaces
-    PORT = 10555  # Arbitrary non-privileged port
+    host = ''  # Symbolic name meaning all available interfaces
+    port = 10555  # Arbitrary non-privileged port
 
     receive_queue = queue.Queue()
-    connector = Connector(HOST, PORT, receive_queue)
-    Thread(target=connector.run).start()
+    with Connector(host, port, receive_queue) as connector:
+        Thread(target=connector.run).start()
 
-    animation_ = Animation()
-    animation_.animate(receive_queue)
+        animation_ = Animation()
+        animation_.animate(receive_queue)
 
-    connector.stop = True
+        connector.stop()
