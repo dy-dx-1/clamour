@@ -1,123 +1,116 @@
-import csv
-import time
 import queue
 import socket
 import struct
 from threading import Thread
 
-import matplotlib.animation as animation
+import numpy as np
+import matplotlib.animation
 import matplotlib.pyplot as plt
 
-COLORS = ["red", "blue", "green", "black"]
 MAX_INDEX = 12
-CSV_FOLDER = "./EKFlogs"
-
-
-class Line:
-    def __init__(self):
-        self.line = None
-        self.xdata, self.ydata = [], []
 
 
 class Animation:
     def __init__(self):
-        self._fig, self._ax = plt.subplots()
-        self._lines = []
-        for i in range(MAX_INDEX):
-            line = Line()
-            line.line, = self._ax.plot([], [], lw=2, color=COLORS[i % (len(COLORS))])
-            self._lines.append(line)
-        self._ax.grid()
-        self._ymin, self._ymax = 0, 0
-        self._xmin, self._xmax = 0, 0
-        self._max_points = 15
+        self.fig = plt.figure(num=0, figsize=(12, 10))
+
+        self.ax01 = plt.subplot2grid((2, 2), (0, 0))
+        self.ax02 = plt.subplot2grid((2, 2), (0, 1))
+        self.ax03 = plt.subplot2grid((2, 2), (1, 0))
+        self.ax04 = plt.subplot2grid((2, 2), (1, 1))
+
+        self.set_plot_presentation()
+
+        # Placeholder data
+        self.t = np.zeros(0)
+        self.x_unfiltered = np.zeros(0)
+        self.x_filtered = np.zeros(0)
+        self.y_unfiltered = np.zeros(0)
+        self.y_filtered = np.zeros(0)
+        self.yaw_unfiltered = np.zeros(0)
+        self.yaw_filtered = np.zeros(0)
+
+        self.p000, = self.ax01.plot(self.x_filtered, self.y_filtered, "b-")
+        self.p010, = self.ax01.plot(self.t, self.x_filtered, "b-")
+        self.p011, = self.ax01.plot(self.t, self.x_unfiltered, "g-")
+        self.p100, = self.ax01.plot(self.t, self.y_filtered, "b-")
+        self.p101, = self.ax01.plot(self.t, self.y_unfiltered, "g-")
+        self.p110, = self.ax01.plot(self.t, self.yaw_filtered, "b-")
+        self.p111, = self.ax01.plot(self.t, self.yaw_unfiltered, "g-")
+
         self._queue = None
         self.stop = False
-        self._csvfile = open("{}/log_{}.csv".format(CSV_FOLDER, time.strftime("%Y%m%d-%H%M%S")), 'w')
-        self._writer = csv.writer(self._csvfile, delimiter=',', lineterminator='\n')
+
+    def set_plot_presentation(self):
+        self.fig.suptitle("Live data from tag")
+        self.set_plot_titles()
+        self.set_plot_grids()
+        self.set_plot_axes()
+
+    def set_plot_titles(self):
+        self.ax01.set_title("Cartesian position")
+        self.ax02.set_title("Filtered vs Unfiltered X")
+        self.ax03.set_title("Filtered vs Unfiltered Y")
+        self.ax04.set_title("Filtered vs Unfiltered Yaw")
+
+    def set_plot_grids(self):
+        self.ax01.grid(True)
+        self.ax02.grid(True)
+        self.ax03.grid(True)
+        self.ax04.grid(True)
+
+    def set_plot_axes(self):
+        self.ax01.set_xlabel("X")
+        self.ax02.set_xlabel("X")
+        self.ax03.set_xlabel("Y")
+        self.ax04.set_xlabel("Yaw")
+
+        self.ax01.set_xlabel("Y")
+        self.ax02.set_xlabel("Time")
+        self.ax03.set_xlabel("Time")
+        self.ax04.set_xlabel("Time")
 
     def data_gen(self):
         while not self.stop:
-            datas = []
+            data = []
             for _ in range(MAX_INDEX):
-                try:
-                    data = self._queue.get(False, None)
-                except queue.Empty:
-                    continue
-                except KeyboardInterrupt:
-                    break
-                try:
-                    state = struct.unpack('fff', data)
-                except:
-                    continue
-                self._writer.writerow(state)
-                if state[2] > 0:  # det(P) > means system is diverging
-                    print(int(state[0]), int(state[1]), 1/state[2])
-                x = state[0]
-                y = state[1]
+                if not self._queue.empty():
+                    data.append(struct.unpack(fmt='fffffff', string=self._queue.get(block=False)))
 
-                datas.append([0, x, y])
+            yield data
 
-            yield datas
+    def run(self, data):
+        for d in data:
+            print(d[0])
+            self.append_data(d)
+            self.set_data()
 
-    def init(self):
-        self._ax.set_ylim(-1.1, 1.1)
-        self._ax.set_xlim(0, 10)
+            return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111
 
-        for line in self._lines:
-            del line.xdata[:]
-            del line.ydata[:]
-            line.line.set_data(line.xdata, line.ydata)
+    def append_data(self, data):
+        self.t = np.append(self.t, data[0])
+        self.x_filtered = np.append(self.x_filtered, data[1])
+        self.x_unfiltered = np.append(self.x_unfiltered, data[2])
+        self.y_filtered = np.append(self.y_filtered, data[3])
+        self.y_unfiltered = np.append(self.y_unfiltered, data[4])
+        self.yaw_filtered = np.append(self.yaw_filtered, data[5])
+        self.yaw_unfiltered = np.append(self.yaw_unfiltered, data[6])
 
-        return self._lines,
-
-    def run(self, datas):
-        # update the data
-        for data in datas:
-            index, x, y = data
-
-            line = self._lines[index]
-            line.xdata.append(x)
-            line.ydata.append(y)
-
-            if len(line.xdata) > self._max_points:
-                line.xdata.pop(0)
-                line.ydata.pop(0)
-
-            if y < self._ymin:
-                self._ymin = y * 0.65 if y > 0 else y * 1.5
-                self._ax.set_ylim(self._ymin, self._ymax)
-                self._ax.figure.canvas.draw()
-
-            if y > self._ymax:
-                self._ymax = y * 1.5 if y > 0 else y * 0.65
-                self._ax.set_ylim(self._ymin, self._ymax)
-                self._ax.figure.canvas.draw()
-
-            if x < self._xmin:
-                self._xmin = x * 0.65 if x > 0 else x * 1.5
-                self._ax.set_xlim(self._xmin, self._xmax)
-                self._ax.figure.canvas.draw()
-
-            if x > self._xmax:
-                self._xmax = x * 1.5 if x > 0 else x * 0.65
-                self._ax.set_xlim(self._xmin, self._xmax)
-                self._ax.figure.canvas.draw()
-
-            line.line.set_data(line.xdata, line.ydata)
-
-        return self._lines,
+    def set_data(self):
+        self.p000.set_data(self.x_filtered, self.y_filtered)
+        self.p010.set_data(self.t, self.x_filtered)
+        self.p011.set_data(self.t, self.x_unfiltered)
+        self.p100.set_data(self.t, self.y_filtered)
+        self.p101.set_data(self.t, self.y_unfiltered)
+        self.p110.set_data(self.t, self.yaw_filtered)
+        self.p111.set_data(self.t, self.yaw_unfiltered)
 
     def animate(self, receive_queue):
         self._queue = receive_queue
-        ani = animation.FuncAnimation(self._fig, self.run, self.data_gen, blit=False, interval=50,
-                                      repeat=False, init_func=self.init)
+        _ = matplotlib.animation.FuncAnimation(self.fig, self.run, self.data_gen, interval=200, repeat=False)
         plt.show()
 
         self.stop = True
-
-    def __del__(self):
-        self._csvfile.close()
 
 
 class Stopper:
@@ -149,10 +142,7 @@ class Connector:
             remote_ip, remote_port = str(address[0]), str(address[1])
             print("Connected with " + remote_ip + ":" + remote_port)
 
-            try:
-                Thread(target=client_thread, args=(connection, self._queue, self._stopper)).start()
-            except:
-                print("Thread did not start.")
+            Thread(target=client_thread, args=(connection, self._queue, self._stopper)).start()
 
     def stop(self):
         self._stop = True
