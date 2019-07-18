@@ -31,12 +31,12 @@ class Animation:
         self.yaw_filtered = np.zeros(0)
 
         self.p000, = self.ax01.plot(self.x_filtered, self.y_filtered, "b-")
-        self.p010, = self.ax01.plot(self.t, self.x_filtered, "b-")
-        self.p011, = self.ax01.plot(self.t, self.x_unfiltered, "g-")
-        self.p100, = self.ax01.plot(self.t, self.y_filtered, "b-")
-        self.p101, = self.ax01.plot(self.t, self.y_unfiltered, "g-")
-        self.p110, = self.ax01.plot(self.t, self.yaw_filtered, "b-")
-        self.p111, = self.ax01.plot(self.t, self.yaw_unfiltered, "g-")
+        self.p010, = self.ax02.plot(self.t, self.x_filtered, "b-")
+        self.p011, = self.ax02.plot(self.t, self.x_unfiltered, "g-")
+        self.p100, = self.ax03.plot(self.t, self.y_filtered, "b-")
+        self.p101, = self.ax03.plot(self.t, self.y_unfiltered, "g-")
+        self.p110, = self.ax04.plot(self.t, self.yaw_filtered, "b-")
+        self.p111, = self.ax04.plot(self.t, self.yaw_unfiltered, "g-")
 
         self._queue = None
         self.stop = False
@@ -46,6 +46,7 @@ class Animation:
         self.set_plot_titles()
         self.set_plot_grids()
         self.set_plot_axes()
+        self.set_axes_limits()
 
     def set_plot_titles(self):
         self.ax01.set_title("Cartesian position")
@@ -70,18 +71,28 @@ class Animation:
         self.ax03.set_xlabel("Time")
         self.ax04.set_xlabel("Time")
 
+    def set_axes_limits(self):
+        self.ax01.set_xlim(0.0, 20.0)
+        self.ax02.set_xlim(0.0, 20.0)
+        self.ax03.set_xlim(0.0, 20.0)
+        self.ax04.set_xlim(0.0, 20.0)
+
+        self.ax01.set_ylim(0.0, 20.0)
+        self.ax02.set_ylim(0.0, 20.0)
+        self.ax03.set_ylim(0.0, 20.0)
+        self.ax04.set_ylim(80.0, 100.0)
+
     def data_gen(self):
         while not self.stop:
             data = []
             for _ in range(MAX_INDEX):
                 if not self._queue.empty():
-                    data.append(struct.unpack(fmt='fffffff', string=self._queue.get(block=False)))
+                    data.append(struct.unpack('fffffff', self._queue.get(block=False)))
 
             yield data
 
     def run(self, data):
         for d in data:
-            print(d[0])
             self.append_data(d)
             self.set_data()
 
