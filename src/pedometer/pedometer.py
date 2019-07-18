@@ -33,7 +33,7 @@ class Pedometer:
 
         with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
             self.initialize_ekf()
-            socket.send(self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P))
+            socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
 
             while True:
                 linear_acceleration = self.get_acceleration_measurement()
@@ -49,7 +49,7 @@ class Pedometer:
 
                 self.detect_step()
                 self.process_latest_state_info()
-                socket.send(self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P))
+                socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
                 sleep(0.01)
 
     @staticmethod
