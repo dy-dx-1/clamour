@@ -74,7 +74,7 @@ class Pedometer:
                                               message.timestamp)
             elif message.update_type == UpdateType.RANGING:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
-                                       message.timestamp, message.neighbors)
+                                        message.timestamp, message.neighbors)
 
             socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
 
