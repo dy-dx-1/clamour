@@ -124,6 +124,7 @@ class Animation:
 
     def update_time_axis_limits(self, new_time: float):
         if new_time >= self.axes_limits["time"][1]:
+            print(new_time, self.axes_limits["time"])
             self.axes_limits["time"] = (self.axes_limits["time"][0] + 1.0, self.axes_limits["time"][1] + 1.0)
             self.ax02.set_xlim(self.axes_limits["time"])
             self.ax03.set_xlim(self.axes_limits["time"])

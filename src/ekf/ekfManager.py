@@ -11,6 +11,7 @@ from messages import UpdateMessage, UpdateType
 class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue):
         self.ekf = None
+        self.start_time = 0  # Needed for live graph
         self.communication_queue = communication_queue
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
 
@@ -26,6 +27,7 @@ class EKFManager:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
+                    self.start_time = message.timestamp  # This is the first timestamp to be received
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
@@ -65,7 +67,7 @@ class EKFManager:
         return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
 
     def broadcast_latest_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        socket.send([timestamp,
+        socket.send([timestamp - self.start_time,
                      coordinates.x, self.ekf.x[0],
                      coordinates.y, self.ekf.x[2],
                      yaw, self.ekf.x[6],
