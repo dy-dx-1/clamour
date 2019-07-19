@@ -31,8 +31,7 @@ class Pedometer:
         nb_measurements = 0
 
         with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
-            self.initialize_ekf()
-            socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
+            self.initialize_ekf(socket)
 
             while True:
                 linear_acceleration = self.get_acceleration_measurement()
@@ -50,15 +49,20 @@ class Pedometer:
                 self.process_latest_state_info(socket)
                 sleep(0.01)
 
-    def initialize_ekf(self):
+    def initialize_ekf(self, socket: ContextManagedSocket):
         while self.ekf is None:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
-                    print("Initial measurements: ", message.measured_xyz, message.measured_yaw)
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+
+                    socket.send([message.timestamp,
+                                 message.measured_xyz.x, self.ekf.x[0],
+                                 message.measured_xyz.y, self.ekf.x[2],
+                                 message.measured_yaw, self.ekf.x[6],
+                                 np.linalg.det(self.ekf.P)])
 
     def process_latest_state_info(self, socket: ContextManagedSocket):
         if not self.communication_queue.empty():
@@ -76,12 +80,11 @@ class Pedometer:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                         message.timestamp, message.neighbors)
 
-            socket.send([self.ekf.x[0], self.ekf.x[2], np.linalg.det(self.ekf.P)])
-
-            print(str(round(self.ekf.x[0], 3)) + "; "
-                  + str(round(self.ekf.x[2], 3)) + "; "
-                  + str(round(self.ekf.x[4], 3)) + "; "
-                  + str(round(self.ekf.x[6], 3)) + "\n")
+            socket.send([message.timestamp,
+                         message.measured_xyz.x, self.ekf.x[0],
+                         message.measured_xyz.y, self.ekf.x[2],
+                         message.measured_yaw, self.ekf.x[6],
+                         np.linalg.det(self.ekf.P)])
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()

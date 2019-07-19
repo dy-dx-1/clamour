@@ -89,12 +89,15 @@ class Animation:
             data = []
             for _ in range(MAX_INDEX):
                 if not self._queue.empty():
-                    data.append(struct.unpack('fffffff', self._queue.get(block=False)))
+                    data.append(struct.unpack('ffffffff', self._queue.get(block=False)))
 
             yield data
 
     def run(self, data):
         for d in data:
+            if d[-1] > 0:
+                print("WARNING: Filter might be diverging, because det(P) = ", d[-1], " > 0.")
+
             self.append_data(d)
             self.update_time_axis_limits(d[0])
             self.set_data()
