@@ -22,7 +22,7 @@ class Synchronization(TDMAState):
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
                                                     else mean(self.timing.clock_differential_stat)
-        
+
         self.synchronize()
         self.broadcast_synchronization_message()
 
@@ -40,7 +40,8 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
-        if self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized:
+        if self.neighborhood.is_alone() or \
+                (self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized):
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION

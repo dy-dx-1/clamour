@@ -25,10 +25,6 @@ FRAME_DURATION = TASK_SLOT_DURATION * NB_TASK_SLOTS
 FULL_CYCLE_DURATION = TASK_START_TIME + FRAME_DURATION * NB_FULL_CYCLES
 
 
-
-
-
-
 class Timing:
     def __init__(self):
         self.synchronization_offset_mean = 20

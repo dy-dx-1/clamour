@@ -1,6 +1,6 @@
 import random
 from multiprocessing import Lock
-from time import perf_counter
+from time import perf_counter, time
 
 from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
 
@@ -24,8 +24,8 @@ class Messenger:
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, dt: float, neighbors: list) -> None:
-        message = UpdateMessage(update_type, measured_position, dt, neighbors, measured_yaw=None)
+    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None) -> None:
+        message = UpdateMessage(update_type, measured_position, yaw, time(), neighbors)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, time: int) -> None:
@@ -145,7 +145,7 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data, status = self.obtain_message_from_pozyx()
+        sender_id, data, _ = self.obtain_message_from_pozyx()
 
         try:
             if sender_id != 0 and data != 0:
@@ -173,10 +173,7 @@ class Messenger:
     def update_neighbor_dictionary(self) -> None:
         new_message = self.message_box.peek_last()
         new_message.decode()
-        self.neighborhood.current_neighbors[new_message.sender_id] = (new_message.sender_id,  # todo @yanjun: the neighborhood from which does not receive msg for a long time should be deleted. A garbage collection mechanism for neighborhood hood.
-                                                                      perf_counter(),
-                                                                      new_message.message_type,
-                                                                      new_message)
+        self.neighborhood.current_neighbors[new_message.sender_id] = ([], perf_counter())
 
     def handle_error(self) -> None:
         error_code = SingleRegister()

@@ -32,6 +32,9 @@ class TDMANode:
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
+        print(exception_type)
+        print(exception_value)
+        print(traceback)
         print("Finished with TDMA node.")
 
     def run(self) -> None:
@@ -58,7 +61,7 @@ class TDMANode:
             State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.timing, self.id, self.messenger),
             State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id,
                              self.pozyx, self.pozyx_lock, self.messenger),
-            State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger)}
+            State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger, self.neighborhood)}
 
         self.current_state = self.states[State.INITIALIZATION]
 

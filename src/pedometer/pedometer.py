@@ -4,8 +4,9 @@ import numpy as np
 
 from multiprocessing import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
-from time import perf_counter, sleep
+from time import sleep, time
 from .ekf import CustomEKF
+from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
@@ -17,51 +18,73 @@ class Pedometer:
         self.pozyx_lock = pozyx_lock
         self.steps = []
         self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
+        self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
 
-        # TODO: Initialize EKF properly
-        initial_angles = EulerAngles()
-        with self.pozyx_lock:
-            self.pozyx.getEulerAngles_deg(initial_angles)
-        self.ekf = CustomEKF(Coordinates(), initial_angles[0])
-
+        self.ekf = None
         self.ekf_positions = []
         self.communication_queue = communication_queue
 
     def run(self):
-        print("running pedometer")
-        start_time = perf_counter()
+        print("Running pedometer")
+        start_time = time()
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
 
-        while True:
-            linear_acceleration = self.get_acceleration_measurement()
-            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
-            vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
+        with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
+            self.initialize_ekf(socket)
 
-            # Only used to verify if previous_angles has been filled before using it for smoothing.
-            if nb_measurements < 5:
-                nb_measurements += 1
+            while True:
+                linear_acceleration = self.get_acceleration_measurement()
+                yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
+                vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
 
-            self.buffer = np.append(self.buffer[1:],
-                                    [PedometerMeasurement(perf_counter() - start_time, vertical_acceleration, yaw)])
+                # Only used to verify if previous_angles has been filled before using it for smoothing.
+                if nb_measurements < 5:
+                    nb_measurements += 1
 
-            self.detect_step()
-            self.process_latest_state_info()
-            sleep(0.01)
+                self.buffer = np.append(self.buffer[1:],
+                                        [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
 
-    def process_latest_state_info(self):
-        # While not trilateration received, wait. (We want to init EKF with precise trilateration coordinates.)
+                self.detect_step()
+                self.process_latest_state_info(socket)
+                sleep(0.01)
+
+    def initialize_ekf(self, socket: ContextManagedSocket):
+        while self.ekf is None:
+            if not self.communication_queue.empty():
+                message = UpdateMessage.load(*self.communication_queue.get_nowait())
+                if message.update_type == UpdateType.TRILATERATION:
+                    self.yaw_offset = message.measured_yaw
+                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
+                    self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+
+                    socket.send([message.timestamp,
+                                 message.measured_xyz.x, self.ekf.x[0],
+                                 message.measured_xyz.y, self.ekf.x[2],
+                                 message.measured_yaw, self.ekf.x[6],
+                                 np.linalg.det(self.ekf.P)])
+
+    def process_latest_state_info(self, socket: ContextManagedSocket):
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
+            print(message.update_type)
 
+            # Only trilateration and ranging yaws need to be corrected with an offset,
+            # because the pedometer yaw is corrected in update_trajectory()
             if message.update_type == UpdateType.PEDOMETER:
-                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.delta_time)
-                print(f"X: {self.ekf.x[0]}, Y: {self.ekf.x[0]}")
-
+                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
             elif message.update_type == UpdateType.TRILATERATION:
-                self.ekf.trilateration_update(message.measured_xyz, message.delta_time)
+                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
+                                              message.timestamp)
             elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.delta_time, message.neighbors)
+                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
+                                        message.timestamp, message.neighbors)
+
+            socket.send([message.timestamp,
+                         message.measured_xyz.x, self.ekf.x[0],
+                         message.measured_xyz.y, self.ekf.x[2],
+                         message.measured_yaw, self.ekf.x[6],
+                         np.linalg.det(self.ekf.P)])
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
@@ -74,7 +97,7 @@ class Pedometer:
         angles = EulerAngles()
         with self.pozyx_lock:
             self.pozyx.getEulerAngles_deg(angles)
-        yaw = angles[0]
+        yaw = angles.heading
 
         if self.jump(previous_angles[-1], yaw):
             previous_angles = [yaw] * 4
@@ -133,14 +156,15 @@ class Pedometer:
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
 
     def update_trajectory(self):
-        step_length = 0.75
+        step_length = 750  # millimeters
 
-        delta_position_x = step_length * -math.cos(math.radians(self.steps[-1].z))
-        delta_position_y = step_length * math.sin(math.radians(self.steps[-1].z))
+        delta_position_x = step_length * math.cos(math.radians(self.steps[-1].z - self.yaw_offset))
+        delta_position_y = step_length * -math.sin(math.radians(self.steps[-1].z - self.yaw_offset))
 
-        measured_position = Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, 0)
-        measured_yaw = self.steps[-1].z
-        delta_time = self.steps[-1].x - (self.steps[-2].x if len(self.steps) > 1 else 0)
+        measured_position = Coordinates(self.ekf.x[0] + delta_position_x,
+                                        self.ekf.x[2] + delta_position_y,
+                                        self.ekf.x[4])  # The pedometer cannot measure height; we assumed it is constant
+        measured_yaw = self.steps[-1].z - self.yaw_offset
 
-        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, delta_time, measured_yaw)
+        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, measured_yaw, time())
         self.communication_queue.put(UpdateMessage.save(message))

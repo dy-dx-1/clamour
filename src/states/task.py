@@ -1,11 +1,10 @@
 import random
 from multiprocessing import Lock
-from time import time
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
-                     PozyxSerial, SingleRegister, DeviceCoordinates)
+                     PozyxSerial, SingleRegister, DeviceCoordinates, EulerAngles)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -23,21 +22,20 @@ class Task(TDMAState):
         self.anchors = anchors
         self.id = id
         self.localize = self.ranging
-        self.dt = 0
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.messenger = messenger
-        self.last_ekf_step_time = 0
 
     def execute(self) -> State:
         self.discover_devices()
+        self.neighborhood.collect_garbage()
         self.select_localization_method()
         self.set_manually_measured_anchors()
         self.broadcast_positioning_result(self.localize())
 
         return self.next()
-        
+
     def next(self) -> State:
         if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION +
                                                 (self.timing.current_slot_id + 1) * TASK_SLOT_DURATION):
@@ -52,14 +50,17 @@ class Task(TDMAState):
         position = Coordinates()
         dimension = POZYX_3D
         height = 1000
+        angles = EulerAngles()
 
         with self.pozyx_lock:
             status = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
-        
-        scaled_position = Coordinates(position.x/10, position.y/10, position.z/10)
+            status &= self.pozyx.getEulerAngles_deg(angles)
+        yaw = angles.heading
+
+        position = Coordinates(position.x, position.y, position.z)
 
         if status == POZYX_SUCCESS:
-            self.update(UpdateType.TRILATERATION, scaled_position)
+            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
         return status
 
@@ -69,27 +70,27 @@ class Task(TDMAState):
             device_coordinates = Coordinates()
             with self.pozyx_lock:
                 self.pozyx.getCoordinates(device_coordinates)
-            
+
             self.anchors.anchors_dict[ranging_target_id] = DeviceCoordinates(ranging_target_id, 1, device_coordinates)
 
         device_range = DeviceRange()
+        angles = EulerAngles()
+
         with self.pozyx_lock:
             status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
+            status &= self.pozyx.getEulerAngles_deg(angles)
 
-        measured_position = Coordinates(device_range.data[1]/10, 0, 0)
-        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2]/10,
-                                   self.anchors.anchors_dict[ranging_target_id][3]/10,
-                                   self.anchors.anchors_dict[ranging_target_id][4]/10])
-        
+        yaw = angles.heading
+
+        measured_position = Coordinates(device_range.data[1], 0, 0)
+        neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
+                                   self.anchors.anchors_dict[ranging_target_id][3],
+                                   self.anchors.anchors_dict[ranging_target_id][4]])
+
         if status == POZYX_SUCCESS:
-            self.update(UpdateType.RANGING, measured_position, atleast_2d(neighbor_position))
+            self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
         return status
-
-    def update(self, update_type: UpdateType, measured_position: Coordinates, neighbors: list = None):
-        self.dt = time() - self.last_ekf_step_time
-        self.messenger.send_new_measurement(update_type, measured_position, self.dt, neighbors)
-        self.last_ekf_step_time = time()
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
@@ -109,7 +110,7 @@ class Task(TDMAState):
 
         with self.pozyx_lock:
             self.pozyx.clearDevices()
-        
+
         self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
 
         if len(self.anchors.available_anchors) < 3:
@@ -118,7 +119,7 @@ class Task(TDMAState):
     def discover(self, discovery_type: int) -> None:
         with self.pozyx_lock:
             discovery_status = self.pozyx.doDiscovery(discovery_type=discovery_type)
-        
+
         if discovery_status == POZYX_SUCCESS:
             devices = self.get_devices()
 
@@ -130,7 +131,7 @@ class Task(TDMAState):
         size = SingleRegister()
         with self.pozyx_lock:
             status = self.pozyx.getDeviceListSize(size)
-        
+
         devices = DeviceList(list_size=size[0])
 
         if status == POZYX_SUCCESS and size[0] > 0:
@@ -158,7 +159,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.getCoordinates(device_coordinates)
                     self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
-        
+
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
                 self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
