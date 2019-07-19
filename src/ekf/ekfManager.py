@@ -14,14 +14,14 @@ class EKFManager:
         self.communication_queue = communication_queue
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
 
-    def run(self):
+    def run(self) -> None:
         with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
             self.initialize_ekf(socket)
 
             while True:
                 self.process_latest_state_info(socket)
 
-    def initialize_ekf(self, socket: ContextManagedSocket):
+    def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
@@ -30,11 +30,7 @@ class EKFManager:
                     self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
                     self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
 
-                    socket.send([message.timestamp,
-                                 message.measured_xyz.x, self.ekf.x[0],
-                                 message.measured_xyz.y, self.ekf.x[2],
-                                 message.measured_yaw, self.ekf.x[6],
-                                 linalg.det(self.ekf.P)])
+                    self.broadcast_latest_state(socket, message.timestamp, message.measured_xyz, message.measured_yaw)
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         if not self.communication_queue.empty():
@@ -46,18 +42,15 @@ class EKFManager:
             if message.update_type == UpdateType.PEDOMETER:
                 inferred_coordinates = self.infer_coordinates(message.measured_yaw)
                 self.ekf.pedometer_update(inferred_coordinates, message.measured_yaw, message.timestamp)
+                self.broadcast_latest_state(socket, message.timestamp, inferred_coordinates, message.measured_yaw)
             elif message.update_type == UpdateType.TRILATERATION:
                 self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                               message.timestamp)
+                self.broadcast_latest_state(socket, message.timestamp, message.measured_xyz, message.measured_yaw)
             elif message.update_type == UpdateType.RANGING:
                 self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
                                         message.timestamp, message.neighbors)
-
-            socket.send([message.timestamp,
-                         message.measured_xyz.x, self.ekf.x[0],
-                         message.measured_xyz.y, self.ekf.x[2],
-                         message.measured_yaw, self.ekf.x[6],
-                         linalg.det(self.ekf.P)])
+                self.broadcast_latest_state(socket, message.timestamp, message.measured_xyz, message.measured_yaw)
 
     def infer_coordinates(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
@@ -70,3 +63,10 @@ class EKFManager:
 
         # The pedometer cannot measure height; we assumed it is constant.
         return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
+
+    def broadcast_latest_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
+        socket.send([timestamp,
+                     coordinates.x, self.ekf.x[0],
+                     coordinates.y, self.ekf.x[2],
+                     yaw, self.ekf.x[6],
+                     linalg.det(self.ekf.P)])
