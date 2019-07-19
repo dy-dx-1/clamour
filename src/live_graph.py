@@ -12,14 +12,14 @@ MAX_INDEX = 12
 
 class Animation:
     def __init__(self):
-        self.fig = plt.figure(num=0, figsize=(12, 10))
+        self.fig = plt.figure(num="Live CLAMOUR visualization", figsize=(14, 11))
 
         self.ax01 = plt.subplot2grid((2, 2), (0, 0))
         self.ax02 = plt.subplot2grid((2, 2), (0, 1))
         self.ax03 = plt.subplot2grid((2, 2), (1, 0))
         self.ax04 = plt.subplot2grid((2, 2), (1, 1))
 
-        self.axes_limits = {"x": (0.0, 20.0), "y": (0.0, 20.0), "yaw": (0.0, 360), "time": (0.0, 20.0)}
+        self.axes_limits = {"x": (-10000.0, 10000.0), "y": (-10000.0, 10000.0), "yaw": (0.0, 360), "time": (0.0, 20.0)}
 
         self.set_plot_presentation()
 
