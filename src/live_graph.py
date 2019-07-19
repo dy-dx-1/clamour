@@ -19,6 +19,8 @@ class Animation:
         self.ax03 = plt.subplot2grid((2, 2), (1, 0))
         self.ax04 = plt.subplot2grid((2, 2), (1, 1))
 
+        self.axes_limits = {"x": (0.0, 20.0), "y": (0.0, 20.0), "yaw": (0.0, 360), "time": (0.0, 20.0)}
+
         self.set_plot_presentation()
 
         # Placeholder data
@@ -72,15 +74,15 @@ class Animation:
         self.ax04.set_xlabel("Time")
 
     def set_axes_limits(self):
-        self.ax01.set_xlim(0.0, 20.0)
-        self.ax02.set_xlim(0.0, 20.0)
-        self.ax03.set_xlim(0.0, 20.0)
-        self.ax04.set_xlim(0.0, 20.0)
+        self.ax01.set_xlim(self.axes_limits["x"])
+        self.ax02.set_xlim(self.axes_limits["time"])
+        self.ax03.set_xlim(self.axes_limits["time"])
+        self.ax04.set_xlim(self.axes_limits["time"])
 
-        self.ax01.set_ylim(0.0, 20.0)
-        self.ax02.set_ylim(0.0, 20.0)
-        self.ax03.set_ylim(0.0, 20.0)
-        self.ax04.set_ylim(80.0, 100.0)
+        self.ax01.set_ylim(self.axes_limits["y"])
+        self.ax02.set_ylim(self.axes_limits["x"])
+        self.ax03.set_ylim(self.axes_limits["y"])
+        self.ax04.set_ylim(self.axes_limits["yaw"])
 
     def data_gen(self):
         while not self.stop:
@@ -94,6 +96,7 @@ class Animation:
     def run(self, data):
         for d in data:
             self.append_data(d)
+            self.update_time_axis_limits(d[0])
             self.set_data()
 
             return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111
@@ -115,6 +118,13 @@ class Animation:
         self.p101.set_data(self.t, self.y_unfiltered)
         self.p110.set_data(self.t, self.yaw_filtered)
         self.p111.set_data(self.t, self.yaw_unfiltered)
+
+    def update_time_axis_limits(self, new_time: float):
+        if new_time >= self.axes_limits["time"][1]:
+            self.axes_limits["time"] = (self.axes_limits["time"][0] + 1.0, self.axes_limits["time"][1] + 1.0)
+            self.ax02.set_xlim(self.axes_limits["time"])
+            self.ax03.set_xlim(self.axes_limits["time"])
+            self.ax04.set_xlim(self.axes_limits["time"])
 
     def animate(self, receive_queue):
         self._queue = receive_queue
