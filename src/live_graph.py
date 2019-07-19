@@ -89,7 +89,10 @@ class Animation:
             data = []
             for _ in range(MAX_INDEX):
                 if not self._queue.empty():
-                    data.append(struct.unpack('ffffffff', self._queue.get(block=False)))
+                    try:
+                        data.append(struct.unpack('ffffffff', self._queue.get(block=False)))
+                    except struct.error as e:
+                        print(str(e))
 
             yield data
 
