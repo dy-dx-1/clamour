@@ -40,7 +40,7 @@ class EKFManager:
             print(message.update_type)
 
             # Only trilateration and ranging yaws need to be corrected with an offset,
-            # because the pedometer yaw is corrected in update_trajectory()
+            # because the pedometer yaw is corrected in infer_coordinates()
             if message.update_type == UpdateType.PEDOMETER:
                 inferred_coordinates = self.infer_coordinates(message.measured_yaw)
                 self.ekf.pedometer_update(inferred_coordinates, message.measured_yaw, message.timestamp)
@@ -68,7 +68,7 @@ class EKFManager:
 
     def broadcast_latest_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
         socket.send([timestamp - self.start_time,
-                     coordinates.x, self.ekf.x[0],
-                     coordinates.y, self.ekf.x[2],
-                     yaw, self.ekf.x[6],
+                     self.ekf.x[0], coordinates.x,
+                     self.ekf.x[2], coordinates.y,
+                     self.ekf.x[6], yaw - self.yaw_offset,
                      linalg.det(self.ekf.P)])
