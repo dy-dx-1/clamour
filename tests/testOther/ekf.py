@@ -2,7 +2,7 @@
 
 import unittest
 
-from src.pedometer.ekf import CustomEKF, Coordinates
+from src.ekf.ekf import CustomEKF, Coordinates
 from numpy import array
 
 

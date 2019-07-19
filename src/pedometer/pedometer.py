@@ -3,25 +3,18 @@ import math
 import numpy as np
 
 from multiprocessing import Lock
-from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles, Coordinates
+from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles
 from time import sleep, time
-from .ekf import CustomEKF
-from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
 
 class Pedometer:
     def __init__(self, communication_queue, pozyx: PozyxSerial, pozyx_lock: Lock):
-        print("init pedometer")
         self.pozyx = pozyx
         self.pozyx_lock = pozyx_lock
         self.steps = []
         self.buffer = np.array([PedometerMeasurement(0, 0, 0)] * 20)
-        self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
-
-        self.ekf = None
-        self.ekf_positions = []
         self.communication_queue = communication_queue
 
     def run(self):
@@ -30,61 +23,20 @@ class Pedometer:
         previous_angles = np.array([0.0, 0.0, 0.0, 0.0])
         nb_measurements = 0
 
-        with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
-            self.initialize_ekf(socket)
+        while True:
+            linear_acceleration = self.get_acceleration_measurement()
+            yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
+            vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
 
-            while True:
-                linear_acceleration = self.get_acceleration_measurement()
-                yaw, previous_angles = self.get_filtered_yaw_measurement(previous_angles, nb_measurements)
-                vertical_acceleration = self.vertical_acceleration(self.holding_angle(), linear_acceleration)
+            # Only used to verify if previous_angles has been filled before using it for smoothing.
+            if nb_measurements < 5:
+                nb_measurements += 1
 
-                # Only used to verify if previous_angles has been filled before using it for smoothing.
-                if nb_measurements < 5:
-                    nb_measurements += 1
+            self.buffer = np.append(self.buffer[1:],
+                                    [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
 
-                self.buffer = np.append(self.buffer[1:],
-                                        [PedometerMeasurement(time() - start_time, vertical_acceleration, yaw)])
-
-                self.detect_step()
-                self.process_latest_state_info(socket)
-                sleep(0.01)
-
-    def initialize_ekf(self, socket: ContextManagedSocket):
-        while self.ekf is None:
-            if not self.communication_queue.empty():
-                message = UpdateMessage.load(*self.communication_queue.get_nowait())
-                if message.update_type == UpdateType.TRILATERATION:
-                    self.yaw_offset = message.measured_yaw
-                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
-                    self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
-
-                    socket.send([message.timestamp,
-                                 message.measured_xyz.x, self.ekf.x[0],
-                                 message.measured_xyz.y, self.ekf.x[2],
-                                 message.measured_yaw, self.ekf.x[6],
-                                 np.linalg.det(self.ekf.P)])
-
-    def process_latest_state_info(self, socket: ContextManagedSocket):
-        if not self.communication_queue.empty():
-            message = UpdateMessage.load(*self.communication_queue.get_nowait())
-            print(message.update_type)
-
-            # Only trilateration and ranging yaws need to be corrected with an offset,
-            # because the pedometer yaw is corrected in update_trajectory()
-            if message.update_type == UpdateType.PEDOMETER:
-                self.ekf.pedometer_update(message.measured_xyz, message.measured_yaw, message.timestamp)
-            elif message.update_type == UpdateType.TRILATERATION:
-                self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
-                                              message.timestamp)
-            elif message.update_type == UpdateType.RANGING:
-                self.ekf.ranging_update(message.measured_xyz, message.measured_yaw - self.yaw_offset,
-                                        message.timestamp, message.neighbors)
-
-            socket.send([message.timestamp,
-                         message.measured_xyz.x, self.ekf.x[0],
-                         message.measured_xyz.y, self.ekf.x[2],
-                         message.measured_yaw, self.ekf.x[6],
-                         np.linalg.det(self.ekf.P)])
+            self.detect_step()
+            sleep(0.01)
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
@@ -156,15 +108,5 @@ class Pedometer:
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
 
     def update_trajectory(self):
-        step_length = 750  # millimeters
-
-        delta_position_x = step_length * math.cos(math.radians(self.steps[-1].z - self.yaw_offset))
-        delta_position_y = step_length * -math.sin(math.radians(self.steps[-1].z - self.yaw_offset))
-
-        measured_position = Coordinates(self.ekf.x[0] + delta_position_x,
-                                        self.ekf.x[2] + delta_position_y,
-                                        self.ekf.x[4])  # The pedometer cannot measure height; we assumed it is constant
-        measured_yaw = self.steps[-1].z - self.yaw_offset
-
-        message = UpdateMessage(UpdateType.PEDOMETER, measured_position, measured_yaw, time())
+        message = UpdateMessage(UpdateType.PEDOMETER, time(), self.steps[-1].z)
         self.communication_queue.put(UpdateMessage.save(message))
