@@ -1,5 +1,4 @@
 from filterpy.kalman import ExtendedKalmanFilter
-from math import atan2
 from numpy import array, asarray, ndarray, dot, eye, linalg
 from pypozyx import Coordinates
 

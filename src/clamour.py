@@ -5,6 +5,7 @@ import sys
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
+from ekf import EKFManager
 from tdmaNode import TDMANode
 from contextManagedQueue import ContextManagedQueue
 from contextManagedProcess import ContextManagedProcess
@@ -29,13 +30,15 @@ def main():
         shared_pozyx = connect_pozyx()
         shared_pozyx_lock = Lock()
 
+        ekf_manager = EKFManager(multiprocess_communication_queue)
         pedometer = Pedometer(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock)
 
-        with ContextManagedProcess(target=pedometer.run) as side_process:
-            side_process.start()
-
-            with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock) as node:
-                node.run()
+        with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
+            ekf_manager_process.start()
+            with ContextManagedProcess(target=pedometer.run) as pedometer_process:
+                pedometer_process.start()
+                with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock) as node:
+                    node.run()
 
 
 if __name__ == "__main__":

@@ -7,8 +7,8 @@ from .types import UpdateType
 
 
 class UpdateMessage:
-    def __init__(self, update_type: UpdateType, measured_xyz: Coordinates, measured_yaw: float,
-                 timestamp: float, neighbors: list = None):
+    def __init__(self, update_type: UpdateType, timestamp: float, measured_yaw: float,
+                 measured_xyz: Coordinates = None, neighbors: list = None):
         self.update_type = update_type
         self.measured_xyz = measured_xyz
         self.measured_yaw = measured_yaw
