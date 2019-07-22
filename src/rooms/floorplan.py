@@ -6,9 +6,14 @@ class NonexistentRoomException(Exception):
     pass
 
 
+DEFAULT_ROOMS = [Room('A', 0, 0, (-1, 1), (-1, 1)),
+                 Room('B', 7, 8, (-1, 1), (-1, 1)),
+                 Room('C', 2, 4, (-1, 1), (-1, 1))]
+
+
 class Floorplan:
-    def __init__(self, rooms: list):
-        self.rooms = self.rooms_dict_from_list(rooms)
+    def __init__(self, rooms: list = None):
+        self.rooms = self.rooms_dict_from_list(rooms if rooms is not None else DEFAULT_ROOMS)
         self.paths = []
 
     def add_path_from_labels(self, labels: tuple) -> None:
@@ -25,7 +30,7 @@ class Floorplan:
         distances = {label: room.distance(coordinates) for label, room in self.rooms.items()}
         return min(distances, key=distances.get)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.paths)
 
     @staticmethod
