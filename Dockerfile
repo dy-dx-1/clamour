@@ -11,8 +11,7 @@ RUN apt-get update && apt-get install build-essential python3-dev python3-setupt
     python3-numpy python3-scipy python3-matplotlib python3-pygame
 
 COPY requirements.txt /
-RUN pip install --upgrade setuptools
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade setuptools && pip install --no-cache-dir -r requirements.txt
 
 # Append python3.6 packages to PYTHONPATH so that python3.7 can use them.
 ENV PYTHONPATH="$PYTHONPATH:/usr/local/lib/python3.6/site-packages"
