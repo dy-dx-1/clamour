@@ -1,4 +1,4 @@
-from room import Room
+from .room import Room
 from pypozyx import Coordinates
 
 
