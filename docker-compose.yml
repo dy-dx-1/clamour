@@ -1,7 +1,11 @@
-version: '0.1'
+version: '2'
 services:
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
   clamour:
-    build: .
+    image: samsei/clamour:latest
     ports:
       - '10555:10555'
     privileged: true
