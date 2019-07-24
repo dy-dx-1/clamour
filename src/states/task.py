@@ -32,7 +32,7 @@ class Task(TDMAState):
         self.neighborhood.collect_garbage()
         self.select_localization_method()
         self.set_manually_measured_anchors()
-        self.broadcast_positioning_result(self.localize())
+        self.localize()
 
         return self.next()
 
