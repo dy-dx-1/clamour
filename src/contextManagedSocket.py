@@ -1,4 +1,6 @@
 import struct
+import sys
+import traceback as tb
 from socket import socket
 
 
@@ -16,6 +18,8 @@ class ContextManagedSocket:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.socket.close()
+        print(exc_type, exc_val)
+        tb.print_tb(exc_tb, file=sys.stdout)
 
     def send(self, data: list) -> None:
         message = struct.pack('%sf' % len(data), *data)
