@@ -3,7 +3,7 @@ from multiprocessing import Lock
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceList, DeviceRange,
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceList, DeviceRange,
                      PozyxSerial, SingleRegister, DeviceCoordinates, EulerAngles)
 
 from interfaces import Anchors, Neighborhood, Timing
@@ -77,7 +77,7 @@ class Task(TDMAState):
         angles = EulerAngles()
 
         with self.pozyx_lock:
-            status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else None
+            status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
             status &= self.pozyx.getEulerAngles_deg(angles)
 
         yaw = angles.heading
