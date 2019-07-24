@@ -11,7 +11,7 @@ from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIM
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
 
-from .constants import State, TAG_ID_MASK
+from .constants import State
 from .tdmaState import TDMAState
 
 
@@ -163,16 +163,3 @@ class Task(TDMAState):
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
                 self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
-
-    def broadcast_positioning_result(self, positioning_result) -> None:
-        """Commented function because broadcast via socket deactivated anyway,
-        and possible version incompatibility issues"""
-        pass
-        # message_data = [self.id & TAG_ID_MASK] + self.extended_kalman_filter.x.toList() + \
-        #                [self.localize, self.extended_kalman_filter.dt] + \
-        #                 self.last_measurement + self.last_measurement_data.flatten().tolist() + \
-        #                [self.acceleration.x/10, self.acceleration.y/10, self.acceleration.z/10,
-        #                 self.timing.frame_id, self.timing.current_slot_id, positioning_result]
-        #
-        # message = struct.pack("%sf" % len(message_data), *message_data)
-        # self.socket.send(message)
