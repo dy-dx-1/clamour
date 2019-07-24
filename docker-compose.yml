@@ -1,0 +1,9 @@
+version: '0.1'
+services:
+  clamour:
+    build: .
+    ports:
+      - '10555:10555'
+    privileged: true
+    volumes:
+      - /dev/ttyACM0:/dev/ttyACM0
