@@ -2,6 +2,8 @@ from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, asarray, ndarray, dot, eye, linalg
 from pypozyx import Coordinates
 
+DT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
+
 
 class CustomEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates, yaw: float):
@@ -25,12 +27,23 @@ class CustomEKF(ExtendedKalmanFilter):
                                 [0, 0, 25, 0],
                                 [0, 0, 0, 10]])
 
+        self.R_zero_movement = array([[1, 0, 0, 0],
+                                      [0, 1, 0, 0],
+                                      [0, 0, 1, 0],
+                                      [0, 0, 0, 1]])
+
         self.observation_matrix = array([[1, 0, 0, 0, 0, 0, 0, 0],
                                          [0, 0, 1, 0, 0, 0, 0, 0],
                                          [0, 0, 0, 0, 1, 0, 0, 0],
                                          [0, 0, 0, 0, 0, 0, 1, 0]])
 
         self.x = array([position.x, 0, position.y, 0, position.z, 0, yaw, 0])
+
+    def get_position(self) -> Coordinates:
+        return Coordinates(self.x[0], self.x[2], self.x[4])
+
+    def get_yaw(self) -> float:
+        return self.x[6]
 
     def set_qf(self):
         # As we integrate to find position, we lose precision. Thus we trust x less than dx/dt, hence the dt*2 vs dt.
@@ -56,6 +69,9 @@ class CustomEKF(ExtendedKalmanFilter):
         return dot(self.observation_matrix, x)
 
     def hx_trilateration(self, x) -> ndarray:
+        return dot(self.observation_matrix, x)
+
+    def hx_zero_movement(self, x) -> ndarray:
         return dot(self.observation_matrix, x)
 
     @staticmethod
@@ -96,24 +112,35 @@ class CustomEKF(ExtendedKalmanFilter):
             print("Received message with bad timestamp.")
         self.predict()
 
-    def pedometer_update(self, position: Coordinates, yaw: float, timestamp: float):
+    def pedometer_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_pedometer, self.R_pedometer)
 
-    def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float):
+    def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.y, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_trilateration, self.R_trilateration)
 
-    def ranging_update(self, distance: Coordinates, yaw: float, timestamp: float, neighbor_position: ndarray):
+    def ranging_update(self, distance: Coordinates, yaw: float, timestamp: float, neighbor_position: ndarray) -> None:
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([distance.x, distance.y, distance.z, yaw]),
                                       self.h_ranging, self.hx_ranging, self.R_ranging,
                                       args=neighbor_position,
                                       hx_args=(neighbor_position, yaw))
+
+    def zero_movement_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
+        """This function updates the filter with its previous state.
+        This allows to keep the dt relatively small and avoid drift.
+        Indeed, if dt is too big, the process noise increase even if there was no change to the state."""
+
+        self.pre_update(timestamp)
+
+        super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
+                                      lambda _: self.observation_matrix,
+                                      self.hx_zero_movement, self.R_zero_movement)

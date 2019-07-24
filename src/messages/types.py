@@ -12,3 +12,4 @@ class UpdateType(IntEnum):
     PEDOMETER = 0
     TRILATERATION = 1
     RANGING = 2
+    ZERO_MOVEMENT = 3
