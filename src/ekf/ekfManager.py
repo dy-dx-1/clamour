@@ -53,7 +53,7 @@ class EKFManager:
         elif self.ekf.dt > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
-        self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw)
+        self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
