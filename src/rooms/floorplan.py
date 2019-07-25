@@ -32,12 +32,12 @@ class Floorplan:
     @staticmethod
     def load_rooms_from_csv() -> list:
         room_list = []
-        with open('rooms.csv', 'r') as r:
+        with open('rooms.csv') as r:
             reader = csv.reader(r, delimiter=';')
             next(reader)  # We don't want to read the header
             for room in reader:
-                room_list.append(Room(label=room[0], x=room[1], y=room[2], x_lim=(room[3], room[4]),
-                                      y_lim=(room[5], room[6]), global_orientation=room[7]))
+                room_list.append(Room(label=room[0], x=int(room[1]), y=int(room[2]), x_lim=(int(room[3]), int(room[4])),
+                                      y_lim=(int(room[5]), int(room[6])), theta=float(room[7])))
         return room_list
 
     @staticmethod
