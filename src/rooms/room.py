@@ -4,7 +4,7 @@ from typing import Union
 
 
 class Room:
-    def __init__(self,  label: str, x: float, y: float, x_lim: tuple, y_lim: tuple):
+    def __init__(self,  label: str, x: float, y: float, x_lim: tuple, y_lim: tuple, global_orientation: float = 0.0):
         """x, y are the center's coordinates;
         x_lim, y_lim are the limits of the room relative to its own center."""
 
@@ -13,6 +13,7 @@ class Room:
         self.y = y
         self.x_lim = x_lim
         self.y_lim = y_lim
+        self.global_orientation = global_orientation
         self.neighbors = []
 
     def add_neighbor(self, neighbor: 'Room') -> None:
