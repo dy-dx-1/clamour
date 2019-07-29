@@ -77,18 +77,16 @@ class EKFManager:
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
 
-        # TODO: Activated commented logic, which is unused for the moment because we don't have room measurements.
-        return True
+        if self.current_room.within_bounds(new_coordinates):
+            return True
 
-        # if self.current_room.within_bounds(new_coordinates):
-        #     return True
-        #
-        # new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates)
-        # if new_neighbor is not None:
-        #     self.current_room = self.floorplan[new_neighbor]
-        #     return True
-        #
-        # return False
+        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates)
+        if new_neighbor is not None:
+            print("Changed room.")
+            self.current_room = self.floorplan[new_neighbor]
+            return True
+
+        return False
 
     def generate_zero_update_info(self, timestamp: float) -> tuple:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
