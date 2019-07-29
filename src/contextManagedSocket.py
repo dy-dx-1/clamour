@@ -2,6 +2,7 @@ import struct
 import sys
 import traceback as tb
 from socket import socket
+from time import sleep
 
 
 class ContextManagedSocket:
@@ -24,3 +25,4 @@ class ContextManagedSocket:
     def send(self, data: list) -> None:
         message = struct.pack('%sf' % len(data), *data)
         self.socket.send(message)
+        sleep(0.05)  # Sleep required to 'ensure' the OS has time to send the TCP buffer.
