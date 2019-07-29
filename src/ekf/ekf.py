@@ -107,6 +107,7 @@ class CustomEKF(ExtendedKalmanFilter):
     def pre_update(self, timestamp: float) -> None:
         if timestamp > self.last_measurement_time:
             self.dt = timestamp - self.last_measurement_time
+            self.last_measurement_time = timestamp
             self.set_qf()
         else:
             print("Received message with bad timestamp.")

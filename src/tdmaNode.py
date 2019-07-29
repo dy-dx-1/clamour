@@ -1,3 +1,5 @@
+import sys
+import traceback as tb
 from multiprocessing import Lock
 from pypozyx import Data, PozyxSerial
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
@@ -32,9 +34,8 @@ class TDMANode:
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
-        print(exception_type)
-        print(exception_value)
-        print(traceback)
+        print(exception_type, exception_value)
+        tb.print_tb(traceback, file=sys.stdout)
         print("Finished with TDMA node.")
 
     def run(self) -> None:

@@ -1,6 +1,7 @@
 import math
 from numpy import linalg
 from pypozyx import Coordinates
+from time import time
 
 from .ekf import CustomEKF, DT_THRESHOLD
 from contextManagedQueue import ContextManagedQueue
@@ -16,7 +17,7 @@ class EKFManager:
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
-        self.current_room = self.floorplan.rooms['A']  # TODO: measurements
+        self.current_room = self.floorplan.rooms['Arena']
 
     def run(self) -> None:
         with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
@@ -47,13 +48,13 @@ class EKFManager:
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             update_info = self.extract_update_info(message)
             if self.validate_new_state(update_info[0]):
-                update_functions[message.update_type](self.extract_update_info(message))
+                update_functions[message.update_type](*update_info)
             else:
-                update_functions[UpdateType.ZERO_MOVEMENT](self.generate_zero_update_info(update_info[2]))
-        elif self.ekf.dt > DT_THRESHOLD:
-            update_functions[UpdateType.ZERO_MOVEMENT](self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
+                update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(update_info[2]))
+        elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
+            update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
-        self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw)
+        self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
@@ -76,18 +77,16 @@ class EKFManager:
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
 
-        # TODO: Activated commented logic, which is unused for the moment because we don't have room measurements.
-        return True
+        if self.current_room.within_bounds(new_coordinates):
+            return True
 
-        # if self.current_room.within_bounds(new_coordinates):
-        #     return True
-        #
-        # new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates)
-        # if new_neighbor is not None:
-        #     self.current_room = self.floorplan[new_neighbor]
-        #     return True
-        #
-        # return False
+        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates)
+        if new_neighbor is not None:
+            print("Changed room.")
+            self.current_room = self.floorplan[new_neighbor]
+            return True
+
+        return False
 
     def generate_zero_update_info(self, timestamp: float) -> tuple:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
