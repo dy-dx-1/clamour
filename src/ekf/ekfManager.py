@@ -1,4 +1,5 @@
 import math
+import struct
 from numpy import linalg
 from pypozyx import Coordinates
 from time import time
@@ -92,8 +93,9 @@ class EKFManager:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
     def broadcast_latest_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        socket.send([timestamp - self.start_time,
-                     self.ekf.x[0], coordinates.x,
-                     self.ekf.x[2], coordinates.y,
-                     self.ekf.x[6], yaw - self.yaw_offset,
-                     linalg.det(self.ekf.P)])
+        message = [timestamp - self.start_time,
+                   self.ekf.x[0], coordinates.x,
+                   self.ekf.x[2], coordinates.y,
+                   self.ekf.x[6], yaw - self.yaw_offset,
+                   linalg.det(self.ekf.P)]
+        socket.send(struct.pack('%sf' % len(message), *message))
