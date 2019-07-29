@@ -1,6 +1,7 @@
 import math
 from numpy import linalg
 from pypozyx import Coordinates
+from time import time
 
 from .ekf import CustomEKF, DT_THRESHOLD
 from contextManagedQueue import ContextManagedQueue
@@ -50,7 +51,7 @@ class EKFManager:
                 update_functions[message.update_type](self.extract_update_info(message))
             else:
                 update_functions[UpdateType.ZERO_MOVEMENT](self.generate_zero_update_info(update_info[2]))
-        elif self.ekf.dt > DT_THRESHOLD:
+        elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
         self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw())
