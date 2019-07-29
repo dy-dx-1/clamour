@@ -48,7 +48,7 @@ class EKFManager:
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             update_info = self.extract_update_info(message)
             if self.validate_new_state(update_info[0]):
-                update_functions[message.update_type](update_info)
+                update_functions[message.update_type](*update_info)
             else:
                 update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(update_info[2]))
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
