@@ -44,7 +44,7 @@ class Task(TDMAState):
             return State.TASK
 
     def select_localization_method(self) -> None:
-        self.localize = self.positioning if len(self.anchors.available_anchors) >= 4 else self.ranging
+        self.localize = self.positioning if len(self.anchors.available_anchors) >= 3 else self.ranging
 
     def positioning(self) -> int:
         position = Coordinates()
