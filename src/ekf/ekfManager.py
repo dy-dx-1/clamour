@@ -17,7 +17,7 @@ class EKFManager:
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
-        self.current_room = self.floorplan.rooms['A']  # TODO: measurements
+        self.current_room = self.floorplan.rooms['Arena']
 
     def run(self) -> None:
         with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
