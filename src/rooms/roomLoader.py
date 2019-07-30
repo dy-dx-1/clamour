@@ -16,8 +16,8 @@ class RoomLoader:
         label = room_data[0]
         x = int(room_data[5])
         y = int(room_data[6])
-        x_lim = (int(room_data[1]) / 2, int(room_data[1]) / 2)
-        y_lim = (int(room_data[2]) / 2, int(room_data[2]) / 2)
+        x_lim = (int(room_data[3]), int(room_data[3]))
+        y_lim = (int(room_data[4]), int(room_data[4]))
         theta = RoomLoader.orientation_from_corners(room_data[7:])
 
         return Room(label, x, y, x_lim, y_lim, theta)
