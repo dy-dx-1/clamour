@@ -1,2 +1,2 @@
-"Label";"x";"y";"x_lim_lower";"x_lim_upper";"y_lim_lower";"y_lim_upper";"global_orientation"
-"Arena";0;2585;1780;4000;0;5170;0
+"piece";"largeur";"longueur";"centre_ref_loc_x";"centre_ref_loc_y";"centre_x";"centre_y";"coin_a_x";"coin_a_y";"coin_b_x";"coin_b_y";"coin_c_x";"coin_c_y";"coin_d_x";"coin_d_y"
+"Arena";5780;5170;2890;2585;0;2585;4000;5170;4000;0;-1780;0;-1780;5170;

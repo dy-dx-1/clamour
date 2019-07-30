@@ -25,7 +25,6 @@ class RoomLoader:
     @staticmethod
     def orientation_from_corners(corners: list) -> float:
         diff_x = int(corners[2]) - int(corners[4])
-        diff_y = abs(int(corners[3]) - int(corners[5]))
-        print(diff_x, diff_y)
+        diff_y = int(corners[3]) - int(corners[5])
 
         return math.atan2(diff_y, diff_x)
