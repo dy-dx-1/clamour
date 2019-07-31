@@ -17,9 +17,9 @@ class CustomEKF(ExtendedKalmanFilter):
                                   [0, 0, 20, 0],
                                   [0, 0, 0, 10]])
 
-        self.R_trilateration = array([[15, 0, 0, 0],
-                                      [0, 15, 0, 0],
-                                      [0, 0, 15, 0],
+        self.R_trilateration = array([[20, 0, 0, 0],
+                                      [0, 20, 0, 0],
+                                      [0, 0, 20, 0],
                                       [0, 0, 0, 10]])
 
         self.R_ranging = array([[25, 0, 0, 0],
