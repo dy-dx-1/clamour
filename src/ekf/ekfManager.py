@@ -33,10 +33,11 @@ class EKFManager:
                 if message.update_type == UpdateType.TRILATERATION:
                     self.start_time = message.timestamp  # This is the first timestamp to be received
                     self.yaw_offset = message.measured_yaw
-                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
-                    self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+                    self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
+                    self.ekf.trilateration_update(message.measured_xyz,
+                                                  self.correct_yaw(message.measured_yaw), message.timestamp)
 
-                    self.broadcast_latest_state(socket, message.timestamp, message.measured_xyz, message.measured_yaw)
+                    self.broadcast_latest_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
