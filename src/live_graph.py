@@ -19,7 +19,7 @@ class Animation:
         self.ax03 = plt.subplot2grid((2, 2), (1, 0))
         self.ax04 = plt.subplot2grid((2, 2), (1, 1))
 
-        self.axes_limits = {"x": (-10000.0, 10000.0), "y": (-10000.0, 10000.0), "yaw": (0.0, 360), "time": (0.0, 20.0)}
+        self.axes_limits = {"x": (-5000.0, 5000.0), "y": (-5000.0, 5000.0), "yaw": (0.0, 360), "time": (0.0, 30.0)}
 
         self.set_plot_presentation()
 
