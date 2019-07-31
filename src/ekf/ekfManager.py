@@ -58,9 +58,9 @@ class EKFManager:
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
-            return self.infer_coordinates(msg.measured_yaw), msg.measured_yaw - self.yaw_offset, msg.timestamp
+            return self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp
         elif msg.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
-            return msg.measured_xyz, msg.measured_yaw - self.yaw_offset, msg.timestamp
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp
 
     def infer_coordinates(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
@@ -68,11 +68,15 @@ class EKFManager:
 
         step_length = 750  # millimeters
 
-        delta_position_x = step_length * math.cos(math.radians(measured_yaw - self.yaw_offset))
-        delta_position_y = step_length * -math.sin(math.radians(measured_yaw - self.yaw_offset))
+        delta_position_x = step_length * math.cos(math.radians(self.correct_yaw(measured_yaw)))
+        delta_position_y = step_length * -math.sin(math.radians(self.correct_yaw(measured_yaw)))
 
         # The pedometer cannot measure height; we assumed it is constant.
         return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
+
+    def correct_yaw(self, measured_yaw: float) -> float:
+        new_yaw = measured_yaw - self.yaw_offset
+        return new_yaw if new_yaw > 0 else 360 - new_yaw
 
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
