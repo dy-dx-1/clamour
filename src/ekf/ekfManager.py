@@ -37,7 +37,7 @@ class EKFManager:
                     self.ekf.trilateration_update(message.measured_xyz,
                                                   self.correct_yaw(message.measured_yaw), message.timestamp)
 
-                    self.broadcast_latest_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
@@ -48,14 +48,13 @@ class EKFManager:
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             update_info = self.extract_update_info(message)
-            if self.validate_new_state(update_info[0]):
-                update_functions[message.update_type](*update_info)
-            else:
-                update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(update_info[2]))
+            if not self.validate_new_state(update_info[0]):
+                update_info = self.generate_zero_update_info(update_info[2])
+                message.update_type = UpdateType.ZERO_MOVEMENT
+            update_functions[message.update_type](*update_info)
+            self.broadcast_state(socket, self.ekf.last_measurement_time, message.measured_xyz, message.measured_yaw)
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
-
-        self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
@@ -96,9 +95,9 @@ class EKFManager:
     def generate_zero_update_info(self, timestamp: float) -> tuple:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
-    def broadcast_latest_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
+    def broadcast_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
         socket.send([timestamp - self.start_time,
                      self.ekf.x[0], coordinates.x,
                      self.ekf.x[2], coordinates.y,
-                     self.ekf.x[6], yaw - self.yaw_offset,
+                     self.ekf.x[6], self.correct_yaw(yaw),
                      linalg.det(self.ekf.P)])
