@@ -30,8 +30,8 @@ class Room:
 
     def within_bounds(self, world_coordinates: Coordinates) -> bool:
         local_coordinates = self.transform_to_local_coordinates(world_coordinates)
-        return (self.x + self.x_lim[0] <= local_coordinates.x <= self.x + self.x_lim[1]) \
-            and (self.y + self.y_lim[0] <= local_coordinates.y <= self.y + self.y_lim[1])
+        return (-self.x_lim[0] <= local_coordinates.x <= self.x_lim[1]) \
+            and (-self.y_lim[0] <= local_coordinates.y <= self.y_lim[1])
 
     def transform_to_local_coordinates(self, world_coordinates: Coordinates):
         # World coordinates need to be transformed to 2D homogeneous (x, y, 1)
