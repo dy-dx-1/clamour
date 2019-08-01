@@ -15,17 +15,17 @@ class CustomEKF(ExtendedKalmanFilter):
         self.R_pedometer = array([[20, 0, 0, 0],
                                   [0, 20, 0, 0],
                                   [0, 0, 20, 0],
-                                  [0, 0, 0, 10]])
+                                  [0, 0, 0, 0.5]])
 
         self.R_trilateration = array([[20, 0, 0, 0],
                                       [0, 20, 0, 0],
                                       [0, 0, 20, 0],
-                                      [0, 0, 0, 10]])
+                                      [0, 0, 0, 0.5]])
 
         self.R_ranging = array([[25, 0, 0, 0],
                                 [0, 25, 0, 0],
                                 [0, 0, 25, 0],
-                                [0, 0, 0, 10]])
+                                [0, 0, 0, 0.5]])
 
         self.R_zero_movement = array([[1, 0, 0, 0],
                                       [0, 1, 0, 0],
