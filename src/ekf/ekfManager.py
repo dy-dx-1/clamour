@@ -33,10 +33,11 @@ class EKFManager:
                 if message.update_type == UpdateType.TRILATERATION:
                     self.start_time = message.timestamp  # This is the first timestamp to be received
                     self.yaw_offset = message.measured_yaw
-                    self.ekf = CustomEKF(message.measured_xyz, message.measured_yaw - self.yaw_offset)
-                    self.ekf.trilateration_update(message.measured_xyz, message.measured_yaw, message.timestamp)
+                    self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
+                    self.ekf.trilateration_update(message.measured_xyz,
+                                                  self.correct_yaw(message.measured_yaw), message.timestamp)
 
-                    self.broadcast_latest_state(socket, message.timestamp, message.measured_xyz, message.measured_yaw)
+                    self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
@@ -47,20 +48,19 @@ class EKFManager:
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             update_info = self.extract_update_info(message)
-            if self.validate_new_state(update_info[0]):
-                update_functions[message.update_type](*update_info)
-            else:
-                update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(update_info[2]))
+            if not self.validate_new_state(update_info[0]):
+                update_info = self.generate_zero_update_info(update_info[2])
+                message.update_type = UpdateType.ZERO_MOVEMENT
+            update_functions[message.update_type](*update_info)
+            self.broadcast_state(socket, self.ekf.last_measurement_time, message.measured_xyz, message.measured_yaw)
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
-        self.broadcast_latest_state(socket, self.ekf.last_measurement_time, self.ekf.get_position(), self.ekf.get_yaw())
-
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
-            return self.infer_coordinates(msg.measured_yaw), msg.measured_yaw - self.yaw_offset, msg.timestamp
+            return self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp
         elif msg.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
-            return msg.measured_xyz, msg.measured_yaw - self.yaw_offset, msg.timestamp
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp
 
     def infer_coordinates(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
@@ -68,11 +68,15 @@ class EKFManager:
 
         step_length = 750  # millimeters
 
-        delta_position_x = step_length * math.cos(math.radians(measured_yaw - self.yaw_offset))
-        delta_position_y = step_length * -math.sin(math.radians(measured_yaw - self.yaw_offset))
+        delta_position_x = step_length * math.cos(math.radians(self.correct_yaw(measured_yaw)))
+        delta_position_y = step_length * -math.sin(math.radians(self.correct_yaw(measured_yaw)))
 
         # The pedometer cannot measure height; we assumed it is constant.
         return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
+
+    def correct_yaw(self, measured_yaw: float) -> float:
+        new_yaw = measured_yaw - self.yaw_offset
+        return new_yaw if new_yaw > 0 else 360 + new_yaw
 
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
@@ -91,9 +95,11 @@ class EKFManager:
     def generate_zero_update_info(self, timestamp: float) -> tuple:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
-    def broadcast_latest_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        socket.send([timestamp - self.start_time,
-                     self.ekf.x[0], coordinates.x,
-                     self.ekf.x[2], coordinates.y,
-                     self.ekf.x[6], yaw - self.yaw_offset,
-                     linalg.det(self.ekf.P)])
+    def broadcast_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
+        # TODO: Find source of None coordinates
+        if coordinates is not None:
+            socket.send([timestamp - self.start_time,
+                         self.ekf.x[0], coordinates.x,
+                         self.ekf.x[2], coordinates.y,
+                         self.ekf.x[6], self.correct_yaw(yaw),
+                         linalg.det(self.ekf.P)])

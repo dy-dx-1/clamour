@@ -1,5 +1,4 @@
-import csv
-from .room import Room
+from .roomLoader import RoomLoader
 from pypozyx import Coordinates
 
 
@@ -9,7 +8,7 @@ class NonexistentRoomException(Exception):
 
 class Floorplan:
     def __init__(self):
-        self.rooms = self.rooms_dict_from_list(self.load_rooms_from_csv())
+        self.rooms = self.rooms_dict_from_list(RoomLoader.load_rooms_from_csv())
         self.paths = []
 
     def add_path_from_labels(self, labels: tuple) -> None:
@@ -28,17 +27,6 @@ class Floorplan:
 
     def __repr__(self) -> str:
         return str(self.rooms)
-
-    @staticmethod
-    def load_rooms_from_csv() -> list:
-        room_list = []
-        with open('rooms/rooms.csv') as r:
-            reader = csv.reader(r, delimiter=';')
-            next(reader)  # We don't want to read the header
-            for room in reader:
-                room_list.append(Room(label=room[0], x=int(room[1]), y=int(room[2]), x_lim=(int(room[3]), int(room[4])),
-                                      y_lim=(int(room[5]), int(room[6])), theta=float(room[7])))
-        return room_list
 
     @staticmethod
     def rooms_dict_from_list(rooms: list) -> dict:
