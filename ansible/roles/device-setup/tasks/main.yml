@@ -1,0 +1,16 @@
+- name: "Installing Docker"
+  apt: 
+        name: "{{ packages }}"
+  vars:
+        packages:
+          - docker-ce
+          - docker-ce-cli
+
+- name: "Installing Docker Compose"
+  apt: pkg=docker-compose state=present
+
+- name: "Creating 'clamour' directory"
+  file: path=/home/pi/clamour state=directory
+
+- name: "Copying docker-compose.yml"
+  copy: src=../files/docker-compose.yml dest=/home/pi/clamour/docker-compose.yml owner=pi mode=0644  
