@@ -76,7 +76,7 @@ class EKFManager:
 
     def correct_yaw(self, measured_yaw: float) -> float:
         new_yaw = measured_yaw - self.yaw_offset
-        return new_yaw if new_yaw > 0 else 360 - new_yaw
+        return new_yaw if new_yaw > 0 else 360 + new_yaw
 
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
