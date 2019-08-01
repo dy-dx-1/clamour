@@ -96,8 +96,10 @@ class EKFManager:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
     def broadcast_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        socket.send([timestamp - self.start_time,
-                     self.ekf.x[0], coordinates.x,
-                     self.ekf.x[2], coordinates.y,
-                     self.ekf.x[6], self.correct_yaw(yaw),
-                     linalg.det(self.ekf.P)])
+        # TODO: Find source of None coordinates
+        if coordinates is not None:
+            socket.send([timestamp - self.start_time,
+                         self.ekf.x[0], coordinates.x,
+                         self.ekf.x[2], coordinates.y,
+                         self.ekf.x[6], self.correct_yaw(yaw),
+                         linalg.det(self.ekf.P)])
