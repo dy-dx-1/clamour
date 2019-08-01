@@ -99,7 +99,7 @@ class EKFManager:
         # TODO: Find source of None coordinates
         if coordinates is not None:
             socket.send([timestamp - self.start_time,
-                         self.ekf.x[0], coordinates.x,
-                         self.ekf.x[2], coordinates.y,
-                         self.ekf.x[6], self.correct_yaw(yaw),
+                         self.ekf.get_position().x, coordinates.x,
+                         self.ekf.get_position().y, coordinates.y,
+                         self.ekf.get_yaw(), self.correct_yaw(yaw),
                          linalg.det(self.ekf.P)])
