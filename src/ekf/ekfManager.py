@@ -102,4 +102,4 @@ class EKFManager:
                          self.ekf.get_position().x, coordinates.x,
                          self.ekf.get_position().y, coordinates.y,
                          self.ekf.get_yaw(), self.correct_yaw(yaw),
-                         linalg.det(self.ekf.P)])
+                         linalg.det(self.ekf.P), 0])
