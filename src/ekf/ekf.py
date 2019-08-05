@@ -123,7 +123,7 @@ class CustomEKF(ExtendedKalmanFilter):
     def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)
 
-        super(CustomEKF, self).update(asarray([position.x, position.y, position.y, yaw]),
+        super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_trilateration, self.R_trilateration)
 
