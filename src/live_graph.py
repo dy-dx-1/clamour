@@ -42,10 +42,10 @@ class Animation:
         self.p101, = self.ax03.plot(self.t, self.y_unfiltered, "g-")
         self.p110, = self.ax04.plot(self.t, self.yaw_filtered, "b-")
         self.p111, = self.ax04.plot(self.t, self.yaw_unfiltered, "g-")
-        self.p002 = self.ax01.plot(self.x_real, self.y_real, "r-")
-        self.p012 = self.ax01.plot(self.x_real, self.t, "r-")
-        self.p102 = self.ax01.plot(self.x_real, self.t, "r-")
-        self.p112 = self.ax01.plot(self.x_real, self.t, "r-")
+        self.p002, = self.ax01.plot(self.x_real, self.y_real, "r-")
+        self.p012, = self.ax02.plot(self.t, self.x_real, "r-")
+        self.p102, = self.ax03.plot(self.t, self.y_real, "r-")
+        self.p112, = self.ax04.plot(self.t, self.yaw_real, "r-")
 
         self._queue = None
         self.stop = False
@@ -106,19 +106,20 @@ class Animation:
 
     def run(self, data):
         for d in data:
-            if d[-1] > 0:
-                print("WARNING: Filter might be diverging, because det(P) = ", d[-1], " > 0.")
+            if d[7] > 0:
+                print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
 
             self.update_time_axis_limits(d[0])
-
-            if data[8] == 0:
+            print(d)
+            if d[8] == 0:
                 self.append_data_pozyx(d)
                 self.set_data_pozyx()
-            elif data[8] == 1:
+            elif d[8] == 1:
                 self.append_data_optitrack(d)
                 self.set_data_optitrack()
 
-            return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111
+            return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111, \
+                self.p002, self.p012, self.p102, self.p112
 
     def append_data_pozyx(self, data):
         self.t = np.append(self.t, data[0])

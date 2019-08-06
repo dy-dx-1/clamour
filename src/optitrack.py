@@ -702,18 +702,19 @@ class NatNetClient(object):
 if __name__ == '__main__':
     VERBOSE = False
     start_time = time.time()
+    live_graph_socket = ContextManagedSocket(remote_host="192.168.2.107", port=10555)
+    live_graph_socket.__enter__()
 
     def forward_body_frame_to_graph(timestamp: float, id: int, position: tuple, rotation: list, rigidBodyDescriptor):
         if rigidBodyDescriptor:
             if 'RigidBody 1' in rigidBodyDescriptor:
                 if id == rigidBodyDescriptor['RigidBody 1'][0]:
                     yaw = from_quaternion2rpy(rotation)[0]
-                    with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as live_graph_socket:
-                        print(yaw)
-                        live_graph_socket.send([timestamp - start_time,
-                                                position[0], -1,
-                                                position[1], -1,
-                                                yaw, -1, -1, 1])
+                    live_graph_socket.send([timestamp - start_time,
+                                            position[0], -1,
+                                            position[1], -1,
+                                            yaw, -1,
+                                            -1, 1])
 
 
     # This will create a new NatNet client
