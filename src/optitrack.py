@@ -23,7 +23,7 @@ import socket
 import struct
 from threading import Thread
 import time
-from math import atan2, asin
+from math import atan2, asin, degrees
 from contextManagedSocket import ContextManagedSocket
 
 VERBOSE = False
@@ -704,16 +704,25 @@ if __name__ == '__main__':
     start_time = time.time()
     live_graph_socket = ContextManagedSocket(remote_host="192.168.2.107", port=10555)
     live_graph_socket.__enter__()
+    yaw_offset = None
+
+    def correct_yaw(offset: float, measured_yaw: float) -> float:
+        new_yaw = degrees(measured_yaw) - degrees(offset)
+        return new_yaw if new_yaw > 0 else 360 + new_yaw
 
     def forward_body_frame_to_graph(timestamp: float, id: int, position: tuple, rotation: list, rigidBodyDescriptor):
+        global yaw_offset, start_time
         if rigidBodyDescriptor:
             if 'RigidBody 1' in rigidBodyDescriptor:
                 if id == rigidBodyDescriptor['RigidBody 1'][0]:
-                    yaw = from_quaternion2rpy(rotation)[0]
-                    live_graph_socket.send([timestamp - start_time,
-                                            position[0], -1,
-                                            position[1], -1,
-                                            yaw, -1,
+                    yaw = from_quaternion2rpy(rotation)[2]
+                    print(position)
+                    if yaw_offset is None:
+                        yaw_offset = yaw
+                    live_graph_socket.send([time.time() - start_time,
+                                            -1000 * position[1], -1,
+                                            1000 * position[0], -1,
+                                            correct_yaw(yaw_offset, yaw), -1,
                                             -1, 1])
 
 
