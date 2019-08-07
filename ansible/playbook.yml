@@ -1,4 +1,4 @@
-- hosts: all
+- hosts: eggs
   become: true
   roles:
           - device-setup 
