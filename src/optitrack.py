@@ -712,16 +712,17 @@ if __name__ == '__main__':
 
     def forward_body_frame_to_graph(timestamp: float, id: int, position: tuple, rotation: list, rigidBodyDescriptor):
         global yaw_offset, start_time
+        Y_OFFSET = 648
+        X_OFFSET = -1029
         if rigidBodyDescriptor:
             if 'RigidBody 1' in rigidBodyDescriptor:
                 if id == rigidBodyDescriptor['RigidBody 1'][0]:
                     yaw = from_quaternion2rpy(rotation)[2]
-                    print(position)
                     if yaw_offset is None:
                         yaw_offset = yaw
                     live_graph_socket.send([time.time() - start_time,
-                                            -1000 * position[1], -1,
-                                            1000 * position[0], -1,
+                                            int(-1000 * position[1] + X_OFFSET), -1,
+                                            int(1000 * position[0] + Y_OFFSET), -1,
                                             correct_yaw(yaw_offset, yaw), -1,
                                             -1, 1])
 

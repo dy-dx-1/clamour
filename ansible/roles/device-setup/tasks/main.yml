@@ -7,7 +7,7 @@
           - docker-ce-cli
 
 - name: "Installing Docker Compose"
-  apt: pkg=docker-compose state=present
+    apt: pkg=docker-compose state=present
 
 - name: "Creating 'clamour' directory"
   file: path=/home/pi/clamour state=directory
