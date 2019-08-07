@@ -1,10 +1,18 @@
+- name: "Updating apt"
+  command: apt update
+
+- name: "Verifying if Docker is installed"
+  stat:
+    path: /usr/bin/docker
+  register: docker_bin
+
+- name: "Fetching Docker"
+  get_url: url=https://get.docker.com dest=/tmp/get-docker.sh mode=755
+  when: not docker_bin.stat.exists
+
 - name: "Installing Docker"
-  apt: 
-        name: "{{ packages }}"
-  vars:
-        packages:
-          - docker-ce
-          - docker-ce-cli
+  shell: /tmp/get-docker.sh
+  when: not docker_bin.stat.exists
 
 - name: "Installing Docker Compose"
   apt: pkg=docker-compose state=present
@@ -13,4 +21,10 @@
   file: path=/home/pi/clamour state=directory
 
 - name: "Copying docker-compose.yml"
-  copy: src=../files/docker-compose.yml dest=/home/pi/clamour/docker-compose.yml owner=pi mode=0644  
+  copy: src=../files/docker-compose.yml dest=/home/pi/clamour/docker-compose.yml owner=pi mode=0644
+
+- name: "Changing default password"
+  user:
+    name: pi
+    groups: docker
+    password: "{{'!clamour' | password_hash('sha512')}}"
