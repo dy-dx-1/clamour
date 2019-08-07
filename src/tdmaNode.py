@@ -1,8 +1,7 @@
 import sys
 import traceback as tb
 from multiprocessing import Lock
-from pypozyx import Data, PozyxSerial
-from pypozyx.definitions.registers import POZYX_NETWORK_ID
+from pypozyx import PozyxSerial
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
 from messenger import Messenger
@@ -10,8 +9,9 @@ from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchr
 
 
 class TDMANode:
-    def __init__(self, multiprocess_communication_queue, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock):
-        self.id = 0
+    def __init__(self, multiprocess_communication_queue, shared_pozyx: PozyxSerial,
+                 shared_pozyx_lock: Lock, pozyx_id: int):
+        self.id = pozyx_id
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
@@ -47,8 +47,6 @@ class TDMANode:
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
-        self.set_id()
-
     def initialize_states(self) -> None:
         self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment,
                                    self.pozyx_lock, self.multiprocess_communication_queue)
@@ -65,11 +63,3 @@ class TDMANode:
             State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger, self.neighborhood)}
 
         self.current_state = self.states[State.INITIALIZATION]
-
-    def set_id(self) -> None:
-        data = Data([0] * 2)
-        with self.pozyx_lock:
-            self.pozyx.getRead(POZYX_NETWORK_ID, data)
-
-        self.id = data[1] * 256 + data[0]
-        print("Device ID: ", self.id)

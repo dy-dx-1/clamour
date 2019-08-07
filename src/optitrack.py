@@ -724,7 +724,7 @@ if __name__ == '__main__':
                                             int(-1000 * position[1] + X_OFFSET), -1,
                                             int(1000 * position[0] + Y_OFFSET), -1,
                                             correct_yaw(yaw_offset, yaw), -1,
-                                            -1, 1])
+                                            -1, -1])
 
 
     # This will create a new NatNet client

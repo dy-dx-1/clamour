@@ -11,7 +11,8 @@ from rooms import Floorplan
 
 
 class EKFManager:
-    def __init__(self, communication_queue: ContextManagedQueue):
+    def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
+        self.pozyx_id = pozyx_id
         self.ekf = None
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
@@ -102,4 +103,4 @@ class EKFManager:
                          self.ekf.get_position().x, coordinates.x,
                          self.ekf.get_position().y, coordinates.y,
                          self.ekf.get_yaw(), self.correct_yaw(yaw),
-                         linalg.det(self.ekf.P), 0])
+                         linalg.det(self.ekf.P), self.pozyx_id])

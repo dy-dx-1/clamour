@@ -8,6 +8,8 @@ import matplotlib.animation
 import matplotlib.pyplot as plt
 
 MAX_INDEX = 12
+GRAPH_TAG_ID = 0x2006
+OPTITRACK_ID = -1
 
 
 class Animation:
@@ -111,10 +113,10 @@ class Animation:
 
             self.update_time_axis_limits(d[0])
             print(d)
-            if d[8] == 0:
+            if d[8] == GRAPH_TAG_ID:
                 self.append_data_pozyx(d)
                 self.set_data_pozyx()
-            elif d[8] == 1:
+            elif d[8] == OPTITRACK_ID:
                 self.append_data_optitrack(d)
                 self.set_data_optitrack()
 
