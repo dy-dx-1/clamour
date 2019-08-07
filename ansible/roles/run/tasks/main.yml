@@ -1,2 +1,5 @@
+- name: "Pulling latest version of Clamour"
+  command: chdir=/home/pi/clamour docker-compose pull clamour
+
 - name: "Starting Clamour"
-  command: chdir=/home/pi/clamour docker-compose up
+  command: chdir=/home/pi/clamour docker-compose up -d
