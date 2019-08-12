@@ -17,3 +17,6 @@ class Neighborhood:
 
     def is_alone(self):
         return len(self.current_neighbors) == 0
+
+    def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float) -> None:
+        self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
