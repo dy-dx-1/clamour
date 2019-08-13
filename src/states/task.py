@@ -10,7 +10,7 @@ from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
-from discovery import PozyxDiscoverer
+from pozyx_utils import PozyxDiscoverer
 
 from .constants import State
 from .tdmaState import TDMAState
