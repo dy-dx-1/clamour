@@ -108,11 +108,10 @@ class Animation:
 
     def run(self, data):
         for d in data:
-            if d[7] > 0:
-                print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
+            # if d[7] > 0:
+            #     print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
 
             self.update_time_axis_limits(d[0])
-            print(d)
             if d[8] == GRAPH_TAG_ID:
                 self.append_data_pozyx(d)
                 self.set_data_pozyx()

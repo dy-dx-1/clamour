@@ -81,7 +81,7 @@ class unpackingError(Exception):
 
 
 class NatNetClient(object):
-    def __init__(self, client_ip=None, server_ip="192.168.2.100",
+    def __init__(self, client_ip=None, server_ip="192.168.4.186",
                  multicast_address="239.255.42.99",
                  command_port=1510,
                  data_port=1511):
@@ -702,7 +702,7 @@ class NatNetClient(object):
 if __name__ == '__main__':
     VERBOSE = False
     start_time = time.time()
-    live_graph_socket = ContextManagedSocket(remote_host="192.168.2.107", port=10555)
+    live_graph_socket = ContextManagedSocket(remote_host="192.168.4.120", port=10555)
     live_graph_socket.__enter__()
     yaw_offset = None
 
@@ -728,7 +728,7 @@ if __name__ == '__main__':
 
 
     # This will create a new NatNet client
-    streamingClient = NatNetClient(client_ip='192.168.2.107')
+    streamingClient = NatNetClient(client_ip='192.168.4.120')
 
     # Configure the streaming client to call our rigid body handler on the emulator to send data out.
     streamingClient.rigidBodyListener = forward_body_frame_to_graph
