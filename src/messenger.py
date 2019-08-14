@@ -170,10 +170,14 @@ class Messenger:
 
         return info[0], data[0], status
 
-    def update_neighbor_dictionary(self) -> None:
-        new_message = self.message_box.peek_last()
-        new_message.decode()
-        self.neighborhood.current_neighbors[new_message.sender_id] = ([], perf_counter())
+    def update_neighbor_dictionary(self, device_list: list = None) -> None:
+        if device_list is not None:
+            for device in device_list:
+                self.neighborhood.add_neighbor(device, [], perf_counter())
+        else:
+            new_message = self.message_box.peek_last()
+            new_message.decode()
+            self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
 
     def handle_error(self) -> None:
         error_code = SingleRegister()

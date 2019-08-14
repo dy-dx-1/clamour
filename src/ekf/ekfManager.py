@@ -11,7 +11,8 @@ from rooms import Floorplan
 
 
 class EKFManager:
-    def __init__(self, communication_queue: ContextManagedQueue):
+    def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
+        self.pozyx_id = pozyx_id
         self.ekf = None
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
@@ -20,7 +21,7 @@ class EKFManager:
         self.current_room = self.floorplan.rooms['Arena']
 
     def run(self) -> None:
-        with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
+        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
             self.initialize_ekf(socket)
 
             while True:
@@ -52,7 +53,7 @@ class EKFManager:
                 update_info = self.generate_zero_update_info(update_info[2])
                 message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
-            self.broadcast_state(socket, self.ekf.last_measurement_time, message.measured_xyz, message.measured_yaw)
+            self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
@@ -68,8 +69,8 @@ class EKFManager:
 
         step_length = 750  # millimeters
 
-        delta_position_x = step_length * math.cos(math.radians(self.correct_yaw(measured_yaw)))
-        delta_position_y = step_length * -math.sin(math.radians(self.correct_yaw(measured_yaw)))
+        delta_position_x = step_length * -math.cos(math.radians(self.correct_yaw(measured_yaw)))
+        delta_position_y = step_length * math.sin(math.radians(self.correct_yaw(measured_yaw)))
 
         # The pedometer cannot measure height; we assumed it is constant.
         return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
@@ -99,7 +100,7 @@ class EKFManager:
         # TODO: Find source of None coordinates
         if coordinates is not None:
             socket.send([timestamp - self.start_time,
-                         self.ekf.x[0], coordinates.x,
-                         self.ekf.x[2], coordinates.y,
-                         self.ekf.x[6], self.correct_yaw(yaw),
-                         linalg.det(self.ekf.P)])
+                         self.ekf.get_position().x, coordinates.x,
+                         self.ekf.get_position().y, coordinates.y,
+                         self.ekf.get_yaw(), self.correct_yaw(yaw),
+                         linalg.det(self.ekf.P), self.pozyx_id])

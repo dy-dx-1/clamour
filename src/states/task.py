@@ -3,13 +3,14 @@ from multiprocessing import Lock
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceList, DeviceRange,
-                     PozyxSerial, SingleRegister, DeviceCoordinates, EulerAngles)
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceRange,
+                     PozyxSerial, DeviceCoordinates, EulerAngles)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
+from pozyx_utils import PozyxDiscoverer
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -117,30 +118,12 @@ class Task(TDMAState):
             self.discover(POZYX_DISCOVERY_TAGS_ONLY)
 
     def discover(self, discovery_type: int) -> None:
-        with self.pozyx_lock:
-            discovery_status = self.pozyx.doDiscovery(discovery_type=discovery_type)
+        PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, discovery_type)
+        devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock)
 
-        if discovery_status == POZYX_SUCCESS:
-            devices = self.get_devices()
-
-            for device_id in devices:
-                if device_id not in self.anchors.available_anchors:
-                    self.anchors.available_anchors.append(device_id)
-
-    def get_devices(self) -> DeviceList:
-        size = SingleRegister()
-        with self.pozyx_lock:
-            status = self.pozyx.getDeviceListSize(size)
-
-        devices = DeviceList(list_size=size[0])
-
-        if status == POZYX_SUCCESS and size[0] > 0:
-            with self.pozyx_lock:
-                status &= self.pozyx.getDeviceIds(devices)
-        else:
-            print("No anchors available.")
-
-        return devices
+        for device_id in devices:
+            if device_id not in self.anchors.available_anchors:
+                self.anchors.available_anchors.append(device_id)
 
     def set_manually_measured_anchors(self) -> None:
         """If a discovered anchor's coordinates are known (i.e. were manually measured),

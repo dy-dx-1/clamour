@@ -2,7 +2,9 @@
 
 import os
 import sys
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port
+from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
+from pypozyx.definitions.registers import POZYX_NETWORK_ID
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 from ekf import EKFManager
@@ -23,21 +25,29 @@ def connect_pozyx() -> PozyxSerial:
     return PozyxSerial(serial_port)
 
 
+def get_pozyx_id(pozyx) -> int:
+    data = Data([0] * 2)
+    pozyx.getRead(POZYX_NETWORK_ID, data)
+
+    return data[1] * 256 + data[0]
+
+
 def main():
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
 
     with ContextManagedQueue() as multiprocess_communication_queue:
         shared_pozyx = connect_pozyx()
         shared_pozyx_lock = Lock()
+        pozyx_id = get_pozyx_id(shared_pozyx)
 
-        ekf_manager = EKFManager(multiprocess_communication_queue)
+        ekf_manager = EKFManager(multiprocess_communication_queue, pozyx_id)
         pedometer = Pedometer(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock)
 
         with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
             ekf_manager_process.start()
             with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                 pedometer_process.start()
-                with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock) as node:
+                with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id) as node:
                     node.run()
 
 

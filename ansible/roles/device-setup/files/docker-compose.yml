@@ -1,9 +1,5 @@
 version: '2'
 services:
-  watchtower:
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
   clamour:
     image: samsei/clamour:latest
     ports:

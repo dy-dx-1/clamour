@@ -1,9 +1,10 @@
 from multiprocessing import Lock
 from pypozyx import PozyxSerial
-from pypozyx.definitions.constants import (POZYX_DISCOVERY_ALL_DEVICES, POZYX_SUCCESS)
+from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
 
 from interfaces import Anchors, Neighborhood
 from messenger import Messenger
+from pozyx_utils import PozyxDiscoverer
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -29,25 +30,18 @@ class Initialization(TDMAState):
         print("Entering synchronization...")
         return State.SYNCHRONIZATION
 
-    def discover_neighbors(self):  # todo @yanjun: By receiving msgs? If in this case, who is sending? If by pozyx.doDiscovery, then need to do at different time. I used sleeping for a period related with id to randomize this process?
+    def discover_neighbors(self):
         self.clear_known_devices()
-        
-        # We scan the network for messages an arbitrary number of times
-        for _ in range(1000):
-            if self.messenger.receive_new_message():
-                self.messenger.update_neighbor_dictionary()
-                self.messenger.message_box.pop()  # Discard the message, it will not be needed afterwards
-        
-        self.reset_discovery_settings()
+
+        PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, POZYX_DISCOVERY_TAGS_ONLY)
+        devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock)
+
+        self.messenger.update_neighbor_dictionary(devices)
 
     def clear_known_devices(self):
-        self.neighborhood.neighbor_list = []
-        self.anchors.available_anchors = []
-
-    def reset_discovery_settings(self):
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
-            if self.pozyx.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES) == POZYX_SUCCESS: # todo @yanjun: update neighbood tags here.
-                self.pozyx.printDeviceList()
-                self.anchors.discovery_done = False
+        self.neighborhood.neighbor_list = []
+        self.anchors.available_anchors = []
+        self.anchors.discovery_done = False

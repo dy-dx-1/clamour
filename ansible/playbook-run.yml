@@ -1,0 +1,4 @@
+- hosts: eggs
+  become: true
+  roles:
+          - run

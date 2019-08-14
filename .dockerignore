@@ -6,3 +6,4 @@ tests/
 LICENSE
 Makefile
 README.md
+ansible/

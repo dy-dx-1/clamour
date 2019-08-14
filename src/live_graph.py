@@ -8,6 +8,8 @@ import matplotlib.animation
 import matplotlib.pyplot as plt
 
 MAX_INDEX = 12
+GRAPH_TAG_ID = 0x2006
+OPTITRACK_ID = -1
 
 
 class Animation:
@@ -27,10 +29,13 @@ class Animation:
         self.t = np.zeros(0)
         self.x_unfiltered = np.zeros(0)
         self.x_filtered = np.zeros(0)
+        self.x_real = np.zeros(0)
         self.y_unfiltered = np.zeros(0)
         self.y_filtered = np.zeros(0)
+        self.y_real = np.zeros(0)
         self.yaw_unfiltered = np.zeros(0)
         self.yaw_filtered = np.zeros(0)
+        self.yaw_real = np.zeros(0)
 
         self.p000, = self.ax01.plot(self.x_filtered, self.y_filtered, "b-")
         self.p010, = self.ax02.plot(self.t, self.x_filtered, "b-")
@@ -39,6 +44,10 @@ class Animation:
         self.p101, = self.ax03.plot(self.t, self.y_unfiltered, "g-")
         self.p110, = self.ax04.plot(self.t, self.yaw_filtered, "b-")
         self.p111, = self.ax04.plot(self.t, self.yaw_unfiltered, "g-")
+        self.p002, = self.ax01.plot(self.x_real, self.y_real, "r-")
+        self.p012, = self.ax02.plot(self.t, self.x_real, "r-")
+        self.p102, = self.ax03.plot(self.t, self.y_real, "r-")
+        self.p112, = self.ax04.plot(self.t, self.yaw_real, "r-")
 
         self._queue = None
         self.stop = False
@@ -91,7 +100,7 @@ class Animation:
                 if not self._queue.empty():
                     try:
                         msg = self._queue.get(block=False)
-                        data.append(struct.unpack('ffffffff', msg))
+                        data.append(struct.unpack('fffffffff', msg))
                     except struct.error as e:
                         print(str(e))
 
@@ -99,17 +108,21 @@ class Animation:
 
     def run(self, data):
         for d in data:
-            if d[-1] > 0:
-                print("WARNING: Filter might be diverging, because det(P) = ", d[-1], " > 0.")
+            # if d[7] > 0:
+            #     print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
 
-            print(d)
-            self.append_data(d)
             self.update_time_axis_limits(d[0])
-            self.set_data()
+            if d[8] == GRAPH_TAG_ID:
+                self.append_data_pozyx(d)
+                self.set_data_pozyx()
+            elif d[8] == OPTITRACK_ID:
+                self.append_data_optitrack(d)
+                self.set_data_optitrack()
 
-            return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111
+            return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111, \
+                self.p002, self.p012, self.p102, self.p112
 
-    def append_data(self, data):
+    def append_data_pozyx(self, data):
         self.t = np.append(self.t, data[0])
         self.x_filtered = np.append(self.x_filtered, data[1])
         self.x_unfiltered = np.append(self.x_unfiltered, data[2])
@@ -118,7 +131,13 @@ class Animation:
         self.yaw_filtered = np.append(self.yaw_filtered, data[5])
         self.yaw_unfiltered = np.append(self.yaw_unfiltered, data[6])
 
-    def set_data(self):
+    def append_data_optitrack(self, data):
+        self.t = np.append(self.t, data[0])
+        self.x_real = np.append(self.x_real, data[1])
+        self.y_real = np.append(self.y_real, data[3])
+        self.yaw_real = np.append(self.yaw_real, data[5])
+
+    def set_data_pozyx(self):
         self.p000.set_data(self.x_filtered, self.y_filtered)
         self.p010.set_data(self.t, self.x_filtered)
         self.p011.set_data(self.t, self.x_unfiltered)
@@ -126,6 +145,12 @@ class Animation:
         self.p101.set_data(self.t, self.y_unfiltered)
         self.p110.set_data(self.t, self.yaw_filtered)
         self.p111.set_data(self.t, self.yaw_unfiltered)
+
+    def set_data_optitrack(self):
+        self.p002.set_data(self.x_real, self.y_real)
+        self.p012.set_data(self.t, self.x_real)
+        self.p102.set_data(self.t, self.y_real)
+        self.p112.set_data(self.t, self.yaw_real)
 
     def update_time_axis_limits(self, new_time: float):
         if new_time >= self.axes_limits["time"][1]:

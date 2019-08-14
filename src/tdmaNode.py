@@ -1,8 +1,7 @@
 import sys
 import traceback as tb
 from multiprocessing import Lock
-from pypozyx import Data, PozyxSerial
-from pypozyx.definitions.registers import POZYX_NETWORK_ID
+from pypozyx import PozyxSerial
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
 from messenger import Messenger
@@ -10,27 +9,32 @@ from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchr
 
 
 class TDMANode:
-    def __init__(self, multiprocess_communication_queue, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock):
-        self.id = 0
-        self.multiprocess_communication_queue = multiprocess_communication_queue
-        self.pozyx = shared_pozyx
-        self.pozyx_lock = shared_pozyx_lock
+    def __init__(self, multiprocess_communication_queue, shared_pozyx: PozyxSerial,
+                 shared_pozyx_lock: Lock, pozyx_id: int):
 
-        self.neighborhood = Neighborhood()
-        self.slot_assignment = SlotAssignment()
+        self.clear_devices(shared_pozyx, shared_pozyx_lock)
+
+        neighborhood = Neighborhood()
+        slot_assignment = SlotAssignment()
+        anchors = Anchors()
+        messenger = Messenger(pozyx_id, shared_pozyx, neighborhood, slot_assignment,
+                              shared_pozyx_lock, multiprocess_communication_queue)
+
         self.timing = Timing()
-        self.anchors = Anchors()
 
-        # These attributes need to be set after setup
-        self.messenger = None
-        self.states = None
-        self.current_state = None
+        self.states = self.states = {
+            State.INITIALIZATION: Initialization(neighborhood, anchors, pozyx_id, shared_pozyx, messenger,
+                                                 multiprocess_communication_queue, shared_pozyx_lock),
+            State.SYNCHRONIZATION: Synchronization(neighborhood, slot_assignment, self.timing, messenger,
+                                                   pozyx_id, multiprocess_communication_queue),
+            State.SCHEDULING: Scheduling(neighborhood, slot_assignment, self.timing, pozyx_id, messenger),
+            State.TASK: Task(self.timing, anchors, neighborhood, pozyx_id, shared_pozyx, shared_pozyx_lock, messenger),
+            State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
+
+        self.current_state = self.states[State.INITIALIZATION]
 
     def __enter__(self):
         print("Setting up TDMA node...")
-        self.setup()
-        self.initialize_states()
-
         return self
 
     def __exit__(self, exception_type, exception_value, traceback):
@@ -43,33 +47,7 @@ class TDMANode:
             self.timing.update_current_time()
             self.current_state = self.states[self.current_state.execute()]
 
-    def setup(self) -> None:
-        with self.pozyx_lock:
-            self.pozyx.clearDevices()
-
-        self.set_id()
-
-    def initialize_states(self) -> None:
-        self.messenger = Messenger(self.id, self.pozyx, self.neighborhood, self.slot_assignment,
-                                   self.pozyx_lock, self.multiprocess_communication_queue)
-
-        self.states = {
-            State.INITIALIZATION: Initialization(self.neighborhood, self.anchors, self.id, self.pozyx,
-                                                 self.messenger, self.multiprocess_communication_queue,
-                                                 self.pozyx_lock),
-            State.SYNCHRONIZATION: Synchronization(self.neighborhood, self.slot_assignment, self.timing, self.messenger,
-                                                   self.id, self.multiprocess_communication_queue),
-            State.SCHEDULING: Scheduling(self.neighborhood, self.slot_assignment, self.timing, self.id, self.messenger),
-            State.TASK: Task(self.timing, self.anchors, self.neighborhood, self.id,
-                             self.pozyx, self.pozyx_lock, self.messenger),
-            State.LISTEN: Listen(self.slot_assignment, self.timing, self.messenger, self.neighborhood)}
-
-        self.current_state = self.states[State.INITIALIZATION]
-
-    def set_id(self) -> None:
-        data = Data([0] * 2)
-        with self.pozyx_lock:
-            self.pozyx.getRead(POZYX_NETWORK_ID, data)
-
-        self.id = data[1] * 256 + data[0]
-        print("Device ID: ", self.id)
+    @staticmethod
+    def clear_devices(pozyx: PozyxSerial, pozyx_lock: Lock()) -> None:
+        with pozyx_lock:
+            pozyx.clearDevices()
