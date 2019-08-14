@@ -21,7 +21,7 @@ class EKFManager:
         self.current_room = self.floorplan.rooms['Arena']
 
     def run(self) -> None:
-        with ContextManagedSocket(remote_host="192.168.2.107", port=10555) as socket:
+        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
             self.initialize_ekf(socket)
 
             while True:
