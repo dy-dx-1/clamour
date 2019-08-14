@@ -11,9 +11,9 @@ class Neighborhood:
         self.synchronized_active_neighbor_count = 0
 
     def collect_garbage(self) -> None:
-        for id, data in self.current_neighbors.items():
-            if data[1] < perf_counter() - OBSOLESCENCE_DELAY:
-                del self.current_neighbors[id]
+        to_del = [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - OBSOLESCENCE_DELAY]
+        for id in to_del:
+            del self.current_neighbors[id]
 
     def is_alone(self):
         return len(self.current_neighbors) == 0
