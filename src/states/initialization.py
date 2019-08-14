@@ -35,7 +35,6 @@ class Initialization(TDMAState):
 
         PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, POZYX_DISCOVERY_TAGS_ONLY)
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock)
-        self.pozyx.printDeviceList()
 
         self.messenger.update_neighbor_dictionary(devices)
 
