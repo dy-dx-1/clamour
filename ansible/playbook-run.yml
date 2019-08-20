@@ -1,4 +1,5 @@
 - hosts: eggs
   become: true
+  gather_facts: yes
   roles:
           - run
