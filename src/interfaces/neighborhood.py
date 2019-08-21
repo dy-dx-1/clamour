@@ -12,6 +12,8 @@ class Neighborhood:
 
     def collect_garbage(self) -> None:
         to_del = [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - OBSOLESCENCE_DELAY]
+        if len(to_del) > 0:
+            print("Collecting garbage: ", to_del)
         for id in to_del:
             del self.current_neighbors[id]
 

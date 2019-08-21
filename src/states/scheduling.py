@@ -22,8 +22,10 @@ class Scheduling(TDMAState):
         self.slot_assignment.update_free_slots()
 
         if self.neighborhood.is_alone():
+            print("Device is alone. (", len(self.neighborhood.current_neighbors), " neighbors)")
             self.alone_slot_assignment()
         else:
+            print("Device has neighbors. (", len(self.neighborhood.current_neighbors), " neighbors)")
             self.community_slot_assignment()
 
         return self.next()
