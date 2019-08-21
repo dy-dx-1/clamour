@@ -1,5 +1,7 @@
 FROM samsei/arm:latest
 
+# the mdkir is required for the log volume mounted by docker-compose
+RUN mkdir -p /var/log/clamour
 COPY /src /src
 WORKDIR /src
 
