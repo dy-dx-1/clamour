@@ -8,7 +8,7 @@ import matplotlib.animation
 import matplotlib.pyplot as plt
 
 MAX_INDEX = 12
-GRAPH_TAG_ID = 0x2006
+GRAPH_TAG_ID = -1
 OPTITRACK_ID = -1
 
 
@@ -112,9 +112,11 @@ class Animation:
 
     def run(self, data):
         for d in data:
+            global GRAPH_TAG_ID
             # if d[7] > 0:
             #     print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
-            print(d[8])
+            if GRAPH_TAG_ID == -1:
+                GRAPH_TAG_ID = d[8]
 
             if d[8] == GRAPH_TAG_ID:
                 if self.first_time is None:
