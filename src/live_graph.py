@@ -115,6 +115,7 @@ class Animation:
             global GRAPH_TAG_ID
             # if d[7] > 0:
             #     print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
+            print(d[8])
             if GRAPH_TAG_ID == -1:
                 GRAPH_TAG_ID = d[8]
 

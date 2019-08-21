@@ -60,6 +60,7 @@ class Task(TDMAState):
 
         position = Coordinates(position.x, position.y, position.z)
 
+        print("Positioning status(nb available anchors: ", len(self.anchors.available_anchors), ")")
         if status == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
@@ -87,7 +88,7 @@ class Task(TDMAState):
         neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
                                    self.anchors.anchors_dict[ranging_target_id][3],
                                    self.anchors.anchors_dict[ranging_target_id][4]])
-
+        print("Ranging status (nb available anchors: ", len(self.anchors.available_anchors), ")")
         if status == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
