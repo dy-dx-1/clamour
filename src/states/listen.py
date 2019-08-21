@@ -36,6 +36,7 @@ class Listen(TDMAState):
         else:
             return State.SYNCHRONIZATION
 
+    "TODO: This is weird, why tf do I need it? Maybe message popping causes bug. Could be replaced by sleep."
     def listen_for_messages(self):
         if self.messenger.receive_new_message():
             self.messenger.update_neighbor_dictionary()

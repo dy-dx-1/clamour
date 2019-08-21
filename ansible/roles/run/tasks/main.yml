@@ -1,3 +1,6 @@
+#- name: "Reboot"
+#  command: reboot
+
 - name: "Stopping existing containers"
   command: chdir=/home/pi/clamour docker-compose stop
 
