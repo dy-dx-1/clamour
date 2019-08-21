@@ -7,4 +7,4 @@ services:
     privileged: true
     volumes:
       - /dev/ttyACM0:/dev/ttyACM0
-      - /home/pi/:/var/log/clamour
+      - /var/log/clamour:/var/log/clamour
