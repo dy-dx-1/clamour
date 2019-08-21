@@ -38,7 +38,6 @@ class Scheduling(TDMAState):
             print("Entering listen state...")
             return State.LISTEN
         else:
-            print(self.timing.current_time_in_cycle, TASK_START_TIME)
             return State.SCHEDULING
 
     def community_slot_assignment(self):
