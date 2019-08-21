@@ -14,7 +14,7 @@ SCHEDULING_SLOT_DURATION = 30
 
 NB_SCHEDULING_CYCLES = 30
 TASK_SLOT_DURATION = 30
-NB_TASK_SLOTS = 25
+NB_TASK_SLOTS = 35
 NB_FULL_CYCLES = 1000
 
 # |<---------------------------------FULL_CYCLE_DURATION------------------------------------->|
