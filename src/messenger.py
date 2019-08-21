@@ -55,6 +55,7 @@ class Messenger:
             message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
+        print("Sending scheduling message")
         self.broadcast(slot, code)
 
     def should_chose_from_non_block(self) -> bool:
@@ -81,6 +82,7 @@ class Messenger:
 
     def receive_message(self) -> None:
         if self.receive_new_message():
+            print("Received message from ", self.message_box.peek_last().sender_id, " : ", type(self.message_box.peek_last()))
             self.update_neighbor_dictionary()
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())
