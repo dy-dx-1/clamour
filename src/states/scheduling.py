@@ -39,9 +39,6 @@ class Scheduling(TDMAState):
             return State.LISTEN
         else:
             print(self.timing.current_time_in_cycle, TASK_START_TIME)
-            print("Receive List: ", self.slot_assignment.receive_list)
-            print("Send List: ", self.slot_assignment.pure_send_list)
-            print()
             return State.SCHEDULING
 
     def community_slot_assignment(self):
