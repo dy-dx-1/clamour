@@ -28,6 +28,7 @@ class Synchronization(TDMAState):
 
         if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
             self.timing.synchronized = True
+            print("Synced after: ", self.timing.current_time_in_cycle)
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
