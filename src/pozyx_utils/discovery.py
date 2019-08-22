@@ -8,13 +8,19 @@ class PozyxDiscoverer:
     @staticmethod
     def discover(pozyx: PozyxSerial, pozyx_lock: Lock, discovery_type: int) -> None:
         with pozyx_lock:
-            pozyx.doDiscovery(discovery_type=discovery_type)
+            status = pozyx.doDiscovery(discovery_type=discovery_type)
+
+        if status != POZYX_SUCCESS:
+            PozyxDiscoverer.handle_error(pozyx, pozyx_lock, "discover")
 
     @staticmethod
     def get_nb_devices(pozyx: PozyxSerial, pozyx_lock: Lock) -> tuple:
         size = SingleRegister()
         with pozyx_lock:
             status = pozyx.getDeviceListSize(size)
+        
+        if status != POZYX_SUCCESS:
+            PozyxDiscoverer.handle_error(pozyx, pozyx_lock, "get_nb_devices")
 
         return status, size[0]
 
@@ -26,5 +32,17 @@ class PozyxDiscoverer:
         if status == POZYX_SUCCESS and size > 0:
             with pozyx_lock:
                 pozyx.getDeviceIds(devices)
+        elif status != POZYX_SUCCESS:
+            PozyxDiscoverer.handle_error(pozyx, pozyx_lock, "get_device_list")
 
         return devices
+
+    @staticmethod
+    def handle_error(pozyx: PozyxSerial, pozyx_lock: Lock, function_name: str) -> None:
+        error_code = SingleRegister()
+
+        with pozyx_lock:
+            message = pozyx.getErrorMessage(error_code)
+            pozyx.getErrorCode(error_code)
+
+        print("Error in", function_name, ": ", str(error_code), message)

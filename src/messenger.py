@@ -2,7 +2,7 @@ import random
 from multiprocessing import Lock
 from time import perf_counter, time
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment
@@ -170,6 +170,9 @@ class Messenger:
             self.pozyx.getRxInfo(info)
             status = self.pozyx.readRXBufferData(data)
 
+        if status != POZYX_SUCCESS:
+            self.handle_error("obtain_message_from_pozyx")
+
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self, device_list: list = None) -> None:
@@ -181,14 +184,11 @@ class Messenger:
             new_message.decode()
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
 
-    def handle_error(self) -> None:
+    def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
         with self.pozyx_lock:
             message = self.pozyx.getErrorMessage(error_code)
-            status = self.pozyx.getErrorCode(error_code)
+            self.pozyx.getErrorCode(error_code)
 
-        # if status == POZYX_SUCCESS:
-        #     print("An empty message was received.")
-        # else:
-        #     print("Error while retrieving message from Pozyx tag: " + str(status) + " occurred: " + message)
+        print("Error in", function_name, ": ", str(error_code), message)
