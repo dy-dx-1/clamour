@@ -54,17 +54,18 @@ class Task(TDMAState):
         angles = EulerAngles()
 
         with self.pozyx_lock:
-            status = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
-            status &= self.pozyx.getEulerAngles_deg(angles)
+            status_pos = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
+            status_angle = self.pozyx.getEulerAngles_deg(angles)
         yaw = angles.heading
 
         position = Coordinates(position.x, position.y, position.z)
 
-        print("Positioning status(nb available anchors: ", len(self.anchors.available_anchors), ")")
-        if status == POZYX_SUCCESS:
+        print("Positioning status ", status_pos, " ", status_angle,
+              "(nb available anchors: ", len(self.anchors.available_anchors), ")")
+        if status_pos == status_pos == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
-        return status
+        return status_pos and status_angle
 
     def ranging(self) -> int:
         ranging_target_id = self.select_ranging_target()
@@ -79,8 +80,8 @@ class Task(TDMAState):
         angles = EulerAngles()
 
         with self.pozyx_lock:
-            status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
-            status &= self.pozyx.getEulerAngles_deg(angles)
+            status_pos = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
+            status_angle = self.pozyx.getEulerAngles_deg(angles)
 
         yaw = angles.heading
 
@@ -88,11 +89,12 @@ class Task(TDMAState):
         neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
                                    self.anchors.anchors_dict[ranging_target_id][3],
                                    self.anchors.anchors_dict[ranging_target_id][4]])
-        print("Ranging status (nb available anchors: ", len(self.anchors.available_anchors), ")")
-        if status == POZYX_SUCCESS:
+        print("Ranging status ", status_pos, " ", status_angle,
+              "(nb available anchors: ", len(self.anchors.available_anchors), ")")
+        if status_pos == status_pos == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
-        return status
+        return status_pos and status_pos
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
