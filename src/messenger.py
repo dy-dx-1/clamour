@@ -191,4 +191,5 @@ class Messenger:
             self.pozyx.getErrorCode(error_code)
             message = self.pozyx.getErrorMessage(error_code)
 
-        print("Error in", function_name, ": ", str(error_code), message)
+        if error_code != 0x0:
+            print("Error in", function_name, ": ", str(error_code), message)
