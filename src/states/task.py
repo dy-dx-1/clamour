@@ -53,6 +53,7 @@ class Task(TDMAState):
         height = 1000
         angles = EulerAngles()
 
+        print("Anchors/tags for positioning:", self.anchors.available_anchors)
         with self.pozyx_lock:
             status_pos = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
             status_angle = self.pozyx.getEulerAngles_deg(angles)
@@ -66,8 +67,6 @@ class Task(TDMAState):
 
         position = Coordinates(position.x, position.y, position.z)
 
-        # print("Positioning status", status_pos, status_angle,
-        #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
         if status_pos == status_angle == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
         
@@ -85,6 +84,7 @@ class Task(TDMAState):
         device_range = DeviceRange()
         angles = EulerAngles()
 
+        print("Anchors/tags for ranging:", self.anchors.available_anchors)
         with self.pozyx_lock:
             status_pos = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
             status_angle = self.pozyx.getEulerAngles_deg(angles)
