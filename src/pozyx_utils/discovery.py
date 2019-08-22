@@ -46,4 +46,4 @@ class PozyxDiscoverer:
             message = pozyx.getErrorMessage(error_code)
 
         if error_code != 0x0:
-            print("Error in", function_name, ": ", str(error_code), message)
+            print("Error in", function_name, ":", message)
