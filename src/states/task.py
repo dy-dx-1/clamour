@@ -138,18 +138,17 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
-            print("Setting anchor #", hex(anchor_id))
             if anchor_id in self.anchors.anchors_dict:
                 # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 with self.pozyx_lock:
                     status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
-                print(status)
+                print("Anchor #", hex(anchor_id), status)
             else:
                 device_coordinates = Coordinates()
                 with self.pozyx_lock:
                     status = self.pozyx.getCoordinates(device_coordinates)
                     status &= self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
-                print(status)
+                print("Tag #", hex(anchor_id), status)
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
