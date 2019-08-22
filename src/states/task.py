@@ -4,7 +4,7 @@ from multiprocessing import Lock
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceRange,
-                     PozyxSerial, DeviceCoordinates, EulerAngles)
+                     PozyxSerial, DeviceCoordinates, EulerAngles, SingleRegister)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -56,6 +56,12 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status_pos = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
             status_angle = self.pozyx.getEulerAngles_deg(angles)
+
+        if status_pos != POZYX_SUCCESS:
+            self.handle_error("positioning (pos)")
+        if status_angle != POZYX_SUCCESS:
+            self.handle_error("positioning (ranging)")
+
         yaw = angles.heading
 
         position = Coordinates(position.x, position.y, position.z)
@@ -64,7 +70,7 @@ class Task(TDMAState):
         #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
         if status_pos == status_angle == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
-
+        
         return status_pos and status_angle
 
     def ranging(self) -> int:
@@ -82,6 +88,11 @@ class Task(TDMAState):
         with self.pozyx_lock:
             status_pos = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
             status_angle = self.pozyx.getEulerAngles_deg(angles)
+        
+        if status_pos != POZYX_SUCCESS:
+            self.handle_error("ranging (pos)")
+        if status_angle != POZYX_SUCCESS:
+            self.handle_error("ranging (ranging)")
 
         yaw = angles.heading
 
@@ -153,3 +164,12 @@ class Task(TDMAState):
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
                 self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+
+    def handle_error(self, function_name: str) -> None:
+        error_code = SingleRegister()
+
+        with self.pozyx_lock:
+            message = self.pozyx.getErrorMessage(error_code)
+            self.pozyx.getErrorCode(error_code)
+
+        print("Error in", function_name, ": ", str(error_code), message)
