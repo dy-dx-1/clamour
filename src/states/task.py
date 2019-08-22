@@ -152,6 +152,7 @@ class Task(TDMAState):
             if anchor_id in self.anchors.anchors_dict:
                 # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 with self.pozyx_lock:
+                    # TODO: Does this add properly if it is just the ID?
                     status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
                 if status != POZYX_SUCCESS:
                     self.handle_error("set_manually_measured_anchors (anchors)")
