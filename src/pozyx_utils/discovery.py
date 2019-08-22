@@ -42,7 +42,7 @@ class PozyxDiscoverer:
         error_code = SingleRegister()
 
         with pozyx_lock:
-            message = pozyx.getErrorMessage(error_code)
             pozyx.getErrorCode(error_code)
+            message = pozyx.getErrorMessage(error_code)
 
         print("Error in", function_name, ": ", str(error_code), message)

@@ -188,7 +188,7 @@ class Messenger:
         error_code = SingleRegister()
 
         with self.pozyx_lock:
-            message = self.pozyx.getErrorMessage(error_code)
             self.pozyx.getErrorCode(error_code)
+            message = self.pozyx.getErrorMessage(error_code)
 
         print("Error in", function_name, ": ", str(error_code), message)
