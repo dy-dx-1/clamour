@@ -60,8 +60,8 @@ class Task(TDMAState):
 
         position = Coordinates(position.x, position.y, position.z)
 
-        print("Positioning status", status_pos, status_angle,
-              "(nb available anchors:", len(self.anchors.available_anchors), ")")
+        # print("Positioning status", status_pos, status_angle,
+        #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
         if status_pos == status_pos == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
@@ -89,8 +89,8 @@ class Task(TDMAState):
         neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
                                    self.anchors.anchors_dict[ranging_target_id][3],
                                    self.anchors.anchors_dict[ranging_target_id][4]])
-        print("Ranging status", status_pos, status_angle,
-              "(nb available anchors:", len(self.anchors.available_anchors), ")")
+        # print("Ranging status", status_pos, status_angle,
+        #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
         if status_pos == status_pos == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
@@ -138,15 +138,18 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
+            print("Setting anchor #", hex(anchor_id))
             if anchor_id in self.anchors.anchors_dict:
                 # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 with self.pozyx_lock:
-                    self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+                    status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+                print(status)
             else:
                 device_coordinates = Coordinates()
                 with self.pozyx_lock:
-                    self.pozyx.getCoordinates(device_coordinates)
-                    self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
+                    status = self.pozyx.getCoordinates(device_coordinates)
+                    status &= self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
+                print(status)
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
