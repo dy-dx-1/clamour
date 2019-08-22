@@ -62,7 +62,7 @@ class Task(TDMAState):
 
         # print("Positioning status", status_pos, status_angle,
         #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
-        if status_pos == status_pos == POZYX_SUCCESS:
+        if status_pos == status_angle == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
         return status_pos and status_angle
@@ -91,10 +91,10 @@ class Task(TDMAState):
                                    self.anchors.anchors_dict[ranging_target_id][4]])
         # print("Ranging status", status_pos, status_angle,
         #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
-        if status_pos == status_pos == POZYX_SUCCESS:
+        if status_pos == status_angle == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
-        return status_pos and status_pos
+        return status_pos and status_angle
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
