@@ -121,7 +121,7 @@ class Task(TDMAState):
     def discover(self, discovery_type: int) -> None:
         PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, discovery_type)
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock)
-
+        # TODO: Why do devices seem to only be discovered in TAG mode?
         for device_id in devices:
             if device_id not in self.anchors.available_anchors:
                 self.anchors.available_anchors.append(device_id)
