@@ -60,8 +60,8 @@ class Task(TDMAState):
 
         position = Coordinates(position.x, position.y, position.z)
 
-        print("Positioning status ", status_pos, " ", status_angle,
-              "(nb available anchors: ", len(self.anchors.available_anchors), ")")
+        print("Positioning status", status_pos, status_angle,
+              "(nb available anchors:", len(self.anchors.available_anchors), ")")
         if status_pos == status_pos == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
 
@@ -89,8 +89,8 @@ class Task(TDMAState):
         neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
                                    self.anchors.anchors_dict[ranging_target_id][3],
                                    self.anchors.anchors_dict[ranging_target_id][4]])
-        print("Ranging status ", status_pos, " ", status_angle,
-              "(nb available anchors: ", len(self.anchors.available_anchors), ")")
+        print("Ranging status", status_pos, status_angle,
+              "(nb available anchors:", len(self.anchors.available_anchors), ")")
         if status_pos == status_pos == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
@@ -129,6 +129,8 @@ class Task(TDMAState):
                 self.anchors.available_anchors.append(device_id)
 
     def set_manually_measured_anchors(self) -> None:
+        # TODO: Revise this function, which may be causing bugs. Instead of clearDevices() and addDevice(),
+        #  maybe use removeDevice() and configureAnchors()
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
 
