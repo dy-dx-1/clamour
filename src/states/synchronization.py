@@ -24,14 +24,16 @@ class Synchronization(TDMAState):
                                                     else mean(self.timing.clock_differential_stat)
 
         self.synchronize()
-        self.broadcast_synchronization_message()
 
         if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
             self.timing.synchronized = True
 
+        self.broadcast_synchronization_message()
+
         next_state = self.next()
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
+            # TODO: what happens here if all devices are not synced?
             self.reset_scheduling()
             self.reset_timing_offsets()
             self.messenger.message_box.clear()
@@ -46,10 +48,10 @@ class Synchronization(TDMAState):
         else:
             return State.SYNCHRONIZATION
 
-    def broadcast_synchronization_message(self):
+    def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
         time = int(round(self.timing.logical_clock.clock * 100000))
-        self.messenger.broadcast_synchronization_message(time)
+        self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
     def synchronize(self):
         # We listen for synchronization messages an arbitrary number of times  # todo @Yanjun, how this arbitrary number works?
@@ -68,7 +70,7 @@ class Synchronization(TDMAState):
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
         self.messenger.message_box.clear()
-        self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
+        self.neighborhood.synchronized_active_neighbor_count = 0
         self.slot_assignment.update_free_slots()
 
     def reset_timing_offsets(self):

@@ -28,8 +28,8 @@ class Messenger:
         message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
-    def broadcast_synchronization_message(self, time: int) -> None:
-        message = UWBSynchronizationMessage(sender_id=self.id)
+    def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
+        message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
         message.synchronized_clock = time
         message.encode()
 
@@ -57,15 +57,15 @@ class Messenger:
 
         print("Sending scheduling message")
         self.broadcast(slot, code)
-
+        
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
-               int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
+               int((NB_TASK_SLOTS + 1) / (len(self.neighborhood.current_neighbors) + 1)) \
                and len(self.slot_assignment.non_block) > 0
 
     def should_chose_from_subpriority(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
-               2 * (NB_TASK_SLOTS + 1) / (3 * self.neighborhood.synchronized_active_neighbor_count) \
+               2 * (NB_TASK_SLOTS + 1) / (3 * (len(self.neighborhood.current_neighbors) + 1)) \
                and len(self.slot_assignment.subpriority_slots) > 1
 
     def clear_non_scheduling_messages(self) -> None:
