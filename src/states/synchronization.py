@@ -42,8 +42,8 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
-        if len(self.neighborhood.synced_neighbors) > 0:
-            print("Synced neibs:", self.neighborhood.synced_neighbors, "neibs:", self.neighborhood.current_neighbors.keys())
+        print(SYNCHRONIZATION_PERIOD, self.timing.current_time_in_cycle,
+              self.timing.synchronized, self.neighborhood.are_neighbors_synced())
         if self.neighborhood.is_alone() or \
                 ((self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized) and
                     self.neighborhood.are_neighbors_synced()):  # TODO: make sure it doesnt get stuck forever
@@ -58,7 +58,8 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
     def synchronize(self):
-        # We listen for synchronization messages an arbitrary number of times  # todo @Yanjun, how this arbitrary number works?
+        # We listen for synchronization messages an arbitrary number of times
+        # todo @Yanjun, how this arbitrary number works?
         for _ in range(10):
             if self.messenger.receive_new_message():
                 message = self.messenger.message_box.pop()
