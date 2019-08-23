@@ -22,12 +22,13 @@ class UWBMessage(object):
 
 
 class UWBSynchronizationMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType=MessageType.SYNC, data: int=0):
+    def __init__(self, sender_id: int, message_type: MessageType=MessageType.SYNC,
+                 data: int=0, synchronized: bool = False):
         super(UWBSynchronizationMessage, self).__init__(sender_id, message_type, data)
         self.CLOCK_MASK = 0b111111111111111111111111111111
         self.SYNC_MASK = 0b01000000000000000000000000000000
         self.synchronized_clock = -1
-        self.synchronization_ok = False
+        self.synchronization_ok = synchronized
 
     def decode(self):
         self.synchronized_clock = self.data & self.CLOCK_MASK

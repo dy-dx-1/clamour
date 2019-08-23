@@ -187,7 +187,6 @@ class Messenger:
                 self.neighborhood.add_synced_neighbor(new_message.sender_id)
                 print('NEW SYNCED NEIGHBOR: ', new_message.sender_id)
 
-
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
