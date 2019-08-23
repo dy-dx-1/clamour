@@ -183,6 +183,10 @@ class Messenger:
             new_message = self.message_box.peek_last()
             new_message.decode()
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
+            if new_message.synced:
+                self.neighborhood.add_synced_neighbor(new_message.sender_id)
+                print('NEW SYNCED NEIGHBOR: ', new_message.sender_id)
+
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()

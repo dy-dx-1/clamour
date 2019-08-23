@@ -43,7 +43,8 @@ class Synchronization(TDMAState):
 
     def next(self) -> State:
         if self.neighborhood.is_alone() or \
-                (self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized):
+                ((self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized) and
+                    self.neighborhood.are_neighbors_synced()):  # TODO: make sure it doesnt get stuck forever
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
