@@ -43,7 +43,7 @@ class Synchronization(TDMAState):
 
     def next(self) -> State:
         if len(self.neighborhood.synced_neighbors) > 0:
-            print("Synced neibs: ", self.neighborhood.synced_neighbors)
+            print("Synced neibs:", self.neighborhood.synced_neighbors, "neibs:", self.neighborhood.current_neighbors.keys())
         if self.neighborhood.is_alone() or \
                 ((self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized) and
                     self.neighborhood.are_neighbors_synced()):  # TODO: make sure it doesnt get stuck forever
