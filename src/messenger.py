@@ -29,11 +29,11 @@ class Messenger:
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
+        print('TIME TIME TIME: ', time)
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
         message.synchronized_clock = time
         message.encode()
 
-        print('ON ENVOIE: ', str(bin(message.data)))
         with self.pozyx_lock:
             self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
