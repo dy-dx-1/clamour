@@ -7,7 +7,7 @@ OBSOLESCENCE_DELAY = 20  # nb of seconds beyond which a neighbor becomes irrelev
 class Neighborhood:
     def __init__(self):
         self.current_neighbors = {}
-        self.synced_neighbors = []
+        self.synced_neighbors = set()
         self.neighbor_synchronization_received = {}
         self.synchronized_active_neighbor_count = 0
 
@@ -25,7 +25,9 @@ class Neighborhood:
         self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
 
     def add_synced_neighbor(self, device_id: int):
-        self.synced_neighbors.append(device_id)
+        if device_id not in self.synced_neighbors:
+            print('NEW SYNCED NEIGHBOR: ', device_id)
+        self.synced_neighbors.add(device_id)
 
     def are_neighbors_synced(self):
         x = all([key in self.synced_neighbors for key in self.current_neighbors.keys()])

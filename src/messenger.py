@@ -174,8 +174,6 @@ class Messenger:
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
 
-        print('INFO: ', info.data)
-        print('DATA: ', data.data)
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self, device_list: list = None) -> None:
@@ -188,7 +186,6 @@ class Messenger:
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
             if new_message.synchronization_ok:
                 self.neighborhood.add_synced_neighbor(new_message.sender_id)
-                print('NEW SYNCED NEIGHBOR: ', new_message.sender_id)
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
