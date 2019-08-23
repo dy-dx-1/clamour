@@ -33,6 +33,7 @@ class Messenger:
         message.synchronized_clock = time
         message.encode()
 
+        print('ON ENVOIE: ', str(bin(message.data)))
         with self.pozyx_lock:
             self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 
@@ -173,6 +174,8 @@ class Messenger:
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
 
+        print('INFO: ', info.data)
+        print('DATA: ', data.data)
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self, device_list: list = None) -> None:
@@ -183,7 +186,7 @@ class Messenger:
             new_message = self.message_box.peek_last()
             new_message.decode()
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
-            if new_message.synced:
+            if new_message.synchronization_ok:
                 self.neighborhood.add_synced_neighbor(new_message.sender_id)
                 print('NEW SYNCED NEIGHBOR: ', new_message.sender_id)
 
