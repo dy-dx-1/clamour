@@ -38,7 +38,7 @@ class UWBSynchronizationMessage(UWBMessage):
         if self.synchronized_clock < 0:
             raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
         
-        self.data = (self.message_type << 31) + (self.synchronization_ok << 30) + self.synchronized_clock
+        self.data = (self.message_type << 31) + (self.synchronization_ok << 30) + (self.synchronized_clock >> 1)
 
     def __repr__(self):
         print("Type:", self.message_type, "Clock:", self.synchronized_clock, "Synced:", self.synchronization_ok)
