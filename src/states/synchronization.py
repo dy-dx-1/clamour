@@ -53,7 +53,6 @@ class Synchronization(TDMAState):
 
     def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
-        print('LOGICAL CLOCK: ', self.timing.logical_clock.clock)
         time = int(round(self.timing.logical_clock.clock * 100000))
         self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
@@ -89,8 +88,10 @@ class Synchronization(TDMAState):
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
+            print("Jumped correction")
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
+            print("Collab correction")
             self.collaborative_offset_compensation(sync_msg)
     
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
