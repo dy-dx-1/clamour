@@ -176,6 +176,7 @@ class Messenger:
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self, device_list: list = None) -> None:
+        print('(STEP) Update neighbor dict')
         if device_list is not None:
             for device in device_list:
                 self.neighborhood.add_neighbor(device, [], perf_counter())
@@ -185,6 +186,7 @@ class Messenger:
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
             if new_message.synchronization_ok:
                 self.neighborhood.add_synced_neighbor(new_message.sender_id)
+        print(self.neighborhood)
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()

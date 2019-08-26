@@ -26,6 +26,7 @@ class Synchronization(TDMAState):
         self.synchronize()
 
         if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
+            print('SYNCED :D')
             self.timing.synchronized = True
 
         self.broadcast_synchronization_message()
@@ -42,25 +43,36 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
+        print('(STEP) next')
         print(SYNCHRONIZATION_PERIOD, self.timing.current_time_in_cycle,
               self.timing.synchronized, self.neighborhood.are_neighbors_synced())
+        print('IS ALONE? ', self.neighborhood.is_alone())
+        print('IS OVER SYNC PERIOD? ', self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD)
+        print('IS SYNCED? ', self.timing.synchronized)
+        print('ARE NEIGHBORS SYNCED? ', self.neighborhood.are_neighbors_synced())
         if self.neighborhood.is_alone() or \
                 ((self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized) and
                     self.neighborhood.are_neighbors_synced()):  # TODO: make sure it doesnt get stuck forever
+            print('STATE SCHEDULING')
             return State.SCHEDULING
         else:
+            print('STATE SYNCHRONIZATION')
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self) -> None:
+        print('(STEP) broadcast sync message')
         self.timing.logical_clock.update_clock()
+        print('Logical clock: ', self.timing.logical_clock.clock)
         time = int(round(self.timing.logical_clock.clock * 100000))
         self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
     def synchronize(self):
+        print('(STEP) synchronize')
         # We listen for synchronization messages an arbitrary number of times
         # todo @Yanjun, how this arbitrary number works?
         for _ in range(10):
             if self.messenger.receive_new_message():
+                print('new message!')
                 message = self.messenger.message_box.pop()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
@@ -69,6 +81,7 @@ class Synchronization(TDMAState):
                 self.messenger.update_neighbor_dictionary()
 
     def reset_scheduling(self):
+        print('(STEP) Reset scheduling')
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
@@ -78,11 +91,13 @@ class Synchronization(TDMAState):
         self.slot_assignment.update_free_slots()
 
     def reset_timing_offsets(self):
+        print('(STEP) reset timing offsets')
         self.timing.clock_differential_stat = []
         self.timing.synchronization_offset_mean = 20
         self.timing.synchronized = False
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
+        print('(STEP) update offset')
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock/100000)
         sync_msg.offset += COMMUNICATION_DELAY
@@ -91,7 +106,6 @@ class Synchronization(TDMAState):
             print("Jumped correction")
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
-            print("Collab correction")
             self.collaborative_offset_compensation(sync_msg)
     
     def collaborative_offset_compensation(self, message: SynchronizationMessage):

@@ -22,12 +22,14 @@ class Neighborhood:
         return len(self.current_neighbors) == 0
 
     def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float) -> None:
+        print('(STEP) Adding neighbor')
         self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
 
     def add_synced_neighbor(self, device_id: int):
+        print('(STEP) Adding synced neighbor')
         if device_id not in self.synced_neighbors:
-            print('NEW SYNCED NEIGHBOR: ', device_id)
-        self.synced_neighbors.add(device_id)
+            self.synced_neighbors.add(device_id)
+        print(self.synced_neighbors)
 
     def are_neighbors_synced(self):
         x = all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
