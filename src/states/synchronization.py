@@ -72,7 +72,7 @@ class Synchronization(TDMAState):
         # todo @Yanjun, how this arbitrary number works?
         for _ in range(10):
             if self.messenger.receive_new_message():
-                print('new message!')
+                # print('new message!')
                 message = self.messenger.message_box.pop()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
@@ -81,7 +81,7 @@ class Synchronization(TDMAState):
                 self.messenger.update_neighbor_dictionary()
 
     def reset_scheduling(self):
-        print('(STEP) Reset scheduling')
+        # print('(STEP) Reset scheduling')
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
@@ -91,7 +91,7 @@ class Synchronization(TDMAState):
         self.slot_assignment.update_free_slots()
 
     def reset_timing_offsets(self):
-        print('(STEP) reset timing offsets')
+        # print('(STEP) reset timing offsets')
         self.timing.clock_differential_stat = []
         self.timing.synchronization_offset_mean = 20
         self.timing.synchronized = False
