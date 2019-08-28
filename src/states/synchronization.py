@@ -68,9 +68,7 @@ class Synchronization(TDMAState):
 
     def synchronize(self):
         print('(STEP) synchronize')
-        # We listen for synchronization messages an arbitrary number of times
-        # todo @Yanjun, how this arbitrary number works?
-        for _ in range(10):
+        while not self.neighborhood.are_neighbors_synced():
             if self.messenger.receive_new_message():
                 # print('new message!')
                 message = self.messenger.message_box.pop()
