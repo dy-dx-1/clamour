@@ -97,10 +97,10 @@ class Synchronization(TDMAState):
         self.timing.synchronized = False
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
-        print('(STEP) update offset')
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock/100000)
         sync_msg.offset += COMMUNICATION_DELAY
+        print('(STEP) update offset:', sync_msg.offset)
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
             print("Jumped correction")
@@ -114,9 +114,11 @@ class Synchronization(TDMAState):
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
             total_offset = 0
-            for _, synchronization in self.neighborhood.neighbor_synchronization_received.items():
+            for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
                 total_offset += synchronization.offset
-            
+            print("Collaborative offset total:", total_offset, "individual:",
+                  [(i, msg.offset) for (i, msg) in self.neighborhood.neighbor_synchronization_received.items()])
+
             offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
