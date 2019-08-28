@@ -27,12 +27,9 @@ class Neighborhood:
 
     def add_synced_neighbor(self, device_id: int):
         print('(STEP) Adding synced neighbor')
-        if device_id not in self.synced_neighbors:
-            self.synced_neighbors.add(device_id)
-        print(self.synced_neighbors)
+        self.synced_neighbors.add(device_id)
+        print('updated sync dict:', self.synced_neighbors)
 
     def are_neighbors_synced(self):
-        x = all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
-        print('ARE NEIGHBORS SYNCED? ', x)
-        return x
+        return all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
 
