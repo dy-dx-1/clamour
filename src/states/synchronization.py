@@ -68,11 +68,11 @@ class Synchronization(TDMAState):
 
     def synchronize(self):
         print('(STEP) synchronize')
-        while not self.neighborhood.are_neighbors_synced():
+        for _ in range(10):
             if self.messenger.receive_new_message():
                 # print('new message!')
                 message = self.messenger.message_box.pop()
-                self.timing.logical_clock.update_clock()
+                # self.timing.logical_clock.update_clock()
                 if isinstance(message, UWBSynchronizationMessage):
                     message.decode()
                     self.update_offset(message.sender_id, message)
