@@ -134,7 +134,7 @@ class Synchronization(TDMAState):
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
             total_offset = []
             for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
-                if synchronization.time_alive <= 5:
+                if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
 
             print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
