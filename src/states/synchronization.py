@@ -125,9 +125,8 @@ class Synchronization(TDMAState):
             total_offset = 0
             for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
                 total_offset += synchronization.offset
-            print("Collaborative offset total:", total_offset, "individual:",
-                  [(i, msg.offset, msg.time_alive) for (i, msg)
-                   in self.neighborhood.neighbor_synchronization_received.items()])
+            print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
+                                          in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
