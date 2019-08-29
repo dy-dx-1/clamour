@@ -152,7 +152,7 @@ class Messenger:
         try:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
-                print('IS MESSAGE BOX EMPTY? ', self.message_box.empty)
+                print('IS MESSAGE BOX EMPTY? ', self.message_box.empty())
                 msg = self.message_box.peek_last()
                 print('NEW MESSAGE: ', msg)
                 print('MAILBOX MESSAGE: ', received_message)
