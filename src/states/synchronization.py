@@ -41,7 +41,7 @@ class Synchronization(TDMAState):
             self.broadcast_synchronization_message()
             self.time_to_sleep = abs(random.gauss(0.001, 100 / 10000))
         else:
-            self.time_to_sleep -= 0.0001
+            self.time_to_sleep -= 0.001
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
