@@ -71,7 +71,6 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
     def synchronize(self):
-        while_cpt = 0
         self.messenger.receive_new_message()
         while not self.messenger.message_box.empty():
             message = self.messenger.message_box.pop()
@@ -81,9 +80,6 @@ class Synchronization(TDMAState):
 
             self.messenger.update_neighbor_dictionary()
             self.messenger.receive_new_message()
-            while_cpt += 1
-
-        print(while_cpt)
 
         self.increment_time_alive()
 
@@ -125,13 +121,16 @@ class Synchronization(TDMAState):
         self.timing.clock_differential_stat.append(message.offset)
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
-            total_offset = 0
+            total_offset = []
             for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
-                total_offset += synchronization.offset
+                if synchronization.time_alive <= 3:
+                    total_offset.append(synchronization.offset)
+
             print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
-            offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
+            offset_correction = sum(total_offset) / (len(total_offset) + 1)
+
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
                   "next clock:", self.timing.logical_clock.clock + offset_correction)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
