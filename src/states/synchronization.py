@@ -30,6 +30,8 @@ class Synchronization(TDMAState):
         if abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME:
             print('SYNCED :D')
             self.timing.synchronized = True
+        else:
+            self.timing.synchronized = False
 
         self.broadcast_synchronization_message()
 
@@ -58,7 +60,7 @@ class Synchronization(TDMAState):
             print('STATE SCHEDULING')
             return State.SCHEDULING
         else:
-            print('STATE SYNCHRONIZATION')
+            # print('STATE SYNCHRONIZATION')
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self) -> None:
@@ -69,7 +71,7 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
     def synchronize(self):
-        print('(STEP) synchronize')
+        # print('(STEP) synchronize')
         for _ in range(10):
             if self.messenger.receive_new_message():
                 # print('new message!')
