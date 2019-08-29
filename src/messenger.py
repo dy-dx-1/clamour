@@ -152,14 +152,16 @@ class Messenger:
         try:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
+                print('================================================')
                 print('IS MESSAGE BOX EMPTY? ', self.message_box.empty())
+                print('LEN MESSAGE BOX', len(self.message_box))
                 msg = self.message_box.peek_last()
                 print('NEW MESSAGE: ', msg)
                 print('MAILBOX MESSAGE: ', received_message)
 
                 if msg is not None:
                     print('ARE THEY THE SAME MESSAGE? ', received_message != msg)
-                if self.message_box.empty() or received_message != msg:
+                if len(self.message_box) == 0 or received_message != msg:
                     self.message_box.append(received_message)
                     is_new_message = True
             else:
