@@ -119,7 +119,7 @@ class Synchronization(TDMAState):
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
         if len(self.timing.clock_differential_stat) > 10:
-            self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + message.offset
+            self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + [message.offset]
         else:
             self.timing.clock_differential_stat.append(message.offset)
 
