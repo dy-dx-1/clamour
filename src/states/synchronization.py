@@ -18,6 +18,7 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
+        self.has_jumped_already = False;
 
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
@@ -101,8 +102,9 @@ class Synchronization(TDMAState):
         sync_msg.offset += COMMUNICATION_DELAY
         print('(STEP) update offset:', sync_msg.offset)
 
-        if abs(sync_msg.offset) > JUMP_THRESHOLD:
+        if abs(sync_msg.offset) > JUMP_THRESHOLD and not self.has_jumped_already:
             print("Jumped correction")
+            self.has_jumped_already = True
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
             self.collaborative_offset_compensation(sync_msg)
