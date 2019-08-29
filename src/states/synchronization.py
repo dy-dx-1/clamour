@@ -26,6 +26,7 @@ class Synchronization(TDMAState):
 
         self.synchronize()
 
+        print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
         if abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME:
             print('SYNCED :D')
             self.timing.synchronized = True
@@ -100,7 +101,7 @@ class Synchronization(TDMAState):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock/100000)
         sync_msg.offset += COMMUNICATION_DELAY
-        print('(STEP) update offset:', sync_msg.offset)
+        # print('(STEP) update offset:', sync_msg.offset)
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD and not self.has_jumped_already:
             print("Jumped correction")
