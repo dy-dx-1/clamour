@@ -72,4 +72,4 @@ class UWBTDMAMessage(UWBMessage):
         print(" Type ", self.message_type, " slot ", self.slot, " code ", self.code)
 
     def __eq__(self, other: 'UWBTDMAMessage'):
-        return self.code == other.code and self.slot == other.slot
+        return super(UWBTDMAMessage, self).__eq__(other) and self.code == other.code and self.slot == other.slot
