@@ -15,6 +15,7 @@ class MessageFactory:
         if message_type == MessageType.SYNC:
             return UWBSynchronizationMessage(sender_id, message_type, message_data)
         elif message_type == MessageType.TDMA:
+            # TODO: Add two-hop neighbor message
             return UWBTDMAMessage(sender_id, message_type, message_data)
         else:
             raise InvalidMessageTypeException("The message type in the received data does not match any known message type.")
