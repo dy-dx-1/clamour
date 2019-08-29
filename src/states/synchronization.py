@@ -82,6 +82,11 @@ class Synchronization(TDMAState):
                     self.update_offset(message.sender_id, message)
 
                 self.messenger.update_neighbor_dictionary()
+        self.increment_time_alive()
+
+    def increment_time_alive(self):
+        for msg_id in self.neighborhood.neighbor_synchronization_received.keys():
+            self.neighborhood.neighbor_synchronization_received[msg_id].time_alive += 1
 
     def reset_scheduling(self):
         # print('(STEP) Reset scheduling')
@@ -101,7 +106,7 @@ class Synchronization(TDMAState):
     
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
-                                          neib_logical=message.synchronized_clock/100000)
+                                          neib_logical=message.synchronized_clock/100000, time_alive=0)
         sync_msg.offset += COMMUNICATION_DELAY
         # print('(STEP) update offset:', sync_msg.offset)
 
@@ -121,7 +126,8 @@ class Synchronization(TDMAState):
             for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
                 total_offset += synchronization.offset
             print("Collaborative offset total:", total_offset, "individual:",
-                  [(i, msg.offset) for (i, msg) in self.neighborhood.neighbor_synchronization_received.items()])
+                  [(i, msg.offset, msg.time_alive) for (i, msg)
+                   in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
