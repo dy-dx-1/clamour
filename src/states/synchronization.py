@@ -36,7 +36,6 @@ class Synchronization(TDMAState):
         else:
             self.timing.synchronized = False
 
-        print(f"Current time {time()}")
         if self.time_to_sleep <= 0:
             self.broadcast_synchronization_message()
             self.time_to_sleep = abs(random.gauss(0.001, 100 / 10000))
@@ -55,13 +54,13 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
-        print('(STEP) next')
+        # print('(STEP) next')
         print(SYNCHRONIZATION_PERIOD, self.timing.current_time_in_cycle,
               self.timing.synchronized, self.neighborhood.are_neighbors_synced())
-        print('IS ALONE? ', self.neighborhood.is_alone())
-        print('IS OVER SYNC PERIOD? ', self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD)
-        print('IS SYNCED? ', self.timing.synchronized)
-        print('ARE NEIGHBORS SYNCED? ', self.neighborhood.are_neighbors_synced())
+        # print('IS ALONE? ', self.neighborhood.is_alone())
+        # print('IS OVER SYNC PERIOD? ', self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD)
+        # print('IS SYNCED? ', self.timing.synchronized)
+        # print('ARE NEIGHBORS SYNCED? ', self.neighborhood.are_neighbors_synced())
         if self.neighborhood.is_alone() or \
                 ((self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized) and
                     self.neighborhood.are_neighbors_synced()):  # TODO: make sure it doesnt get stuck forever
@@ -72,11 +71,11 @@ class Synchronization(TDMAState):
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self) -> None:
-        print('(STEP) broadcast sync message')
+        # print('(STEP) broadcast sync message')
         self.timing.logical_clock.update_clock()
-        print('Logical clock: ', self.timing.logical_clock.clock)
-        time = int(round(self.timing.logical_clock.clock * 100000))
-        self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
+        # print('Logical clock: ', self.timing.logical_clock.clock)
+        t = int(round(self.timing.logical_clock.clock * 100000))
+        self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self):
         self.messenger.receive_new_message()
