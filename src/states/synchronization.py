@@ -132,6 +132,7 @@ class Synchronization(TDMAState):
             print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
+            print(f"Offset list: {total_offset}")
             offset_correction = sum(total_offset) / (len(total_offset))
 
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
