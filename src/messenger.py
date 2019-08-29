@@ -147,7 +147,10 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data, _ = self.obtain_message_from_pozyx()
+        sender_id, data, status = self.obtain_message_from_pozyx()
+
+        if status != POZYX_SUCCESS:
+            print("Bad status, but got message:", sender_id, data)
 
         try:
             if sender_id != 0 and data != 0:

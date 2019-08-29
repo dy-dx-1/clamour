@@ -1,5 +1,5 @@
 from numpy import mean
-from time import sleep
+from time import sleep, time
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
@@ -21,6 +21,7 @@ class Synchronization(TDMAState):
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.has_jumped_already = False
+        self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
 
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
@@ -35,9 +36,12 @@ class Synchronization(TDMAState):
         else:
             self.timing.synchronized = False
 
-        time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
-        sleep(time_to_sleep)
-        self.broadcast_synchronization_message()
+        print(f"Current time {time()}")
+        if self.time_to_sleep <= 0:
+            self.broadcast_synchronization_message()
+            self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+        else:
+            self.time_to_sleep -= 0.0001
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
