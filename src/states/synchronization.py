@@ -1,4 +1,6 @@
 from numpy import mean
+from time import sleep
+import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
 from messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
@@ -33,6 +35,9 @@ class Synchronization(TDMAState):
         else:
             self.timing.synchronized = False
 
+        time_to_sleep = abs(random.gauss(0, len(self.neighborhood.current_neighbors) * 2 / 1000))
+        print(f"Going to sleep for: {time_to_sleep}")
+        sleep(time_to_sleep)
         self.broadcast_synchronization_message()
 
         next_state = self.next()
