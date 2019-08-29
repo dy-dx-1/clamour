@@ -198,5 +198,5 @@ class Messenger:
 
         if error_code != 0x0:
             print("Error in", function_name, ":", message)
-            with self.pozyx_lock:
-                self.pozyx.resetSystem()
+            # with self.pozyx_lock:
+            #     self.pozyx.resetSystem()
