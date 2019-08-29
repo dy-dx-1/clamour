@@ -35,8 +35,7 @@ class Synchronization(TDMAState):
         else:
             self.timing.synchronized = False
 
-        time_to_sleep = abs(random.gauss(0, len(self.neighborhood.current_neighbors) / 5000))
-        print(f"Going to sleep for: {time_to_sleep}")
+        time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
         sleep(time_to_sleep)
         self.broadcast_synchronization_message()
 
@@ -137,7 +136,6 @@ class Synchronization(TDMAState):
             print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
-            print(f"Offset list: {total_offset}")
             offset_correction = sum(total_offset) / (len(total_offset))
 
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
