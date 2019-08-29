@@ -157,7 +157,8 @@ class Messenger:
                 print('NEW MESSAGE: ', msg)
                 print('MAILBOX MESSAGE: ', received_message)
 
-                print('ARE THEY THE SAME MESSAGE? ', received_message != msg )
+                if msg is not None:
+                    print('ARE THEY THE SAME MESSAGE? ', received_message != msg)
                 if self.message_box.empty() or received_message != msg:
                     self.message_box.append(received_message)
                     is_new_message = True
