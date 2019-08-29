@@ -31,7 +31,7 @@ class UWBSynchronizationMessage(UWBMessage):
         self.synchronization_ok = synchronized
 
     def decode(self):
-        self.synchronized_clock = self.data & self.CLOCK_MASK
+        self.synchronized_clock = (self.data & self.CLOCK_MASK) << 2
         self.synchronization_ok = bool(self.data & self.SYNC_MASK)
 
     def encode(self):
