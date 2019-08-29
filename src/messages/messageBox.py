@@ -20,4 +20,5 @@ class MessageBox(deque):
         return self.last_received_message
 
     def empty(self) -> bool:
+        print(f"Message box empty: {not bool(self)} length: {len(self)}")
         return not bool(self)  # If the queue is empty, converting it to bool will give False.
