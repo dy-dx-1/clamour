@@ -18,7 +18,7 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
-        self.has_jumped_already = False;
+        self.has_jumped_already = False
 
     def execute(self) -> State:
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
@@ -118,7 +118,10 @@ class Synchronization(TDMAState):
     
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
-        self.timing.clock_differential_stat.append(message.offset)
+        if len(self.timing.clock_differential_stat) > 10:
+            self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + message.offset
+        else:
+            self.timing.clock_differential_stat.append(message.offset)
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
             total_offset = []
