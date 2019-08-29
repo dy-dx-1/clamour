@@ -72,14 +72,15 @@ class Synchronization(TDMAState):
 
     def synchronize(self):
         while_cpt = 0
+        self.messenger.receive_new_message()
         while not self.messenger.message_box.empty():
-            if self.messenger.receive_new_message():
-                message = self.messenger.message_box.pop()
-                if isinstance(message, UWBSynchronizationMessage):
-                    message.decode()
-                    self.update_offset(message.sender_id, message)
+            message = self.messenger.message_box.pop()
+            if isinstance(message, UWBSynchronizationMessage):
+                message.decode()
+                self.update_offset(message.sender_id, message)
 
-                self.messenger.update_neighbor_dictionary()
+            self.messenger.update_neighbor_dictionary()
+            self.messenger.receive_new_message()
             while_cpt += 1
 
         print(while_cpt)
