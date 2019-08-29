@@ -39,7 +39,7 @@ class Synchronization(TDMAState):
         print(f"Current time {time()}")
         if self.time_to_sleep <= 0:
             self.broadcast_synchronization_message()
-            self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+            self.time_to_sleep = abs(random.gauss(0.001, 100 / 10000))
         else:
             self.time_to_sleep -= 0.0001
 
