@@ -161,7 +161,7 @@ class Messenger:
 
                 if msg is not None:
                     print('ARE THEY THE SAME MESSAGE? ', received_message != msg)
-                if len(self.message_box) == 0 or received_message != msg:
+                if msg is None or received_message != msg:
                     print('passed condition')
                     self.message_box.append(received_message)
                     is_new_message = True
