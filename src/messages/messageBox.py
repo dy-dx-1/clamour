@@ -10,10 +10,10 @@ class MessageBox(deque):
         self.last_received_message = None
 
     def append(self, message: UWBMessage) -> None:
-        print('Adding message to box')
+        #print('Adding message to box')
         super(MessageBox, self).append(message)
         self.last_received_message = message  # Necessary since deque does not provide peek operations
-        print('New current length:', len(self))
+        #print('New current length:', len(self))
 
     def peek_first(self) -> Union[UWBMessage, None]:
         return None if self.empty() else self[0]
