@@ -71,6 +71,7 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(time, self.timing.synchronized)
 
     def synchronize(self):
+        while_cpt = 0
         while not self.messenger.message_box.empty():
             if self.messenger.receive_new_message():
                 message = self.messenger.message_box.pop()
@@ -79,6 +80,10 @@ class Synchronization(TDMAState):
                     self.update_offset(message.sender_id, message)
 
                 self.messenger.update_neighbor_dictionary()
+            while_cpt += 1
+
+        print(while_cpt)
+
         self.increment_time_alive()
 
     def increment_time_alive(self):
