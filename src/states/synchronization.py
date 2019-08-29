@@ -26,7 +26,7 @@ class Synchronization(TDMAState):
 
         self.synchronize()
 
-        if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
+        if abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME:
             print('SYNCED :D')
             self.timing.synchronized = True
 
