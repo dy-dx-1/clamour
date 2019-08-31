@@ -29,7 +29,7 @@ class Neighborhood:
         self.synced_neighbors.add(device_id)
 
     def remove_synced_neighbor(self, device_id: int):
-        self.synced_neighbors.remove(device_id)
+        self.synced_neighbors.discard(device_id)
 
     def are_neighbors_synced(self):
         return all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
