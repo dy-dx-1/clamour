@@ -36,7 +36,7 @@ def get_pozyx_id(pozyx) -> int:
 def main():
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
 
-    signal.setitimer(signal.ITIMER_REAL, 0, 0.01)  # 100Hz
+    signal.setitimer(signal.ITIMER_REAL, 5)  # 100Hz
 
     with ContextManagedQueue() as multiprocess_communication_queue:
         shared_pozyx = connect_pozyx()
