@@ -55,7 +55,7 @@ class Synchronization(TDMAState):
 
     def next(self) -> State:
         # print('(STEP) next')
-        print(SYNCHRONIZATION_PERIOD, self.timing.current_time_in_cycle,
+        print(self.id, self.timing.current_time_in_cycle,
               self.timing.synchronized, self.neighborhood.are_neighbors_synced())
         # print('IS ALONE? ', self.neighborhood.is_alone())
         # print('IS OVER SYNC PERIOD? ', self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD)

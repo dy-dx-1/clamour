@@ -27,14 +27,17 @@ class Neighborhood:
 
     def add_synced_neighbor(self, device_id: int):
         if device_id not in self.synced_neighbors:
-            print(f"Adding {device_id} to synced_neighbors")
+            print(f"Adding {device_id} to synced_neighbors ({self.synced_neighbors})")
         self.synced_neighbors.add(device_id)
 
     def remove_synced_neighbor(self, device_id: int):
         if device_id in self.synced_neighbors:
-            print(f"Removing {device_id} synced_neighbors")
+            print(f"Removing {device_id} from synced_neighbors ({self.synced_neighbors})")
         self.synced_neighbors.discard(device_id)
 
     def are_neighbors_synced(self):
-        return all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
+        synced = all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
+        if synced:
+            print(f"Synced neighbors: {self.synced_neighbors}, neighbors: {self.current_neighbors.keys()}")
+        return synced
 
