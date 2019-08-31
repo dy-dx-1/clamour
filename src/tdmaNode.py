@@ -2,6 +2,7 @@ import sys
 import traceback as tb
 from multiprocessing import Lock
 from pypozyx import PozyxSerial
+from time import time
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
 from messenger import Messenger
@@ -21,6 +22,7 @@ class TDMANode:
                               shared_pozyx_lock, multiprocess_communication_queue)
 
         self.timing = Timing()
+        self.start_time = time()
 
         self.states = self.states = {
             State.INITIALIZATION: Initialization(neighborhood, anchors, pozyx_id, shared_pozyx, messenger,
@@ -42,10 +44,10 @@ class TDMANode:
         tb.print_tb(traceback, file=sys.stdout)
         print("Finished with TDMA node.")
 
-    def run(self) -> None:
-        while True:
-            self.timing.update_current_time()
-            self.current_state = self.states[self.current_state.execute()]
+    def run(self, signum, frame) -> None:
+        self.timing.update_current_time()
+        self.current_state = self.states[self.current_state.execute()]
+        print(f"--- {int(1 / (time() - self.start_time))} Hz ---")
 
     @staticmethod
     def clear_devices(pozyx: PozyxSerial, pozyx_lock: Lock()) -> None:
