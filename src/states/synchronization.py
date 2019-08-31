@@ -43,6 +43,7 @@ class Synchronization(TDMAState):
         if self.time_to_sleep <= 0:
             self.broadcast_synchronization_message()
             self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+            print(f"Time to sleep: {self.time_to_sleep}")
         else:
             self.time_to_sleep -= 0.001
 
