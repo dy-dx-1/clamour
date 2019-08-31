@@ -1,4 +1,5 @@
 import random
+import struct
 from multiprocessing import Lock
 from time import perf_counter, time
 
@@ -170,9 +171,12 @@ class Messenger:
         info = RXInfo()
         data = Data([0], 'i')
 
-        with self.pozyx_lock:
-            self.pozyx.getRxInfo(info)
-            status = self.pozyx.readRXBufferData(data)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getRxInfo(info)
+                status = self.pozyx.readRXBufferData(data)
+        except struct.error as e:
+            print(f"Error while reading from tag: {e}")
 
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
@@ -188,11 +192,11 @@ class Messenger:
             new_message = self.message_box.peek_last()
             new_message.decode()
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
+
             if new_message.synchronization_ok:
                 self.neighborhood.add_synced_neighbor(new_message.sender_id)
             else:
                 self.neighborhood.remove_synced_neighbor(new_message.sender_id)
-        # print('updated dict:', self.neighborhood.current_neighbors)
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
