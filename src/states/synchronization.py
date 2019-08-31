@@ -23,6 +23,7 @@ class Synchronization(TDMAState):
         self.has_jumped_already = False
         self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
         self.first_exec_time = None  # Execution time in milliseconds
+        self.offset_correction = None
 
     def execute(self) -> State:
         if self.first_exec_time is None:
@@ -33,8 +34,8 @@ class Synchronization(TDMAState):
 
         self.synchronize()
 
-        print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
-        self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
+        print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean - self.offset_correction}")
+        self.timing.synchronized = abs(self.timing.synchronization_offset_mean - self.offset_correction) < THRESHOLD_SYNCTIME
 
         if self.timing.synchronized:
             print('SYNCED :D')
@@ -131,10 +132,10 @@ class Synchronization(TDMAState):
             print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
-            offset_correction = sum(total_offset) / (len(total_offset) + 1)
+            self.offset_correction = sum(total_offset) / (len(total_offset) + 1)
 
-            print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
-                  "next clock:", self.timing.logical_clock.clock + offset_correction)
-            self.timing.logical_clock.correct_logical_offset(offset_correction)
+            print("Offset correction:", self.offset_correction, "previous clock:", self.timing.logical_clock.clock,
+                  "next clock:", self.timing.logical_clock.clock + self.offset_correction)
+            self.timing.logical_clock.correct_logical_offset(self.offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}

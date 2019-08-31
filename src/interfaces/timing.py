@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from logicalClock import LogicalClock
 
-COMMUNICATION_DELAY = 0  # delay estimation is 0.005s.
+COMMUNICATION_DELAY = 0.005  # delay estimation is 0.005s.
 SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 0.018
 
