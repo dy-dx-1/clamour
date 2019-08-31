@@ -81,6 +81,7 @@ class Synchronization(TDMAState):
             message = self.messenger.message_box.pop()
             if isinstance(message, UWBSynchronizationMessage):
                 message.decode()
+                self.timing.update_current_time()
                 self.update_offset(message.sender_id, message)
 
             self.messenger.update_neighbor_dictionary()
