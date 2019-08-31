@@ -36,7 +36,7 @@ def get_pozyx_id(pozyx) -> int:
 def main():
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
 
-    signal.setitimer(signal.SIGALRM, 0, 0.01)  # 100Hz
+    signal.setitimer(signal.ITIMER_REAL, 0, 0.01)  # 100Hz
 
     with ContextManagedQueue() as multiprocess_communication_queue:
         shared_pozyx = connect_pozyx()
@@ -51,7 +51,7 @@ def main():
             with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                 pedometer_process.start()
                 with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id) as node:
-                    signal.signal(signal.SIGALRM, node.run)
+                    signal.signal(signal.ITIMER_REAL, node.run)
 
 
 if __name__ == "__main__":
