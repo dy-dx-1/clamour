@@ -23,7 +23,7 @@ class Synchronization(TDMAState):
         self.has_jumped_already = False
         self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
         self.first_exec_time = None  # Execution time in milliseconds
-        self.offset_correction = None
+        self.offset_correction = 0
 
     def execute(self) -> State:
         if self.first_exec_time is None:
