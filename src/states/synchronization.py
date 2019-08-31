@@ -34,23 +34,20 @@ class Synchronization(TDMAState):
         self.synchronize()
 
         print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
-        if abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME:
+        self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
+
+        if self.timing.synchronized:
             print('SYNCED :D')
-            self.timing.synchronized = True
-        else:
-            self.timing.synchronized = False
 
         if self.time_to_sleep <= 0:
             self.broadcast_synchronization_message()
             self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
-            print(f"Time to sleep: {self.time_to_sleep}")
         else:
             self.time_to_sleep -= 0.001
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
-            # TODO: what happens here if all devices are not synced?
             self.reset_scheduling()
             self.reset_timing_offsets()
             self.messenger.message_box.clear()
@@ -65,7 +62,6 @@ class Synchronization(TDMAState):
         if self.neighborhood.is_alone() or \
                 (current_exec_time > SYNCHRONIZATION_PERIOD and self.timing.synchronized
                  and self.neighborhood.are_neighbors_synced()):
-            print('STATE SCHEDULING')
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
