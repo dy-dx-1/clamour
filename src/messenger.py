@@ -190,6 +190,8 @@ class Messenger:
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
             if new_message.synchronization_ok:
                 self.neighborhood.add_synced_neighbor(new_message.sender_id)
+            else:
+                self.neighborhood.remove_synced_neighbor(new_message.sender_id)
         # print('updated dict:', self.neighborhood.current_neighbors)
 
     def handle_error(self, function_name: str) -> None:

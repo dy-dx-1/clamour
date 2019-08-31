@@ -26,9 +26,10 @@ class Neighborhood:
         self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
 
     def add_synced_neighbor(self, device_id: int):
-        # print('(STEP) Adding synced neighbor')
         self.synced_neighbors.add(device_id)
-        # print('updated sync dict:', self.synced_neighbors)
+
+    def remove_synced_neighbor(self, device_id: int):
+        self.synced_neighbors.remove(device_id)
 
     def are_neighbors_synced(self):
         return all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
