@@ -54,26 +54,18 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
-        # print('(STEP) next')
         print(self.id, self.timing.current_time_in_cycle,
               self.timing.synchronized, self.neighborhood.are_neighbors_synced())
-        # print('IS ALONE? ', self.neighborhood.is_alone())
-        # print('IS OVER SYNC PERIOD? ', self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD)
-        # print('IS SYNCED? ', self.timing.synchronized)
-        # print('ARE NEIGHBORS SYNCED? ', self.neighborhood.are_neighbors_synced())
         if self.neighborhood.is_alone() or \
                 ((self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized) and
-                    self.neighborhood.are_neighbors_synced()):  # TODO: make sure it doesnt get stuck forever
+                    self.neighborhood.are_neighbors_synced()):
             print('STATE SCHEDULING')
             return State.SCHEDULING
         else:
-            # print('STATE SYNCHRONIZATION')
             return State.SYNCHRONIZATION
 
     def broadcast_synchronization_message(self) -> None:
-        # print('(STEP) broadcast sync message')
         self.timing.logical_clock.update_clock()
-        # print('Logical clock: ', self.timing.logical_clock.clock)
         t = int(round(self.timing.logical_clock.clock * 100000))
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
@@ -95,7 +87,6 @@ class Synchronization(TDMAState):
             self.neighborhood.neighbor_synchronization_received[msg_id].time_alive += 1
 
     def reset_scheduling(self):
-        # print('(STEP) Reset scheduling')
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
         self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
@@ -105,7 +96,6 @@ class Synchronization(TDMAState):
         self.slot_assignment.update_free_slots()
 
     def reset_timing_offsets(self):
-        # print('(STEP) reset timing offsets')
         self.timing.clock_differential_stat = []
         self.timing.synchronization_offset_mean = 20
         self.timing.synchronized = False
@@ -114,7 +104,6 @@ class Synchronization(TDMAState):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock/100000, time_alive=0)
         sync_msg.offset += COMMUNICATION_DELAY
-        # print('(STEP) update offset:', sync_msg.offset)
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD and not self.has_jumped_already:
             print("Jumped correction")
