@@ -1,6 +1,5 @@
 from interfaces import SlotAssignment, Timing, Neighborhood
 from interfaces.timing import FULL_CYCLE_DURATION, SLOT_FOR_RESET, Timing, TASK_START_TIME
-from messages import UWBCommunicationMessage
 from messenger import Messenger
 
 from .constants import State
@@ -36,11 +35,8 @@ class Listen(TDMAState):
         else:
             return State.SYNCHRONIZATION
 
+    "TODO: This is weird, why tf do I need it? Maybe message popping causes bug. Could be replaced by sleep."
     def listen_for_messages(self):
         if self.messenger.receive_new_message():
             self.messenger.update_neighbor_dictionary()
             message = self.messenger.message_box.pop()
-            if isinstance(message, UWBCommunicationMessage):
-                # TODO: when the device is in wait state, it may still perform actions that do not require interaction,
-                #       such as counting steps using a pedometer
-                pass

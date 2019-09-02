@@ -1,4 +1,6 @@
 from numpy import mean
+from time import time
+import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
 from messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
@@ -18,16 +20,30 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
+        self.has_jumped_already = False
+        self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+        self.first_exec_time = None  # Execution time in milliseconds
 
     def execute(self) -> State:
-        self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10  \
-                                                    else mean(self.timing.clock_differential_stat)
+        if self.first_exec_time is None:
+            self.first_exec_time = int(round(time() * 1000))
+
+        self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10 \
+            else mean(self.timing.clock_differential_stat)
 
         self.synchronize()
-        self.broadcast_synchronization_message()
 
-        if self.timing.synchronization_offset_mean < THRESHOLD_SYNCTIME:
-            self.timing.synchronized = True
+        print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
+        self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
+
+        if self.timing.synchronized:
+            print('SYNCED :D')
+
+        if self.time_to_sleep <= 0:
+            self.broadcast_synchronization_message()
+            self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+        else:
+            self.time_to_sleep -= 0.001
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
@@ -40,27 +56,38 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
+        current_exec_time = int(round(time() * 1000)) - self.first_exec_time
+        print(self.id, current_exec_time, self.timing.synchronized, self.neighborhood.are_neighbors_synced())
+
         if self.neighborhood.is_alone() or \
-                (self.timing.current_time_in_cycle > SYNCHRONIZATION_PERIOD and self.timing.synchronized):
+                (current_exec_time > SYNCHRONIZATION_PERIOD and self.timing.synchronized
+                 and self.neighborhood.are_neighbors_synced()):
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
 
-    def broadcast_synchronization_message(self):
+    def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
-        time = int(round(self.timing.logical_clock.clock * 100000))
-        self.messenger.broadcast_synchronization_message(time)
+        t = int(round(self.timing.logical_clock.clock * 100000))
+        self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self):
-        # We listen for synchronization messages an arbitrary number of times  # todo @Yanjun, how this arbitrary number works?
-        for _ in range(10):
-            if self.messenger.receive_new_message():
-                message = self.messenger.message_box.pop()
-                if isinstance(message, UWBSynchronizationMessage):
-                    message.decode()
-                    self.update_offset(message.sender_id, message)
+        self.messenger.receive_new_message()
+        while not self.messenger.message_box.empty():
+            message = self.messenger.message_box.pop()
+            if isinstance(message, UWBSynchronizationMessage):
+                message.decode()
+                self.timing.update_current_time()
+                self.update_offset(message.sender_id, message)
 
-                self.messenger.update_neighbor_dictionary()
+            self.messenger.update_neighbor_dictionary()
+            self.messenger.receive_new_message()
+
+        self.increment_time_alive()
+
+    def increment_time_alive(self):
+        for msg_id in self.neighborhood.neighbor_synchronization_received.keys():
+            self.neighborhood.neighbor_synchronization_received[msg_id].time_alive += 1
 
     def reset_scheduling(self):
         self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
@@ -68,34 +95,46 @@ class Synchronization(TDMAState):
         self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
         self.slot_assignment.pure_send_list = []
         self.messenger.message_box.clear()
-        self.neighborhood.synchronized_active_neighbor_count = len(self.neighborhood.current_neighbors) + 1
+        self.neighborhood.synchronized_active_neighbor_count = 0
         self.slot_assignment.update_free_slots()
 
     def reset_timing_offsets(self):
         self.timing.clock_differential_stat = []
         self.timing.synchronization_offset_mean = 20
         self.timing.synchronized = False
-    
+
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
-                                          neib_logical=message.synchronized_clock/100000)
+                                          neib_logical=message.synchronized_clock / 100000, time_alive=0)
         sync_msg.offset += COMMUNICATION_DELAY
 
-        if abs(sync_msg.offset) > JUMP_THRESHOLD:
+        if abs(sync_msg.offset) > JUMP_THRESHOLD and not self.has_jumped_already:
+            print("Jumped correction")
+            self.has_jumped_already = True
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
             self.collaborative_offset_compensation(sync_msg)
-    
+
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
-        self.timing.clock_differential_stat.append(message.offset)
+        if len(self.timing.clock_differential_stat) > 10:
+            self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + [message.offset]
+        else:
+            self.timing.clock_differential_stat.append(message.offset)
 
         if len(self.neighborhood.neighbor_synchronization_received) >= len(self.neighborhood.current_neighbors):
-            total_offset = 0
-            for _, synchronization in self.neighborhood.neighbor_synchronization_received.items():
-                total_offset += synchronization.offset
-            
-            offset_correction = total_offset / (len(self.neighborhood.neighbor_synchronization_received) + 1)
+            total_offset = []
+            for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
+                if synchronization.time_alive <= 100:
+                    total_offset.append(synchronization.offset)
+
+            print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
+                                          in self.neighborhood.neighbor_synchronization_received.items()])
+
+            offset_correction = sum(total_offset) / (len(total_offset) + 1)
+
+            print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
+                  "next clock:", self.timing.logical_clock.clock + offset_correction)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}

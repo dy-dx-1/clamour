@@ -81,7 +81,7 @@ class unpackingError(Exception):
 
 
 class NatNetClient(object):
-    def __init__(self, client_ip=None, server_ip="192.168.4.186",
+    def __init__(self, client_ip=None, server_ip="192.168.4.127",
                  multicast_address="239.255.42.99",
                  command_port=1510,
                  data_port=1511):
@@ -740,7 +740,7 @@ if __name__ == '__main__':
     try:
         while True:
             try:
-                time.sleep(0.01)
+                time.sleep(0.1)
             except KeyboardInterrupt:
                 streamingClient.is_alive = False
                 break

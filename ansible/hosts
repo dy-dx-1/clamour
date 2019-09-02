@@ -1,4 +1,10 @@
 [eggs]
-192.168.4.129 ansible_user=pi
-192.168.4.155 ansible_user=pi
-192.168.4.200 ansible_user=pi
+192.168.4.21 ansible_user=pi
+192.168.4.24 ansible_user=pi
+192.168.4.22 ansible_user=pi
+192.168.4.23 ansible_user=pi
+192.168.4.25 ansible_user=pi
+192.168.4.20 ansible_user=pi
+
+[server]
+192.168.4.1 ansible_user=pi

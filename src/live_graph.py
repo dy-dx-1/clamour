@@ -8,7 +8,7 @@ import matplotlib.animation
 import matplotlib.pyplot as plt
 
 MAX_INDEX = 12
-GRAPH_TAG_ID = 0x2006
+GRAPH_TAG_ID = -1
 OPTITRACK_ID = -1
 
 
@@ -51,6 +51,10 @@ class Animation:
 
         self._queue = None
         self.stop = False
+
+        self.first_pozyx_time = None
+        self.first_optitrack_time = None
+        self.first_time = None
 
     def set_plot_presentation(self):
         self.fig.suptitle("Live data from tag")
@@ -108,16 +112,29 @@ class Animation:
 
     def run(self, data):
         for d in data:
+            global GRAPH_TAG_ID
             # if d[7] > 0:
             #     print("WARNING: Filter might be diverging, because det(P) = ", d[7], " > 0.")
+            print(d[8])
+            if GRAPH_TAG_ID == -1:
+                GRAPH_TAG_ID = d[8]
 
-            self.update_time_axis_limits(d[0])
             if d[8] == GRAPH_TAG_ID:
+                if self.first_time is None:
+                    self.first_time = d[0]
+                if self.first_pozyx_time is None:
+                    self.first_pozyx_time = d[0] - self.first_time
                 self.append_data_pozyx(d)
                 self.set_data_pozyx()
-            elif d[8] == OPTITRACK_ID:
-                self.append_data_optitrack(d)
-                self.set_data_optitrack()
+                self.update_time_axis_limits(d[0])
+            elif d[8] == OPTITRACK_ID and len(self.t) > 0:
+                if self.first_optitrack_time is None:
+                    self.first_optitrack_time = d[0] - self.first_time
+                elif len(self.t) > 0:
+                    print(self.t[-1], d[0], self.first_pozyx_time, self.first_optitrack_time)
+                    self.update_time_axis_limits(d[0])
+                # self.append_data_optitrack(d)
+                # self.set_data_optitrack()
 
             return self.p000, self.p010, self.p011, self.p010, self.p011, self.p100, self.p101, self.p110, self.p111, \
                 self.p002, self.p012, self.p102, self.p112

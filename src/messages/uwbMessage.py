@@ -22,22 +22,27 @@ class UWBMessage(object):
 
 
 class UWBSynchronizationMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType=MessageType.SYNC, data: int=0):
+    def __init__(self, sender_id: int, message_type: MessageType=MessageType.SYNC,
+                 data: int=0, synchronized: bool = False):
         super(UWBSynchronizationMessage, self).__init__(sender_id, message_type, data)
         self.CLOCK_MASK = 0b111111111111111111111111111111
+        self.SYNC_MASK = 0b01000000000000000000000000000000
         self.synchronized_clock = -1
+        self.synchronization_ok = synchronized
 
     def decode(self):
         self.synchronized_clock = self.data & self.CLOCK_MASK
+        self.synchronization_ok = bool(self.data & self.SYNC_MASK)
 
     def encode(self):
         if self.synchronized_clock < 0:
+            print("Clock is negative. Have positive feelings instead.", self.synchronized_clock)
             raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
         
-        self.data = (self.message_type << 30) + self.synchronized_clock
+        self.data = (self.message_type << 31) + (self.synchronization_ok << 30) + (self.synchronized_clock >> 2)
 
     def __repr__(self):
-        print(" Type ", self.message_type, " Clock ", self.synchronized_clock)
+        return f"Type: {self.message_type} clock: {self.synchronized_clock} synced: {self.synchronization_ok}"
 
 
 class UWBTDMAMessage(UWBMessage):
@@ -64,37 +69,7 @@ class UWBTDMAMessage(UWBMessage):
         self.data = (self.message_type << 30) + (self.slot << 15) + self.code
 
     def __repr__(self):
-        print(" Type ", self.message_type, " slot ", self.slot, " code ", self.code)
+        return f"Type {self.message_type} slot: {self.slot} code: {self.code}"
 
     def __eq__(self, other: 'UWBTDMAMessage'):
-        return self.code == other.code and self.slot == other.slot
-
-
-class UWBCommunicationMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType=MessageType.COMM, data: int=0):
-        super(UWBCommunicationMessage, self).__init__(sender_id, message_type, data)
-        self.CONFIDENCE_MASK = 0b1111
-        self.XPOS_MASK = 0b1111111111
-        self.YPOS_MASK = 0b1111111111
-        self.ZPOS_MASK = 0b111111
-        self.com_x_pos = -1
-        self.com_y_pos = -1
-        self.com_z_pos = -1
-        self.com_confidence = -1
-    
-    def decode(self):
-        self.com_confidence = (self.data >> 26) & self.CONFIDENCE_MASK
-        self.com_x_pos = (self.data >> 16) & self.XPOS_MASK
-        self.com_y_pos = (self.data >> 6) & self.YPOS_MASK
-        self.com_z_pos = self.data & self.ZPOS_MASK
-
-    def encode(self):
-        if any([x < 0 for x in [self.com_x_pos, self.com_y_pos, self.com_z_pos, self.com_confidence]]):
-            raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
-        
-        self.data = (self.message_type << 30) + (self.com_confidence << 26) +\
-                    (self.com_x_pos << 16) + (self.com_y_pos << 6) + self.com_z_pos
-
-    def __repr__(self):
-        print(" Type ", self.message_type, " confidence ", self.com_confidence, " X ",
-              self.com_x_pos, " Y ", self.com_y_pos, " X ", self.com_z_pos)
+        return super(UWBTDMAMessage, self).__eq__(other) and self.code == other.code and self.slot == other.slot

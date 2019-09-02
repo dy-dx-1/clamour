@@ -1,8 +1,9 @@
 import random
+import struct
 from multiprocessing import Lock
 from time import perf_counter, time
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment
@@ -28,8 +29,8 @@ class Messenger:
         message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
-    def broadcast_synchronization_message(self, time: int) -> None:
-        message = UWBSynchronizationMessage(sender_id=self.id)
+    def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
+        message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
         message.synchronized_clock = time
         message.encode()
 
@@ -55,22 +56,23 @@ class Messenger:
             message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
+        print("Sending scheduling message")
         self.broadcast(slot, code)
-
+        
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
-               int((NB_TASK_SLOTS + 1) / self.neighborhood.synchronized_active_neighbor_count) \
+               int((NB_TASK_SLOTS + 1) / (len(self.neighborhood.current_neighbors) + 1)) \
                and len(self.slot_assignment.non_block) > 0
 
     def should_chose_from_subpriority(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
-               2 * (NB_TASK_SLOTS + 1) / (3 * self.neighborhood.synchronized_active_neighbor_count) \
+               2 * (NB_TASK_SLOTS + 1) / (3 * (len(self.neighborhood.current_neighbors) + 1)) \
                and len(self.slot_assignment.subpriority_slots) > 1
 
     def clear_non_scheduling_messages(self) -> None:
         while not self.message_box.empty() and not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
             self.message_box.popleft()
-            print("Cleared non-tdma message")
+            # print("Cleared non-tdma message")
         
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
@@ -81,6 +83,7 @@ class Messenger:
 
     def receive_message(self) -> None:
         if self.receive_new_message():
+            print("Received message from ", self.message_box.peek_last().sender_id, " : ", type(self.message_box.peek_last()))
             self.update_neighbor_dictionary()
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())
@@ -145,16 +148,20 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data, _ = self.obtain_message_from_pozyx()
+        sender_id, data, status = self.obtain_message_from_pozyx()
+
+        # if status != POZYX_SUCCESS:
+        #     print("Bad status, but got message:", sender_id, data)
 
         try:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
-                if self.message_box.empty() or received_message != self.message_box.peek_last():
+                msg = self.message_box.peek_last()
+                if msg is None or received_message != msg:
                     self.message_box.append(received_message)
                     is_new_message = True
             else:
-                self.handle_error()
+                print("Invalid message:", str(sender_id), str(bin(data)))
         except InvalidMessageTypeException as e:
             pass  # TODO: print(e)
 
@@ -164,13 +171,20 @@ class Messenger:
         info = RXInfo()
         data = Data([0], 'i')
 
-        with self.pozyx_lock:
-            self.pozyx.getRxInfo(info)
-            status = self.pozyx.readRXBufferData(data)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getRxInfo(info)
+                status = self.pozyx.readRXBufferData(data)
+        except struct.error as e:
+            print(f"Error while reading from tag: {e}")
+
+        if status != POZYX_SUCCESS:
+            self.handle_error("obtain_message_from_pozyx")
 
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self, device_list: list = None) -> None:
+        # print('(STEP) Update neighbor dict')
         if device_list is not None:
             for device in device_list:
                 self.neighborhood.add_neighbor(device, [], perf_counter())
@@ -179,14 +193,19 @@ class Messenger:
             new_message.decode()
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
 
-    def handle_error(self) -> None:
+            if new_message.synchronization_ok:
+                self.neighborhood.add_synced_neighbor(new_message.sender_id)
+            else:
+                self.neighborhood.remove_synced_neighbor(new_message.sender_id)
+
+    def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
         with self.pozyx_lock:
+            self.pozyx.getErrorCode(error_code)
             message = self.pozyx.getErrorMessage(error_code)
-            status = self.pozyx.getErrorCode(error_code)
 
-        # if status == POZYX_SUCCESS:
-        #     print("An empty message was received.")
-        # else:
-        #     print("Error while retrieving message from Pozyx tag: " + str(status) + " occurred: " + message)
+        if error_code != 0x0:
+            print("Error in", function_name, ":", message)
+            # with self.pozyx_lock:
+            #     self.pozyx.resetSystem()

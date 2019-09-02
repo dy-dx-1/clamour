@@ -4,7 +4,7 @@ from multiprocessing import Lock
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceRange,
-                     PozyxSerial, DeviceCoordinates, EulerAngles)
+                     PozyxSerial, DeviceCoordinates, EulerAngles, SingleRegister)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -53,17 +53,24 @@ class Task(TDMAState):
         height = 1000
         angles = EulerAngles()
 
+        print("Anchors/tags for positioning:", self.anchors.available_anchors)
         with self.pozyx_lock:
-            status = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
-            status &= self.pozyx.getEulerAngles_deg(angles)
+            status_pos = self.pozyx.doPositioning(position, dimension, height, POZYX_POS_ALG_UWB_ONLY)
+            status_angle = self.pozyx.getEulerAngles_deg(angles)
+
+        if status_pos != POZYX_SUCCESS:
+            self.handle_error("positioning (pos)")
+        if status_angle != POZYX_SUCCESS:
+            self.handle_error("positioning (ranging)")
+
         yaw = angles.heading
 
         position = Coordinates(position.x, position.y, position.z)
 
-        if status == POZYX_SUCCESS:
+        if status_pos == status_angle == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
-
-        return status
+        
+        return status_pos and status_angle
 
     def ranging(self) -> int:
         ranging_target_id = self.select_ranging_target()
@@ -77,9 +84,15 @@ class Task(TDMAState):
         device_range = DeviceRange()
         angles = EulerAngles()
 
+        print("Anchors/tags for ranging:", self.anchors.available_anchors)
         with self.pozyx_lock:
-            status = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
-            status &= self.pozyx.getEulerAngles_deg(angles)
+            status_pos = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
+            status_angle = self.pozyx.getEulerAngles_deg(angles)
+        
+        if status_pos != POZYX_SUCCESS:
+            self.handle_error("ranging (pos)")
+        if status_angle != POZYX_SUCCESS:
+            self.handle_error("ranging (ranging)")
 
         yaw = angles.heading
 
@@ -87,11 +100,12 @@ class Task(TDMAState):
         neighbor_position = array([self.anchors.anchors_dict[ranging_target_id][2],
                                    self.anchors.anchors_dict[ranging_target_id][3],
                                    self.anchors.anchors_dict[ranging_target_id][4]])
-
-        if status == POZYX_SUCCESS:
+        # print("Ranging status", status_pos, status_angle,
+        #       "(nb available anchors:", len(self.anchors.available_anchors), ")")
+        if status_pos == status_angle == POZYX_SUCCESS:
             self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
 
-        return status
+        return status_pos and status_angle
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
@@ -120,12 +134,14 @@ class Task(TDMAState):
     def discover(self, discovery_type: int) -> None:
         PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, discovery_type)
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock)
-
+        # TODO: Why do devices seem to only be discovered in TAG mode?
         for device_id in devices:
             if device_id not in self.anchors.available_anchors:
                 self.anchors.available_anchors.append(device_id)
 
     def set_manually_measured_anchors(self) -> None:
+        # TODO: Revise this function, which may be causing bugs. Instead of clearDevices() and addDevice(),
+        #  maybe use removeDevice() and configureAnchors()
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
 
@@ -136,13 +152,30 @@ class Task(TDMAState):
             if anchor_id in self.anchors.anchors_dict:
                 # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 with self.pozyx_lock:
-                    self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+                    # TODO: Does this add properly if it is just the ID?
+                    status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+                if status != POZYX_SUCCESS:
+                    self.handle_error("set_manually_measured_anchors (anchors)")
             else:
                 device_coordinates = Coordinates()
                 with self.pozyx_lock:
-                    self.pozyx.getCoordinates(device_coordinates)
-                    self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
+                    status_coord = self.pozyx.getCoordinates(device_coordinates)
+                    status_device = self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
+                if status_coord != POZYX_SUCCESS:
+                    self.handle_error("set_manually_measured_anchors (tags_coord)")
+                if status_device != POZYX_SUCCESS:
+                    self.handle_error("set_manually_measured_anchors (tags_device)")
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
                 self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+
+    def handle_error(self, function_name: str) -> None:
+        error_code = SingleRegister()
+
+        with self.pozyx_lock:
+            self.pozyx.getErrorCode(error_code)
+            message = self.pozyx.getErrorMessage(error_code)
+
+        if error_code != 0x0:
+            print("Error in", function_name, ":", message)
