@@ -1,0 +1,14 @@
+- name: "Pulling latest code version"
+  git:
+    repo: git@github.com:MISTLab/clamour.git
+    version: test-phase
+    dest: /home/pi/clamour
+
+- name: "Building and deploying Docker image"
+  docker_image:
+    name: samsei/clamour:latest
+    state: present
+    force: yes
+    path: /home/pi/clamour
+    push: yes
+    repository: samsei/clamour
