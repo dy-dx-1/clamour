@@ -1,5 +1,4 @@
 - hosts: server
-  become: true
   gather_facts: yes
   roles:
     - build_deploy
