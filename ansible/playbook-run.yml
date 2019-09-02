@@ -1,5 +1,11 @@
+- hosts: server
+  become: true
+  gather_facts: yes
+  roles:
+    - build_deploy
+
 - hosts: eggs
   become: true
   gather_facts: yes
   roles:
-          - run
+    - run
