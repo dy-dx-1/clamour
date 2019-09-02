@@ -162,6 +162,7 @@ class Messenger:
                     self.received_synced_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
+                    print("Received new valid message.")
                 else:
                     print("Received duplicate message.")
             else:
