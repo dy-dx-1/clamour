@@ -51,18 +51,16 @@ class TDMANode:
             self.timing.update_current_time()
             self.current_state = self.states[self.current_state.execute()]
 
-            exec_time = time() - start_time
-            print(f"Exec time: {exec_time}")
-            self.wait(exec_time)
+            self.wait(start_time)
 
             print(f"--- {int(1 / (time() - start_time))} Hz ---")
 
     @staticmethod
-    def wait(exec_time: float):
+    def wait(start_time: float):
         frequency = 60.0  # Hz
         period = 1.0 / frequency
 
-        while (time() - exec_time) <= period:
+        while (time() - start_time) <= period:
             sleep(0.00000001)
 
     @staticmethod
