@@ -45,16 +45,17 @@ class TDMANode:
         print("Finished with TDMA node.")
 
     def run(self) -> None:
-        start_time = time()
+        while True:
+            start_time = time()
 
-        self.timing.update_current_time()
-        self.current_state = self.states[self.current_state.execute()]
+            self.timing.update_current_time()
+            self.current_state = self.states[self.current_state.execute()]
 
-        exec_time = time() - start_time
-        print(f"Exec time: {exec_time}")
-        self.wait(exec_time)
+            exec_time = time() - start_time
+            print(f"Exec time: {exec_time}")
+            self.wait(exec_time)
 
-        print(f"--- {int(1 / (time() - start_time))} Hz ---")
+            print(f"--- {int(1 / (time() - start_time))} Hz ---")
 
     @staticmethod
     def wait(exec_time: float):
