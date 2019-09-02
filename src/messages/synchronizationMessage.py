@@ -4,4 +4,5 @@ class SynchronizationMessage:
         self.clock = clock
         self.neib_logical = neib_logical
         self.offset = self.neib_logical - self.clock
+        print(f"CLOCK SELF {self.clock}; NEIB: {self.neib_logical}; OFFSET: {self.offset}")
         self.time_alive = time_alive
