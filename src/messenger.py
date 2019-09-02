@@ -24,6 +24,7 @@ class Messenger:
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
+        self.received_synced_messages = []
 
     def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None) -> None:
         message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors)
@@ -156,12 +157,13 @@ class Messenger:
         try:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
-                msg = self.message_box.peek_last()
-                if msg is None or received_message != msg:
+                self.received_synced_messages.append(received_message)
+
+                if received_message not in self.received_synced_messages:
                     self.message_box.append(received_message)
                     is_new_message = True
                 else:
-                    print(f"Received message was already in message box? {received_message == msg}")
+                    print("Received duplicate message.")
             else:
                 print("Invalid message:", str(sender_id), str(bin(data)))
         except InvalidMessageTypeException as e:
