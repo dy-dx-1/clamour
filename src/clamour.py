@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import os
-import signal
 import sys
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
@@ -36,8 +35,6 @@ def get_pozyx_id(pozyx) -> int:
 def main():
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
 
-    signal.setitimer(signal.ITIMER_REAL, 0, 0.01)  # 100Hz
-
     with ContextManagedQueue() as multiprocess_communication_queue:
         shared_pozyx = connect_pozyx()
         shared_pozyx_lock = Lock()
@@ -51,7 +48,7 @@ def main():
             with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                 pedometer_process.start()
                 with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id) as node:
-                    signal.signal(signal.ITIMER_REAL, node.run)
+                    node.run()
 
 
 if __name__ == "__main__":
