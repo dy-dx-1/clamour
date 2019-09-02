@@ -22,6 +22,7 @@ class Synchronization(TDMAState):
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.has_jumped_already = False
         self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+        self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
 
     def execute(self) -> State:
@@ -39,11 +40,10 @@ class Synchronization(TDMAState):
         if self.timing.synchronized:
             print('SYNCED :D')
 
-        if self.time_to_sleep <= 0:
+        if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
-            self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
-        else:
-            self.time_to_sleep -= 0.001
+            self.time_to_sleep = abs(random.gauss(0.001, 50 / 1000))
+            self.start_t = time()
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
