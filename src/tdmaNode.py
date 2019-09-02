@@ -51,6 +51,7 @@ class TDMANode:
         self.current_state = self.states[self.current_state.execute()]
 
         exec_time = time() - start_time
+        print(f"Exec time: {exec_time}")
         self.wait(exec_time)
 
         print(f"--- {int(1 / (time() - start_time))} Hz ---")
