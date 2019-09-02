@@ -160,6 +160,8 @@ class Messenger:
                 if msg is None or received_message != msg:
                     self.message_box.append(received_message)
                     is_new_message = True
+                else:
+                    print(f"Received message was already in message box? {received_message == msg}")
             else:
                 print("Invalid message:", str(sender_id), str(bin(data)))
         except InvalidMessageTypeException as e:
@@ -184,7 +186,6 @@ class Messenger:
         return info[0], data[0], status
 
     def update_neighbor_dictionary(self, device_list: list = None) -> None:
-        # print('(STEP) Update neighbor dict')
         if device_list is not None:
             for device in device_list:
                 self.neighborhood.add_neighbor(device, [], perf_counter())
