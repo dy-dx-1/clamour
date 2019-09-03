@@ -21,7 +21,7 @@ class Synchronization(TDMAState):
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.has_jumped_already = False
-        self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+        self.time_to_sleep = abs(random.gauss(0.001, 5.0 / 1000))
         self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
 
@@ -42,7 +42,7 @@ class Synchronization(TDMAState):
 
         if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
-            self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+            self.time_to_sleep = abs(random.gauss(0.001, 5.0 / 1000))
             self.start_t = time()
 
         next_state = self.next()
