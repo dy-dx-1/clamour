@@ -111,7 +111,7 @@ class Synchronization(TDMAState):
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
             print("Jumped correction")
             self.has_jumped_already = True
-            self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
+            #self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
             self.collaborative_offset_compensation(sync_msg)
 
