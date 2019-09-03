@@ -106,7 +106,9 @@ class Synchronization(TDMAState):
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock / 100000, time_alive=0)
+        print(f"Message offset before comm delay: {sync_msg.offset}")
         sync_msg.offset += COMMUNICATION_DELAY
+        print(f"Message offset after comm delay: {sync_msg.offset}")
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
             print("Jumped correction")
@@ -116,6 +118,7 @@ class Synchronization(TDMAState):
             self.collaborative_offset_compensation(sync_msg)
 
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
+        print(f"Message offset during compensation: {message.offset}")
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
         if len(self.timing.clock_differential_stat) > 10:
             self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + [message.offset]
