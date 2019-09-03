@@ -51,6 +51,9 @@ class TDMANode:
             self.current_state = self.states[self.current_state.execute()]
             self.wait(start_time)
 
+            if int(1 / (time() - start_time)) < 60.0:
+                print(f"WARNING: --- {int(1 / (time() - start_time))} Hz ---")
+
     @staticmethod
     def wait(start_time: float):
         frequency = 60.0  # Hz
