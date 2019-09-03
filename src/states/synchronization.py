@@ -128,7 +128,7 @@ class Synchronization(TDMAState):
                 if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
 
-            print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
+            print("Individual offsets:", [(i, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)
