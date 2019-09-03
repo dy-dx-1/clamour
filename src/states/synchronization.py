@@ -106,7 +106,7 @@ class Synchronization(TDMAState):
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock / 100000, time_alive=0)
-        sync_msg.offset -= COMMUNICATION_DELAY
+        sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
             print("Jumped correction")
