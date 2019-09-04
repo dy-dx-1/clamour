@@ -3,7 +3,7 @@ import struct
 from multiprocessing import Lock
 from time import perf_counter, time
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS, POZYX_FAILURE
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment
@@ -173,6 +173,7 @@ class Messenger:
                 self.pozyx.getRxInfo(info)
                 status = self.pozyx.readRXBufferData(data)
         except struct.error as e:
+            status = POZYX_FAILURE
             print(f"Error while reading from tag: {e}")
 
         if status != POZYX_SUCCESS:
