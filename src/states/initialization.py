@@ -25,7 +25,7 @@ class Initialization(TDMAState):
 
     def execute(self) -> State:
         self.discover_neighbors()
-        self.clear_pozyx_buffer()
+        # self.clear_pozyx_buffer()
         return self.next()
 
     def next(self) -> State:
