@@ -32,7 +32,7 @@ class Messenger:
 
     def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
-        message.synchronized_clock = 16384
+        message.synchronized_clock = time
         print(f"Sending message: {message.synchronized_clock}")
         message.encode()
 
