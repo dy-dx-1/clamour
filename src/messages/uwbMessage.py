@@ -38,7 +38,9 @@ class UWBSynchronizationMessage(UWBMessage):
         if self.synchronized_clock < 0:
             print("Clock is negative. Have positive feelings instead.", self.synchronized_clock)
             raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
-        
+
+        if self.synchronized_clock < 100:
+            print(f"sync clock {str(bin(self.synchronized_clock))} {str(bin(self.synchronized_clock >> 2))}")
         self.data = (self.message_type << 31) + (self.synchronization_ok << 30) + (self.synchronized_clock >> 2)
 
     def __hash__(self):
