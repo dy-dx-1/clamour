@@ -21,7 +21,8 @@ class Synchronization(TDMAState):
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.has_jumped_already = False
-        self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
+        self.time_to_sleep = abs(random.gauss(0.001, 0.05))
+        self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
 
     def execute(self) -> State:
@@ -39,11 +40,10 @@ class Synchronization(TDMAState):
         if self.timing.synchronized:
             print('SYNCED :D')
 
-        if self.time_to_sleep <= 0:
+        if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
-            self.time_to_sleep = abs(random.gauss(0.001, 50 / 10000))
-        else:
-            self.time_to_sleep -= 0.001
+            self.time_to_sleep = abs(random.gauss(0.001, 0.05))
+            self.start_t = time()
 
         next_state = self.next()
         if next_state == State.SCHEDULING:
@@ -105,11 +105,11 @@ class Synchronization(TDMAState):
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
-                                          neib_logical=message.synchronized_clock / 100000, time_alive=0)
+                                          neib_logical=(message.synchronized_clock / 100000))
         sync_msg.offset += COMMUNICATION_DELAY
 
-        if abs(sync_msg.offset) > JUMP_THRESHOLD and not self.has_jumped_already:
-            print("Jumped correction")
+        if abs(sync_msg.offset) > JUMP_THRESHOLD:
+            print("Jumped correction-----------------------------")
             self.has_jumped_already = True
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
@@ -128,7 +128,7 @@ class Synchronization(TDMAState):
                 if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
 
-            print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
+            print("Individual offsets:", [(i, msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)

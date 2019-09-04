@@ -1,6 +1,7 @@
 from multiprocessing import Lock
-from pypozyx import PozyxSerial
+from pypozyx import PozyxSerial, Data
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
+from time import sleep
 
 from interfaces import Anchors, Neighborhood
 from messenger import Messenger
@@ -24,11 +25,19 @@ class Initialization(TDMAState):
 
     def execute(self) -> State:
         self.discover_neighbors()
+        # self.clear_pozyx_buffer()
         return self.next()
 
     def next(self) -> State:
         print("Entering synchronization...")
         return State.SYNCHRONIZATION
+
+    def clear_pozyx_buffer(self):
+        print(self.pozyx.sendData(destination=self.id, data=Data([0], 'i')))
+        sleep(0.25)
+        for _ in range(50):
+            print(self.messenger.obtain_message_from_pozyx())
+            sleep(0.05)
 
     def discover_neighbors(self):
         self.clear_known_devices()

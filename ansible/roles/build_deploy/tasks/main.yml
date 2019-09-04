@@ -1,0 +1,20 @@
+- name: "Pulling latest code version"
+  git:
+    repo: git@github.com:MISTLab/clamour.git
+    version: test-phase
+    dest: /home/pi/clamour
+
+- name: "Logging into Dockerhub"
+  docker_login:
+    email: samuel.arseneault@polymtl.ca
+    username: samsei
+    password: pz9sQ9tUMQy5ZFU  # I know, this is not secure.
+
+- name: "Building and deploying Docker image"
+  docker_image:
+    name: samsei/clamour:latest
+    state: present
+    force: yes
+    path: /home/pi/clamour
+    push: yes
+    repository: samsei/clamour

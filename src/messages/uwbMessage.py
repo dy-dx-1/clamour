@@ -31,15 +31,20 @@ class UWBSynchronizationMessage(UWBMessage):
         self.synchronization_ok = synchronized
 
     def decode(self):
-        self.synchronized_clock = self.data & self.CLOCK_MASK
+        self.synchronized_clock = (self.data & self.CLOCK_MASK) << 2
         self.synchronization_ok = bool(self.data & self.SYNC_MASK)
 
     def encode(self):
         if self.synchronized_clock < 0:
             print("Clock is negative. Have positive feelings instead.", self.synchronized_clock)
             raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
-        
+
+        if self.synchronized_clock < 100:
+            print(f"sync clock {str(bin(self.synchronized_clock))} {str(bin(self.synchronized_clock >> 2))}")
         self.data = (self.message_type << 31) + (self.synchronization_ok << 30) + (self.synchronized_clock >> 2)
+
+    def __hash__(self):
+        return hash(self.data + self.sender_id)
 
     def __repr__(self):
         return f"Type: {self.message_type} clock: {self.synchronized_clock} synced: {self.synchronization_ok}"
