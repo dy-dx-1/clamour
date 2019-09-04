@@ -33,6 +33,7 @@ class Messenger:
     def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
         message.synchronized_clock = time
+        print(f"Sending message: {self.id} {message.synchronized_clock}")
         message.encode()
 
         with self.pozyx_lock:
@@ -51,7 +52,6 @@ class Messenger:
                 slot = random.choice(self.slot_assignment.subpriority_slots)
                 self.slot_assignment.send_list[slot] = self.id
             else:
-                # Repetitively broadcast one of own slot. TODO: why? reply@yanjun: because in real case, their maybe some wrone schedule because of communication, so if no slot need to be proposed, the node simply repeat his schedule again to make sure its slots are right. Or else the slot will be reject somehow.
                 slot = random.choice(self.slot_assignment.pure_send_list)
         else:
             message = self.message_box.popleft()
@@ -162,9 +162,6 @@ class Messenger:
                     self.received_synced_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
-                    print("Received new valid message.")
-                else:
-                    print("Received duplicate message.")
             else:
                 print("Invalid message:", str(sender_id), str(bin(data)))
         except InvalidMessageTypeException as e:
