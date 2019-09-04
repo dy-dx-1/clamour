@@ -24,12 +24,18 @@ class Initialization(TDMAState):
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
     def execute(self) -> State:
+        self.clear_pozyx_buffer()
         self.discover_neighbors()
         return self.next()
 
     def next(self) -> State:
         print("Entering synchronization...")
         return State.SYNCHRONIZATION
+
+    def clear_pozyx_buffer(self):
+        for _ in range(100):
+            print(self.messenger.obtain_message_from_pozyx())
+            sleep(0.05)
 
     def discover_neighbors(self):
         self.clear_known_devices()
