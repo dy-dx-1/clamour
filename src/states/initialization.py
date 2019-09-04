@@ -1,6 +1,7 @@
 from multiprocessing import Lock
 from pypozyx import PozyxSerial
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
+from time import sleep
 
 from interfaces import Anchors, Neighborhood
 from messenger import Messenger
@@ -24,6 +25,7 @@ class Initialization(TDMAState):
 
     def execute(self) -> State:
         self.pozyx.resetSystem()
+        sleep(1)
         self.discover_neighbors()
         return self.next()
 
