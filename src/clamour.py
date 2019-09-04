@@ -28,11 +28,16 @@ def connect_pozyx() -> PozyxSerial:
 
 def connect_and_reset() -> PozyxSerial:
     temp_pozyx = connect_pozyx()
+    print("Connected first pozyx")
+
     temp_pozyx.resetSystem()
 
     sleep(1)
+    second_pozyx = connect_pozyx()
 
-    return connect_pozyx()
+    print("Connected second pozyx")
+
+    return second_pozyx
 
 
 def get_pozyx_id(pozyx) -> int:
