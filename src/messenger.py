@@ -33,7 +33,6 @@ class Messenger:
     def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
         message.synchronized_clock = time
-        print(f"Sending message: {message.synchronized_clock}")
         message.encode()
 
         with self.pozyx_lock:
@@ -73,8 +72,7 @@ class Messenger:
     def clear_non_scheduling_messages(self) -> None:
         while not self.message_box.empty() and not isinstance(self.message_box.peek_first(), UWBTDMAMessage):
             self.message_box.popleft()
-            # print("Cleared non-tdma message")
-        
+
     def broadcast(self, slot: int, code: int) -> None:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
@@ -150,9 +148,6 @@ class Messenger:
 
         is_new_message = False
         sender_id, data, status = self.obtain_message_from_pozyx()
-
-        # if status != POZYX_SUCCESS:
-        #     print("Bad status, but got message:", sender_id, data)
 
         try:
             if sender_id != 0 and data != 0:
