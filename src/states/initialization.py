@@ -34,7 +34,8 @@ class Initialization(TDMAState):
 
     def clear_pozyx_buffer(self):
         print(self.pozyx.sendData(destination=self.id, data=Data([0], 'i')))
-        for _ in range(100):
+        sleep(1)
+        for _ in range(50):
             print(self.messenger.obtain_message_from_pozyx())
             sleep(0.05)
 
