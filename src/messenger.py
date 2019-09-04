@@ -35,7 +35,6 @@ class Messenger:
         message.synchronized_clock = time
         message.encode()
 
-        print(f"Sending message {str(bin(message.data))}")
         with self.pozyx_lock:
             self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
 

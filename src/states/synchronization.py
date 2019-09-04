@@ -20,7 +20,6 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
-        self.has_jumped_already = False
         self.time_to_sleep = abs(random.gauss(0.001, 0.05))
         self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
@@ -36,9 +35,6 @@ class Synchronization(TDMAState):
 
         print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
-
-        if self.timing.synchronized:
-            print('SYNCED :D')
 
         if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
@@ -109,8 +105,6 @@ class Synchronization(TDMAState):
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
-            print("Jumped correction-----------------------------")
-            self.has_jumped_already = True
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
             self.collaborative_offset_compensation(sync_msg)
@@ -132,9 +126,6 @@ class Synchronization(TDMAState):
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)
-
-            print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
-                  "next clock:", self.timing.logical_clock.clock + offset_correction)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
