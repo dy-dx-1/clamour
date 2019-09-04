@@ -4,6 +4,7 @@ import os
 import sys
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
+from time import sleep
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
@@ -25,6 +26,15 @@ def connect_pozyx() -> PozyxSerial:
     return PozyxSerial(serial_port)
 
 
+def connect_and_reset() -> PozyxSerial:
+    temp_pozyx = connect_pozyx()
+    temp_pozyx.resetSystem()
+
+    sleep(1)
+
+    return connect_pozyx()
+
+
 def get_pozyx_id(pozyx) -> int:
     data = Data([0] * 2)
     pozyx.getRead(POZYX_NETWORK_ID, data)
@@ -36,7 +46,7 @@ def main():
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
 
     with ContextManagedQueue() as multiprocess_communication_queue:
-        shared_pozyx = connect_pozyx()
+        shared_pozyx = connect_and_reset()
         shared_pozyx_lock = Lock()
         pozyx_id = get_pozyx_id(shared_pozyx)
 
