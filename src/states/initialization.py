@@ -1,5 +1,5 @@
 from multiprocessing import Lock
-from pypozyx import PozyxSerial
+from pypozyx import PozyxSerial, Data
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
 from time import sleep
 
@@ -33,6 +33,7 @@ class Initialization(TDMAState):
         return State.SYNCHRONIZATION
 
     def clear_pozyx_buffer(self):
+        print(self.pozyx.sendData(destination=self.id, data=Data([0], 'i')))
         for _ in range(100):
             print(self.messenger.obtain_message_from_pozyx())
             sleep(0.05)
