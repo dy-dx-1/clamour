@@ -25,7 +25,7 @@ class Initialization(TDMAState):
 
     def execute(self) -> State:
         self.pozyx.resetSystem()
-        sleep(1)
+        sleep(10)
         self.discover_neighbors()
         return self.next()
 
