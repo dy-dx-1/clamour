@@ -23,6 +23,7 @@ class Initialization(TDMAState):
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
     def execute(self) -> State:
+        self.pozyx.resetSystem()
         self.discover_neighbors()
         return self.next()
 
