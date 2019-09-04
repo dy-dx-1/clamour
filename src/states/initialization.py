@@ -24,8 +24,8 @@ class Initialization(TDMAState):
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
     def execute(self) -> State:
-        self.clear_pozyx_buffer()
         self.discover_neighbors()
+        self.clear_pozyx_buffer()
         return self.next()
 
     def next(self) -> State:
@@ -34,7 +34,7 @@ class Initialization(TDMAState):
 
     def clear_pozyx_buffer(self):
         print(self.pozyx.sendData(destination=self.id, data=Data([0], 'i')))
-        sleep(1)
+        sleep(0.25)
         for _ in range(50):
             print(self.messenger.obtain_message_from_pozyx())
             sleep(0.05)
