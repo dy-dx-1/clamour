@@ -23,6 +23,7 @@ class Synchronization(TDMAState):
         self.time_to_sleep = abs(random.gauss(0.001, 0.05))
         self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
+        self.nb_cycles_neighbors_synced = 0
 
     def execute(self) -> State:
         if self.first_exec_time is None:
@@ -35,6 +36,11 @@ class Synchronization(TDMAState):
 
         print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
+
+        if self.neighborhood.are_neighbors_synced():
+            self.nb_cycles_neighbors_synced += 1
+        else:
+            self.nb_cycles_neighbors_synced = 0
 
         if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
@@ -53,14 +59,18 @@ class Synchronization(TDMAState):
 
     def next(self) -> State:
         current_exec_time = int(round(time() * 1000)) - self.first_exec_time
-        print(self.id, current_exec_time, self.timing.synchronized, self.neighborhood.are_neighbors_synced())
 
-        if self.neighborhood.is_alone() or \
-                (current_exec_time > SYNCHRONIZATION_PERIOD and self.timing.synchronized
+        if self.neighborhood.is_alone() or self.is_left_behind() or \
+                (current_exec_time > SYNCHRONIZATION_PERIOD and (self.timing.synchronized or self.is_left_behind())
                  and self.neighborhood.are_neighbors_synced()):
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
+
+    def is_left_behind(self):
+        if self.nb_cycles_neighbors_synced > 10:
+            print(f"LEFT BEHIND {self.nb_cycles_neighbors_synced}")
+        return self.nb_cycles_neighbors_synced > 10
 
     def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
