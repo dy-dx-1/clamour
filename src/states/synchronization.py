@@ -136,6 +136,6 @@ class Synchronization(TDMAState):
 
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
                   "next clock:", self.timing.logical_clock.clock + offset_correction)
-            #self.timing.logical_clock.correct_logical_offset(offset_correction)
+            self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
