@@ -77,7 +77,7 @@ class Synchronization(TDMAState):
             message = self.messenger.message_box.pop()
             if isinstance(message, UWBSynchronizationMessage):
                 message.decode()
-                print(f"Received message: {message.sender_id} {message.synchronized_clock}")
+                print(f"Received message: {message.synchronized_clock}")
                 self.timing.update_current_time()
                 self.update_offset(message.sender_id, message)
 
