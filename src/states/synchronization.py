@@ -107,10 +107,10 @@ class Synchronization(TDMAState):
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=message.synchronized_clock / 100000, time_alive=0)
-        sync_msg.offset -= COMMUNICATION_DELAY
+        sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
-            print("Jumped correction")
+            print("Jumped correction-----------------------------")
             self.has_jumped_already = True
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
@@ -129,13 +129,13 @@ class Synchronization(TDMAState):
                 if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
 
-            print("Individual offsets:", [(i, msg.offset, msg.time_alive) for (i, msg)
+            print("Individual offsets:", [(i,msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)
 
             print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
                   "next clock:", self.timing.logical_clock.clock + offset_correction)
-            self.timing.logical_clock.correct_logical_offset(offset_correction)
+            #self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
