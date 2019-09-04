@@ -105,7 +105,7 @@ class Synchronization(TDMAState):
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
-                                          neib_logical=message.synchronized_clock / 100000, time_alive=0)
+                                          neib_logical=(message.synchronized_clock / 100000))
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
@@ -128,7 +128,7 @@ class Synchronization(TDMAState):
                 if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
 
-            print("Individual offsets:", [(i,msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
+            print("Individual offsets:", [(i, msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
                                           in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)
