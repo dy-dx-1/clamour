@@ -34,7 +34,7 @@ class Synchronization(TDMAState):
 
         self.synchronize()
 
-        print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
+        # print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
 
         if self.timing.synchronized:
@@ -57,7 +57,7 @@ class Synchronization(TDMAState):
 
     def next(self) -> State:
         current_exec_time = int(round(time() * 1000)) - self.first_exec_time
-        print(self.id, current_exec_time, self.timing.synchronized, self.neighborhood.are_neighbors_synced())
+        # print(self.id, current_exec_time, self.timing.synchronized, self.neighborhood.are_neighbors_synced())
 
         if self.neighborhood.is_alone() or \
                 (current_exec_time > SYNCHRONIZATION_PERIOD and self.timing.synchronized
@@ -110,7 +110,7 @@ class Synchronization(TDMAState):
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
-            print("Jumped correction-----------------------------")
+            # print("Jumped correction-----------------------------")
             self.has_jumped_already = True
             self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
         else:
@@ -129,13 +129,13 @@ class Synchronization(TDMAState):
                 if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
 
-            print("Individual offsets:", [(i,msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
-                                          in self.neighborhood.neighbor_synchronization_received.items()])
+            # print("Individual offsets:", [(i,msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
+            #                               in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)
 
-            print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
-                  "next clock:", self.timing.logical_clock.clock + offset_correction)
+            # print("Offset correction:", offset_correction, "previous clock:", self.timing.logical_clock.clock,
+            #       "next clock:", self.timing.logical_clock.clock + offset_correction)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
 
             self.neighborhood.neighbor_synchronization_received = {}
