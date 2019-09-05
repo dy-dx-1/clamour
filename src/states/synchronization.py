@@ -33,8 +33,6 @@ class Synchronization(TDMAState):
             else mean(self.timing.clock_differential_stat)
 
         self.synchronize()
-
-        print(f"CURRENT OFFSET: {self.timing.synchronization_offset_mean}")
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
 
         if self.neighborhood.are_neighbors_synced():
@@ -65,9 +63,7 @@ class Synchronization(TDMAState):
         else:
             return State.SYNCHRONIZATION
 
-    def is_left_behind(self):
-        if self.nb_cycles_neighbors_synced > 10:
-            print(f"LEFT BEHIND {self.nb_cycles_neighbors_synced}")
+    def is_left_behind(self) -> bool:
         return self.nb_cycles_neighbors_synced > 10
 
     def broadcast_synchronization_message(self) -> None:
@@ -75,7 +71,7 @@ class Synchronization(TDMAState):
         t = int(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
-    def synchronize(self):
+    def synchronize(self) -> None:
         self.messenger.receive_new_message()
         while not self.messenger.message_box.empty():
             message = self.messenger.message_box.pop()
@@ -89,18 +85,18 @@ class Synchronization(TDMAState):
 
         self.increment_time_alive()
 
-    def increment_time_alive(self):
+    def increment_time_alive(self) -> None:
         for msg_id in self.neighborhood.neighbor_synchronization_received.keys():
             self.neighborhood.neighbor_synchronization_received[msg_id].time_alive += 1
 
-    def prepare_next_state(self):
+    def prepare_next_state(self) -> None:
         self.neighborhood.synchronized_active_neighbor_count = 0
         self.slot_assignment.reset()
         self.timing.clear_synchronization_info()
         self.messenger.message_box.clear()
         self.messenger.received_synced_messages.clear()
 
-    def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
+    def update_offset(self, sender_id: int, message: UWBSynchronizationMessage) -> None:
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=(message.synchronized_clock / TRANSMISSION_SCALING))
         sync_msg.offset += COMMUNICATION_DELAY
@@ -110,7 +106,7 @@ class Synchronization(TDMAState):
         else:
             self.collaborative_offset_compensation(sync_msg)
 
-    def collaborative_offset_compensation(self, message: SynchronizationMessage):
+    def collaborative_offset_compensation(self, message: SynchronizationMessage) -> None:
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
         if len(self.timing.clock_differential_stat) > NB_SAMPLES_OFFSET:
             self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + [message.offset]
@@ -122,9 +118,6 @@ class Synchronization(TDMAState):
             for id, synchronization in self.neighborhood.neighbor_synchronization_received.items():
                 if synchronization.time_alive <= 100:
                     total_offset.append(synchronization.offset)
-
-            print("Individual offsets:", [(i, msg.clock, msg.offset, msg.time_alive, msg.neib_logical) for (i, msg)
-                                          in self.neighborhood.neighbor_synchronization_received.items()])
 
             offset_correction = sum(total_offset) / (len(total_offset) + 1)
             self.timing.logical_clock.correct_logical_offset(offset_correction)
