@@ -4,11 +4,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from logicalClock import LogicalClock
 
-COMMUNICATION_DELAY = 0.005 #0.005 + 1.0 / 60  # delay estimation is 0.005s, + 1 / frequency (60Hz)
+COMMUNICATION_DELAY = 0.005
 SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 0.018
 
-SYNCHRONIZATION_PERIOD = 7500  # Time leave for syn (ms)
+SYNCHRONIZATION_PERIOD = 7500
 NB_NODES = 35
 SCHEDULING_SLOT_DURATION = 30
 
