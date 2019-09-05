@@ -44,7 +44,7 @@ class UWBSynchronizationMessage(UWBMessage):
         self.data = (self.message_type << 31) + (self.synchronization_ok << 30) + (self.synchronized_clock >> 2)
 
     def __hash__(self):
-        return hash(self.data + self.sender_id)
+        return hash(f"{self.sender_id}{self.data}")
 
     def __repr__(self):
         return f"Type: {self.message_type} clock: {self.synchronized_clock} synced: {self.synchronization_ok}"
@@ -72,6 +72,9 @@ class UWBTDMAMessage(UWBMessage):
             self.code = 16384 - self.code
         
         self.data = (self.message_type << 30) + (self.slot << 15) + self.code
+
+    def __hash__(self):
+        return hash(f"{self.sender_id}{self.data}")
 
     def __repr__(self):
         return f"Type {self.message_type} slot: {self.slot} code: {self.code}"
