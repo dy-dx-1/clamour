@@ -4,11 +4,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from logicalClock import LogicalClock
 
-COMMUNICATION_DELAY = 0.005 #0.005 + 1.0 / 60  # delay estimation is 0.005s, + 1 / frequency (60Hz)
+SECONDS_TO_MILLISECONDS = 1000
+
+COMMUNICATION_DELAY = 0.005
 SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 0.018
 
-SYNCHRONIZATION_PERIOD = 7500  # Time leave for syn (ms)
+SYNCHRONIZATION_PERIOD = 7500
 NB_NODES = 35
 SCHEDULING_SLOT_DURATION = 30
 
@@ -37,10 +39,15 @@ class Timing:
 
     def update_current_time(self):
         self.logical_clock.update_clock()
-        self.current_time_in_cycle = int(self.logical_clock.clock * 1000) % FULL_CYCLE_DURATION
+        self.current_time_in_cycle = int(self.logical_clock.clock * SECONDS_TO_MILLISECONDS) % FULL_CYCLE_DURATION
 
     def update_frame_id(self):
         self.frame_id = int((self.current_time_in_cycle - TASK_START_TIME) / FRAME_DURATION)
 
     def update_slot_id(self):
         self.current_slot_id = int(((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / TASK_SLOT_DURATION)
+
+    def clear_synchronization_info(self):
+        self.clock_differential_stat = []
+        self.synchronization_offset_mean = 20
+        self.synchronized = False

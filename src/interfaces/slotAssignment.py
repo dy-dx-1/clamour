@@ -24,3 +24,10 @@ class SlotAssignment:
                 if self.send_list[x] == -2:
                     self.subpriority_slots.append(0) # todo @yanjun, does here should be append(x)?
                 self.free_slots += 1
+
+    def reset(self):
+        self.block = [-1] * len(self.block)
+        self.send_list = [-1] * len(self.send_list)
+        self.receive_list = [-1] * len(self.receive_list)
+        self.pure_send_list = []
+        self.update_free_slots()
