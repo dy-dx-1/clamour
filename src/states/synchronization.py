@@ -7,7 +7,7 @@ from messages import (MessageFactory, SynchronizationMessage, UWBSynchronization
 from messenger import Messenger
 from interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
 
-from .constants import JUMP_THRESHOLD, State
+from .constants import *
 from .tdmaState import TDMAState
 
 
@@ -20,7 +20,7 @@ class Synchronization(TDMAState):
         self.id = id
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
-        self.time_to_sleep = abs(random.gauss(0.001, 0.05))
+        self.time_to_sleep = abs(random.gauss(RANDOM_DELAY_MEAN, RANDOM_DELAY_VARIANCE))
         self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
         self.nb_cycles_neighbors_synced = 0
@@ -29,7 +29,7 @@ class Synchronization(TDMAState):
         if self.first_exec_time is None:
             self.first_exec_time = int(round(time() * 1000))
 
-        self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < 10 \
+        self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
 
         self.synchronize()
@@ -44,7 +44,7 @@ class Synchronization(TDMAState):
 
         if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
-            self.time_to_sleep = abs(random.gauss(0.001, 0.05))
+            self.time_to_sleep = abs(random.gauss(RANDOM_DELAY_MEAN, RANDOM_DELAY_VARIANCE))
             self.start_t = time()
 
         next_state = self.next()
@@ -74,7 +74,7 @@ class Synchronization(TDMAState):
 
     def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
-        t = int(round(self.timing.logical_clock.clock * 100000))
+        t = int(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self):
@@ -111,7 +111,7 @@ class Synchronization(TDMAState):
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
-                                          neib_logical=(message.synchronized_clock / 100000))
+                                          neib_logical=(message.synchronized_clock / TRANSMISSION_SCALING))
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
@@ -121,7 +121,7 @@ class Synchronization(TDMAState):
 
     def collaborative_offset_compensation(self, message: SynchronizationMessage):
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
-        if len(self.timing.clock_differential_stat) > 10:
+        if len(self.timing.clock_differential_stat) > NB_SAMPLES_OFFSET:
             self.timing.clock_differential_stat = self.timing.clock_differential_stat[1:] + [message.offset]
         else:
             self.timing.clock_differential_stat.append(message.offset)
