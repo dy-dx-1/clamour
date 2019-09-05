@@ -16,8 +16,13 @@ class Scheduling(TDMAState):
         self.timing = timing
         self.id = id
         self.messenger = messenger
+        self.first_scheduling_execution = True
 
     def execute(self) -> State:
+        if self.first_scheduling_execution:
+            self.reset_time_in_cycle()
+            self.first_scheduling_execution = False
+
         self.messenger.clear_non_scheduling_messages()
         self.slot_assignment.update_free_slots()
 
@@ -37,6 +42,9 @@ class Scheduling(TDMAState):
             return State.LISTEN
         else:
             return State.SCHEDULING
+
+    def reset_time_in_cycle(self):
+        self.timing.current_time_in_cycle = SYNCHRONIZATION_PERIOD
 
     def community_slot_assignment(self):
         if self.is_broadcast_slot():
