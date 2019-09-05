@@ -24,7 +24,7 @@ class Messenger:
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
-        self.received_synced_messages = set()
+        self.received_messages = set()
 
     def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None) -> None:
         message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors)
@@ -153,8 +153,8 @@ class Messenger:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
 
-                if received_message not in self.received_synced_messages:
-                    self.received_synced_messages.add(received_message)
+                if received_message not in self.received_messages:
+                    self.received_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
             else:
@@ -190,10 +190,14 @@ class Messenger:
             new_message.decode()
             self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
 
-            if new_message.synchronization_ok:
-                self.neighborhood.add_synced_neighbor(new_message.sender_id)
-            else:
-                self.neighborhood.remove_synced_neighbor(new_message.sender_id)
+            if isinstance(new_message, UWBSynchronizationMessage):
+                self.update_synced_neighbors(new_message)
+
+    def update_synced_neighbors(self, message: UWBSynchronizationMessage) -> None:
+        if message.synchronization_ok:
+            self.neighborhood.add_synced_neighbor(message.sender_id)
+        else:
+            self.neighborhood.remove_synced_neighbor(message.sender_id)
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()

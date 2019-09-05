@@ -94,7 +94,7 @@ class Synchronization(TDMAState):
         self.slot_assignment.reset()
         self.timing.clear_synchronization_info()
         self.messenger.message_box.clear()
-        self.messenger.received_synced_messages.clear()
+        self.messenger.received_messages.clear()
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage) -> None:
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
