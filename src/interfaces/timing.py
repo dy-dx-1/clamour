@@ -46,3 +46,8 @@ class Timing:
 
     def update_slot_id(self):
         self.current_slot_id = int(((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / TASK_SLOT_DURATION)
+
+    def clear_synchronization_info(self):
+        self.clock_differential_stat = []
+        self.synchronization_offset_mean = 20
+        self.synchronized = False

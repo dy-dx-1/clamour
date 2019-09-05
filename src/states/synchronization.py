@@ -50,9 +50,7 @@ class Synchronization(TDMAState):
         next_state = self.next()
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
-            self.reset_scheduling()
-            self.reset_timing_offsets()
-            self.messenger.message_box.clear()
+            self.prepare_next_state()
             print("Entering scheduling...")
 
         return next_state
@@ -95,19 +93,12 @@ class Synchronization(TDMAState):
         for msg_id in self.neighborhood.neighbor_synchronization_received.keys():
             self.neighborhood.neighbor_synchronization_received[msg_id].time_alive += 1
 
-    def reset_scheduling(self):
-        self.slot_assignment.block = [-1] * len(self.slot_assignment.block)
-        self.slot_assignment.send_list = [-1] * len(self.slot_assignment.send_list)
-        self.slot_assignment.receive_list = [-1] * len(self.slot_assignment.receive_list)
-        self.slot_assignment.pure_send_list = []
-        self.messenger.message_box.clear()
+    def prepare_next_state(self):
         self.neighborhood.synchronized_active_neighbor_count = 0
-        self.slot_assignment.update_free_slots()
-
-    def reset_timing_offsets(self):
-        self.timing.clock_differential_stat = []
-        self.timing.synchronization_offset_mean = 20
-        self.timing.synchronized = False
+        self.slot_assignment.reset()
+        self.timing.clear_synchronization_info()
+        self.messenger.message_box.clear()
+        self.messenger.received_synced_messages.clear()
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage):
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
