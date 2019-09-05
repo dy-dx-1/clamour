@@ -27,7 +27,7 @@ class Synchronization(TDMAState):
 
     def execute(self) -> State:
         if self.first_exec_time is None:
-            self.first_exec_time = int(round(time() * 1000))
+            self.first_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS))
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
@@ -58,7 +58,7 @@ class Synchronization(TDMAState):
         return next_state
 
     def next(self) -> State:
-        current_exec_time = int(round(time() * 1000)) - self.first_exec_time
+        current_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS)) - self.first_exec_time
 
         if self.neighborhood.is_alone() or self.is_left_behind() or \
                 (current_exec_time > SYNCHRONIZATION_PERIOD and (self.timing.synchronized or self.is_left_behind())
