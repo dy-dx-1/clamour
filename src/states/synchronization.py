@@ -1,5 +1,5 @@
 from numpy import mean
-from time import time
+from time import time, perf_counter
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
@@ -49,7 +49,7 @@ class Synchronization(TDMAState):
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
             self.prepare_next_state()
-            print(f"Entering scheduling at {self.timing.current_time_in_cycle} in cycle ({self.timing.logical_clock.clock})")
+            print(f"Entering scheduling at {self.timing.current_time_in_cycle} in cycle; Perf: ({perf_counter()})")
 
         return next_state
 
