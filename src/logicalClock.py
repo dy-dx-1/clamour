@@ -9,7 +9,8 @@ class LogicalClock:
         self.clock = 0
 
     def update_clock(self) -> None:
-        self.clock += ((perf_counter() - self.last_hardware_time) * (self.logicalRate + 1))
+        self.clock += (perf_counter() - self.last_hardware_time)
+        print(f"Logical clock: {self.clock}")
         self.last_hardware_time = perf_counter()
 
     def correct_logical_offset(self, correction: int) -> None:
