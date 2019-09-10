@@ -44,6 +44,7 @@ class Scheduling(TDMAState):
             return State.SCHEDULING
 
     def reset_time_in_cycle(self):
+        print(f"Time in cycle before reset: {self.timing.current_time_in_cycle}")
         self.timing.current_time_in_cycle = SYNCHRONIZATION_PERIOD
 
     def community_slot_assignment(self):
