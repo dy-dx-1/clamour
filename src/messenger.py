@@ -157,7 +157,7 @@ class Messenger:
                     self.received_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
-        except InvalidMessageTypeException as e:
+        except InvalidMessageTypeException as e:current
             pass  # TODO: print(e)
 
         return is_new_message
