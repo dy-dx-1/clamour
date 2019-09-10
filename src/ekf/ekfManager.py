@@ -1,4 +1,6 @@
 import math
+import os.path
+import csv
 from numpy import linalg
 from pypozyx import Coordinates
 from time import time
@@ -9,7 +11,6 @@ from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from rooms import Floorplan
 
-
 class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
         self.pozyx_id = pozyx_id
@@ -19,6 +20,15 @@ class EKFManager:
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['Arena']
+
+        filepath = '/dev/csv/broadcast_state.csv'
+        isnewfile = os.path.exists(filepath))
+        fieldnames = ['elapsed_time', 'efk_posx', 'coords_x', 'efk_posy', 'coords_y', 'efk_yaw', 'poszyx_id']
+        self.state_csv = open(filepath, 'a')
+        self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
+        if isnewfile:
+            self.writer.writeheader()
+        
 
     def run(self) -> None:
         with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
@@ -106,3 +116,16 @@ class EKFManager:
                          self.ekf.get_position().y, coordinates.y,
                          self.ekf.get_yaw(), self.correct_yaw(yaw),
                          linalg.det(self.ekf.P), self.pozyx_id])
+
+            csv_data = {
+                'elapsed_time': timestamp - self.start_time,
+                'efk_posx'  : self.ekf.get_position().x, 
+                'coords_x'  : coordinates.x, 
+                'efk_posy'  : self.ekf.get_position().y, 
+                'coords_y'  : coordinates.y,
+                'efk_yaw'   : self.ekf.get_yaw(), 
+                'poszyx_id' : self.pozyx_id
+            }
+
+            writer.writerow(csv_data)
+            self.state_csv.flush()
