@@ -44,7 +44,7 @@ class Messenger:
             code = -1
             if self.should_chose_from_non_block():
                 # Propose new slot by randomly choosing from non_block
-                slot = random.randint(0, len(self.slot_assignment.non_block))
+                slot = random.randint(0, len(self.slot_assignment.non_block) - 1)
                 self.slot_assignment.send_list[slot] = self.id
             elif self.should_chose_from_subpriority():
                 # Propose new slot by randomly choosing from subpriority_slots
