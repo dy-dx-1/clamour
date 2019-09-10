@@ -68,7 +68,7 @@ class Synchronization(TDMAState):
 
     def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
-        t = int(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
+        t = int(round(self.timing.logical_clock.clock))
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self) -> None:
@@ -98,7 +98,7 @@ class Synchronization(TDMAState):
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage) -> None:
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
-                                          neib_logical=(message.synchronized_clock / TRANSMISSION_SCALING))
+                                          neib_logical=message.synchronized_clock)
         sync_msg.offset += COMMUNICATION_DELAY
 
         if abs(sync_msg.offset) > JUMP_THRESHOLD:
