@@ -44,7 +44,7 @@ class Messenger:
             code = -1
             if self.should_chose_from_non_block():
                 # Propose new slot by randomly choosing from non_block
-                slot = random.randint(0, len(self.slot_assignment.non_block))
+                slot = random.randint(0, len(self.slot_assignment.non_block) - 1)
                 self.slot_assignment.send_list[slot] = self.id
             elif self.should_chose_from_subpriority():
                 # Propose new slot by randomly choosing from subpriority_slots
@@ -56,7 +56,6 @@ class Messenger:
             message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
-        print("Sending scheduling message")
         self.broadcast(slot, code)
         
     def should_chose_from_non_block(self) -> bool:
@@ -78,11 +77,10 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([message.data], 'I'))
+            self.pozyx.sendData(0, Data([message.data], 'i'))
 
     def receive_message(self) -> None:
         if self.receive_new_message():
-            print("Received message from ", self.message_box.peek_last().sender_id, " : ", type(self.message_box.peek_last()))
             self.update_neighbor_dictionary()
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())
@@ -157,8 +155,6 @@ class Messenger:
                     self.received_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
-            else:
-                print("Invalid message:", str(sender_id), str(bin(data)))
         except InvalidMessageTypeException as e:
             pass  # TODO: print(e)
 
@@ -194,7 +190,7 @@ class Messenger:
                 self.update_synced_neighbors(new_message)
 
     def update_synced_neighbors(self, message: UWBSynchronizationMessage) -> None:
-        if message.synchronization_ok:
+        if message.synchronized:
             self.neighborhood.add_synced_neighbor(message.sender_id)
         else:
             self.neighborhood.remove_synced_neighbor(message.sender_id)
