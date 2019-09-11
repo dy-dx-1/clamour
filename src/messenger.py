@@ -32,6 +32,7 @@ class Messenger:
 
     def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
+        print(f"Sending message. Is it synced? {message.synchronized}")
         message.synchronized_clock = time
         message.encode()
 
