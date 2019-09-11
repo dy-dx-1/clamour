@@ -25,8 +25,8 @@ class UWBSynchronizationMessage(UWBMessage):
     def __init__(self, sender_id: int, message_type: MessageType=MessageType.SYNC,
                  data: int=0, synchronized: bool = False):
         super(UWBSynchronizationMessage, self).__init__(sender_id, message_type, data)
-        self.CLOCK_MASK = 0b111111111111111111111111111111
-        self.SYNC_MASK = 0b01000000000000000000000000000000
+        self.CLOCK_MASK = 0x3FFFFFFF
+        self.SYNC_MASK = 0x10000000
         self.synchronized_clock = -1
         self.synchronization_ok = synchronized
 
@@ -53,8 +53,8 @@ class UWBSynchronizationMessage(UWBMessage):
 class UWBTDMAMessage(UWBMessage):
     def __init__(self, sender_id: int, message_type: MessageType=MessageType.TDMA, data: int=0, slot: int=-1, code: int=-5):
         super(UWBTDMAMessage, self).__init__(sender_id, message_type, data)
-        self.SLOT_MASK = 0b111111111111111000000000000000
-        self.TDMA_CODE_MASK = 0b111111111111111
+        self.SLOT_MASK = 0xFFFF0000
+        self.TDMA_CODE_MASK = 0xFFFF
         self.slot = slot
         self.code = code
 
