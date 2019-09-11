@@ -56,7 +56,6 @@ class Messenger:
             message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
-        print("Sending scheduling message")
         self.broadcast(slot, code)
         
     def should_chose_from_non_block(self) -> bool:
