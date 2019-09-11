@@ -63,6 +63,8 @@ class Synchronization(TDMAState):
                  and self.neighborhood.are_neighbors_synced()):
             return State.SCHEDULING
         else:
+            print(f"Exec time: {current_exec_time}, synced? {self.timing.synchronized}, "
+                  f"sync neighbors: {self.neighborhood.synced_neighbors}")
             return State.SYNCHRONIZATION
 
     def is_left_behind(self) -> bool:
@@ -109,7 +111,6 @@ class Synchronization(TDMAState):
             else:
                 self.collaborative_offset_compensation(sync_msg)
         else:
-            print(f"Offset of skipped correction: {sync_msg.offset}")
             self.has_done_first_correction = True
 
     def collaborative_offset_compensation(self, message: SynchronizationMessage) -> None:
