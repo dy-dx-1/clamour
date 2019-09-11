@@ -37,7 +37,7 @@ class UWBSynchronizationMessage(UWBMessage):
         print(f"Decoded with sync {self.synchronized}")
 
     def encode(self):
-        if self.synchronized_clock < int32(0):
+        if int(self.synchronized_clock) < 0:
             raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
 
         self.data = int32((bool(self.message_type) << 31) | (self.synchronized << 30) | (self.synchronized_clock >> 2))
