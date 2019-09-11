@@ -35,8 +35,9 @@ class EKFManager:
         self.ekf = CustomEKF(Coordinates(), 0)
 
         while True:
-            message = UpdateMessage(UpdateType.RANGING, time(), 0.5, Coordinates(1,2), ['2','2'])
+            message = UpdateMessage(UpdateType.PEDOMETER, time(), 0.5, Coordinates(1,2), ['2','2'])
             self.communication_queue.put(UpdateMessage.save(message))
+
             self.process_latest_state_info()
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
