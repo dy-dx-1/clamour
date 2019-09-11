@@ -30,15 +30,10 @@ class EKFManager:
             self.writer.writeheader()
 
     def run(self) -> None:
-        # with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
-            # self.initialize_ekf(socket)
-        self.ekf = CustomEKF(Coordinates(), 0)
-
-        while True:
-            message = UpdateMessage(UpdateType.PEDOMETER, time(), 0.5, Coordinates(1,2), ['2','2'])
-            self.communication_queue.put(UpdateMessage.save(message))
-
-            self.process_latest_state_info()
+        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
+            self.initialize_ekf(socket)
+            while True:
+                self.process_latest_state_info(socket)
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
@@ -51,7 +46,7 @@ class EKFManager:
                     self.ekf.trilateration_update(message.measured_xyz,
                                                   self.correct_yaw(message.measured_yaw), message.timestamp)
 
-                    #self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
                     self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
     def process_latest_state_info(self) -> None:
@@ -69,14 +64,8 @@ class EKFManager:
             update_functions[message.update_type](*update_info)
             print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
             # TODO: update pozyx position value with EKF result?
-            # self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
-            print("SAVING TO CSV:")
+            self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
-
-            # pas des uwb messages
-            #avg clock offset: il faut que dans la phase de syncro on envoie des messages
-            #envoyer des messages d'un format different (rien pr le moment)
-            #list of neighbors : nouveau type de message
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
@@ -130,9 +119,7 @@ class EKFManager:
                          linalg.det(self.ekf.P), self.pozyx_id])
     
     def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        print("SAVING TO CSV FUNCTION:")
         if coordinates is not None:
-            print(self.ekf.P)
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
@@ -147,5 +134,3 @@ class EKFManager:
 
             self.writer.writerow(csv_data)
             self.state_csv.flush()
-        else:
-            print('Coordinates are none')
