@@ -79,7 +79,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([message.data], 'I'))
+            self.pozyx.sendData(0, Data([message.data], 'i'))
 
     def receive_message(self) -> None:
         if self.receive_new_message():
