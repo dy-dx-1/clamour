@@ -1,4 +1,5 @@
 from .types import MessageType
+from numpy import int32
 
 
 class InvalidValueException(Exception):
@@ -41,7 +42,7 @@ class UWBSynchronizationMessage(UWBMessage):
 
         if self.synchronized_clock < 100:
             print(f"sync clock {str(bin(self.synchronized_clock))} {str(bin(self.synchronized_clock >> 2))}")
-        self.data = (self.message_type << 31) | (self.synchronization_ok << 30) | (self.synchronized_clock >> 2)
+        self.data = int32((self.message_type << 31) | (self.synchronization_ok << 30) | (self.synchronized_clock >> 2))
 
     def __hash__(self):
         return hash(f"{self.sender_id}{self.data}")
@@ -71,7 +72,7 @@ class UWBTDMAMessage(UWBMessage):
         if self.code < 0:
             self.code = 16384 - self.code
         
-        self.data = (self.message_type << 30) | (self.slot << 15) | self.code
+        self.data = int32((self.message_type << 30) | (self.slot << 15) | self.code)
 
     def __hash__(self):
         return hash(f"{self.sender_id}{self.data}")

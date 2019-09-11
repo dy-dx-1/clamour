@@ -1,4 +1,4 @@
-from numpy import mean
+from numpy import mean, int32
 from time import time, perf_counter
 import random
 
@@ -32,6 +32,7 @@ class Synchronization(TDMAState):
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
+        print("Offset: ", self.timing.synchronization_offset_mean)
 
         self.synchronize()
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
@@ -69,7 +70,7 @@ class Synchronization(TDMAState):
 
     def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
-        t = int(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
+        t = int32(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self) -> None:

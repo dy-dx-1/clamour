@@ -3,6 +3,5 @@ class SynchronizationMessage:
         self.sender_id = sender_id
         self.clock = clock
         self.neib_logical = neib_logical
-        print(f"Received clock: {self.neib_logical} from {self.sender_id}. Own clock: {self.clock}")
         self.offset = self.neib_logical - self.clock
         self.time_alive = time_alive
