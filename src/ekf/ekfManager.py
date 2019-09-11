@@ -52,7 +52,7 @@ class EKFManager:
                                                   self.correct_yaw(message.measured_yaw), message.timestamp)
 
                     #self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
-                    self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw(), "")
+                    self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
     def process_latest_state_info(self) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
@@ -71,7 +71,7 @@ class EKFManager:
             # TODO: update pozyx position value with EKF result?
             # self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             print("SAVING TO CSV:")
-            self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1], "")
+            self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
 
             # pas des uwb messages
             #avg clock offset: il faut que dans la phase de syncro on envoie des messages
@@ -129,8 +129,9 @@ class EKFManager:
                          self.ekf.get_yaw(), self.correct_yaw(yaw),
                          linalg.det(self.ekf.P), self.pozyx_id])
     
-    def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float, matrix) -> None:
+    def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
         print("SAVING TO CSV FUNCTION:")
+        print(self.efk.P)
         if coordinates is not None:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
@@ -140,7 +141,7 @@ class EKFManager:
                 'efk_posx': self.ekf.get_position().x, 
                 'efk_posy': self.ekf.get_position().y, 
                 'efk_yaw': self.ekf.get_yaw(), 
-                'ekf_covar_matrix': matrix,
+                'ekf_covar_matrix': self.efk.P,
                 'two_hop_neighbors': ""
             }
 
