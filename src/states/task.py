@@ -123,13 +123,16 @@ class Task(TDMAState):
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""
 
+        self.anchors.available_anchors.clear()
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
         self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
+        print(f"Discovered anchors: {self.anchors.available_anchors}")
 
         if len(self.anchors.available_anchors) < 3:
             self.discover(POZYX_DISCOVERY_TAGS_ONLY)
+            print(f"Tags discovered: {self.anchors.available_anchors}")
 
     def discover(self, discovery_type: int) -> None:
         PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, discovery_type)
@@ -145,8 +148,8 @@ class Task(TDMAState):
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
 
-        with self.pozyx_lock:
-            self.pozyx.clearDevices()
+        # with self.pozyx_lock:
+        #     self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
             if anchor_id in self.anchors.anchors_dict:

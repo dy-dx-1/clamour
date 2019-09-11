@@ -9,7 +9,7 @@ class InvalidMessageTypeException(Exception):
 class MessageFactory:
     @staticmethod
     def create(sender_id: int, message_data: int=0) -> UWBMessage:
-        type_bit_mask = 0b10000000000000000000000000000000
+        type_bit_mask = 0x80000000
         message_type = (message_data & type_bit_mask) >> 31
 
         if message_type == MessageType.SYNC:

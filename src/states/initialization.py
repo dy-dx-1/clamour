@@ -1,3 +1,4 @@
+import random
 from multiprocessing import Lock
 from pypozyx import PozyxSerial, Data
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
@@ -24,8 +25,8 @@ class Initialization(TDMAState):
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
     def execute(self) -> State:
+        sleep(abs(random.gauss(0.02, 0.05)))
         self.discover_neighbors()
-        # self.clear_pozyx_buffer()
         return self.next()
 
     def next(self) -> State:

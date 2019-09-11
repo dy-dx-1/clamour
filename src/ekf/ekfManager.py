@@ -1,4 +1,6 @@
 import math
+import os.path
+import csv
 from numpy import linalg
 from pypozyx import Coordinates
 from time import time
@@ -8,7 +10,6 @@ from contextManagedQueue import ContextManagedQueue
 from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from rooms import Floorplan
-
 
 class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
@@ -20,10 +21,17 @@ class EKFManager:
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['Arena']
 
+        filepath = '/dev/csv/broadcast_state.csv'
+        isnewfile = os.path.exists(filepath)
+        fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'ekf_posx', 'ekf_posy', 'ekf_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
+        self.state_csv = open(filepath, 'a')
+        self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
+        if isnewfile:
+            self.writer.writeheader()
+
     def run(self) -> None:
         with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
             self.initialize_ekf(socket)
-
             while True:
                 self.process_latest_state_info(socket)
 
@@ -39,6 +47,7 @@ class EKFManager:
                                                   self.correct_yaw(message.measured_yaw), message.timestamp)
 
                     self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
@@ -56,6 +65,8 @@ class EKFManager:
             print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
             # TODO: update pozyx position value with EKF result?
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
+            self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
+
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
@@ -106,3 +117,20 @@ class EKFManager:
                          self.ekf.get_position().y, coordinates.y,
                          self.ekf.get_yaw(), self.correct_yaw(yaw),
                          linalg.det(self.ekf.P), self.pozyx_id])
+    
+    def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
+        if coordinates is not None:
+            csv_data = {
+                'pozyx_id': self.pozyx_id,
+                'timestamp': timestamp,
+                'coords_posx': coordinates.x,
+                'coords_posy': coordinates.y,
+                'ekf_posx': self.ekf.get_position().x, 
+                'ekf_posy': self.ekf.get_position().y, 
+                'ekf_yaw': self.ekf.get_yaw(), 
+                'ekf_covar_matrix': self.ekf.P,
+                'two_hop_neighbors': ""
+            }
+
+            self.writer.writerow(csv_data)
+            self.state_csv.flush()

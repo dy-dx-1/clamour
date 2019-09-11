@@ -1,5 +1,6 @@
 from numpy import mean
-from time import time
+from ctypes import c_int32 as int32
+from time import time, perf_counter
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
@@ -24,6 +25,7 @@ class Synchronization(TDMAState):
         self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
         self.nb_cycles_neighbors_synced = 0
+        self.has_done_first_correction = False
 
     def execute(self) -> State:
         if self.first_exec_time is None:
@@ -49,7 +51,7 @@ class Synchronization(TDMAState):
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
             self.prepare_next_state()
-            print("Entering scheduling...")
+            print(f"Entering scheduling at {self.timing.current_time_in_cycle} in cycle; Perf: ({perf_counter()})")
 
         return next_state
 
@@ -68,7 +70,7 @@ class Synchronization(TDMAState):
 
     def broadcast_synchronization_message(self) -> None:
         self.timing.logical_clock.update_clock()
-        t = int(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
+        t = int32(round(self.timing.logical_clock.clock * TRANSMISSION_SCALING))
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self) -> None:
@@ -94,17 +96,20 @@ class Synchronization(TDMAState):
         self.slot_assignment.reset()
         self.timing.clear_synchronization_info()
         self.messenger.message_box.clear()
-        self.messenger.received_synced_messages.clear()
+        self.messenger.received_messages.clear()
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage) -> None:
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
                                           neib_logical=(message.synchronized_clock / TRANSMISSION_SCALING))
         sync_msg.offset += COMMUNICATION_DELAY
 
-        if abs(sync_msg.offset) > JUMP_THRESHOLD:
-            self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
+        if self.has_done_first_correction:
+            if abs(sync_msg.offset) > JUMP_THRESHOLD:
+                self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
+            else:
+                self.collaborative_offset_compensation(sync_msg)
         else:
-            self.collaborative_offset_compensation(sync_msg)
+            self.has_done_first_correction = True
 
     def collaborative_offset_compensation(self, message: SynchronizationMessage) -> None:
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
