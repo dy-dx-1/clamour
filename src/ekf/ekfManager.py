@@ -23,7 +23,7 @@ class EKFManager:
 
         filepath = '/dev/csv/broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
-        fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'efk_posx', 'efk_posy', 'efk_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
+        fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'ekf_posx', 'ekf_posy', 'ekf_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
         self.state_csv = open(filepath, 'a')
         self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
         if isnewfile:
@@ -131,17 +131,17 @@ class EKFManager:
     
     def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
         print("SAVING TO CSV FUNCTION:")
-        print(self.efk.P)
         if coordinates is not None:
+            print(self.ekf.P)
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
                 'coords_posx': coordinates.x,
                 'coords_posy': coordinates.y,
-                'efk_posx': self.ekf.get_position().x, 
-                'efk_posy': self.ekf.get_position().y, 
-                'efk_yaw': self.ekf.get_yaw(), 
-                'ekf_covar_matrix': self.efk.P,
+                'ekf_posx': self.ekf.get_position().x, 
+                'ekf_posy': self.ekf.get_position().y, 
+                'ekf_yaw': self.ekf.get_yaw(), 
+                'ekf_covar_matrix': self.ekf.P,
                 'two_hop_neighbors': ""
             }
 
