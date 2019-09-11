@@ -193,7 +193,7 @@ class Messenger:
                 self.update_synced_neighbors(new_message)
 
     def update_synced_neighbors(self, message: UWBSynchronizationMessage) -> None:
-        if message.synchronization_ok:
+        if message.synchronized:
             self.neighborhood.add_synced_neighbor(message.sender_id)
         else:
             self.neighborhood.remove_synced_neighbor(message.sender_id)
