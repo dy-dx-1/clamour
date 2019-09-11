@@ -67,6 +67,7 @@ class EKFManager:
             print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
             # TODO: update pozyx position value with EKF result?
             # self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
+            print("SAVING TO CSV:")
             save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1], "")
 
             # pas des uwb messages
@@ -126,6 +127,7 @@ class EKFManager:
                          linalg.det(self.ekf.P), self.pozyx_id])
     
     def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float, matrix) -> None:
+        print("SAVING TO CSV FUNCTION:")
         if coordinates is not None:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
@@ -141,3 +143,5 @@ class EKFManager:
 
             writer.writerow(csv_data)
             self.state_csv.flush()
+        else:
+            print('Coordinates are none')
