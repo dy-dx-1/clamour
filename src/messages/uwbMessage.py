@@ -1,5 +1,5 @@
 from .types import MessageType
-from numpy import int32
+from ctypes import c_int32 as int32
 
 
 class InvalidValueException(Exception):
