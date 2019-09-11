@@ -148,8 +148,8 @@ class Task(TDMAState):
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
 
-        with self.pozyx_lock:
-            self.pozyx.clearDevices()
+        # with self.pozyx_lock:
+        #     self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
             if anchor_id in self.anchors.anchors_dict:
