@@ -24,6 +24,7 @@ class Synchronization(TDMAState):
         self.start_t = time()
         self.first_exec_time = None  # Execution time in milliseconds
         self.nb_cycles_neighbors_synced = 0
+        self.has_done_first_correction = False
 
     def execute(self) -> State:
         if self.first_exec_time is None:
@@ -101,10 +102,14 @@ class Synchronization(TDMAState):
                                           neib_logical=(message.synchronized_clock / TRANSMISSION_SCALING))
         sync_msg.offset += COMMUNICATION_DELAY
 
-        if abs(sync_msg.offset) > JUMP_THRESHOLD:
-            self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
+        if not self.has_done_first_correction:
+            if abs(sync_msg.offset) > JUMP_THRESHOLD:
+                self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
+            else:
+                self.collaborative_offset_compensation(sync_msg)
         else:
-            self.collaborative_offset_compensation(sync_msg)
+            print(f"Offset of skipped correction: {sync_msg.offset}")
+            self.has_done_first_correction = True
 
     def collaborative_offset_compensation(self, message: SynchronizationMessage) -> None:
         self.neighborhood.neighbor_synchronization_received[message.sender_id] = message
