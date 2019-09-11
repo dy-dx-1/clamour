@@ -36,6 +36,8 @@ class EKFManager:
 
         while True:
             # process_queue.update
+            message = UpdateMessage(UpdateType.RANGING, time(), 0.5, Coordinates(1,2), ['2','2'])
+            self.multiprocess_communication_queue.put(UpdateMessage.save(message))
             self.process_latest_state_info()
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
@@ -49,7 +51,8 @@ class EKFManager:
                     self.ekf.trilateration_update(message.measured_xyz,
                                                   self.correct_yaw(message.measured_yaw), message.timestamp)
 
-                    self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    #self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw(), "")
 
     def process_latest_state_info(self) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
@@ -68,7 +71,7 @@ class EKFManager:
             # TODO: update pozyx position value with EKF result?
             # self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             print("SAVING TO CSV:")
-            save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1], "")
+            self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1], "")
 
             # pas des uwb messages
             #avg clock offset: il faut que dans la phase de syncro on envoie des messages
