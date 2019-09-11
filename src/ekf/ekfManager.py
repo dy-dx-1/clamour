@@ -22,7 +22,7 @@ class EKFManager:
         self.current_room = self.floorplan.rooms['Arena']
 
         filepath = '/dev/csv/broadcast_state.csv'
-        isnewfile = os.path.exists(filepath))
+        isnewfile = os.path.exists(filepath)
         fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'efk_posx', 'efk_posy', 'efk_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
         self.state_csv = open(filepath, 'a')
         self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
