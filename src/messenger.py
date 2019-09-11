@@ -32,7 +32,6 @@ class Messenger:
 
     def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
-        print(f"Sending message. Is it synced? {message.synchronized}")
         message.synchronized_clock = time
         message.encode()
 
@@ -83,7 +82,6 @@ class Messenger:
 
     def receive_message(self) -> None:
         if self.receive_new_message():
-            print("Received message from ", self.message_box.peek_last().sender_id, " : ", type(self.message_box.peek_last()))
             self.update_neighbor_dictionary()
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())

@@ -23,9 +23,13 @@ class Neighborhood:
         self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
 
     def add_synced_neighbor(self, device_id: int) -> None:
+        if device_id not in self.synced_neighbors:
+            print(f"Adding {device_id} to synced neibs")
         self.synced_neighbors.add(device_id)
 
     def remove_synced_neighbor(self, device_id: int) -> None:
+        if device_id in self.synced_neighbors:
+            print(f"Removing {device_id} from synced neibs")
         self.synced_neighbors.discard(device_id)
 
     def are_neighbors_synced(self) -> bool:
