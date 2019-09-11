@@ -67,7 +67,7 @@ class EKFManager:
             print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
             # TODO: update pozyx position value with EKF result?
             # self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
-            save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
+            save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1], "")
 
             # pas des uwb messages
             #avg clock offset: il faut que dans la phase de syncro on envoie des messages
@@ -135,7 +135,7 @@ class EKFManager:
                 'efk_posx': self.ekf.get_position().x, 
                 'efk_posy': self.ekf.get_position().y, 
                 'efk_yaw': self.ekf.get_yaw(), 
-                'ekf_covar_matrix': matrix
+                'ekf_covar_matrix': matrix,
                 'two_hop_neighbors': ""
             }
 
