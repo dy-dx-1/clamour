@@ -1,7 +1,7 @@
 - name: "Pulling latest code version"
   git:
     repo: git@github.com:MISTLab/clamour.git
-    version: test-phase
+    version: state-csv
     dest: /home/pi/clamour
 
 - name: "Logging into Dockerhub"

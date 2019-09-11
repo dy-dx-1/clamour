@@ -23,19 +23,20 @@ class EKFManager:
 
         filepath = '/dev/csv/broadcast_state.csv'
         isnewfile = os.path.exists(filepath))
-        fieldnames = ['elapsed_time', 'efk_posx', 'coords_x', 'efk_posy', 'coords_y', 'efk_yaw', 'poszyx_id']
+        fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'efk_posx', 'efk_posy', 'efk_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
         self.state_csv = open(filepath, 'a')
         self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
         if isnewfile:
             self.writer.writeheader()
-        
 
     def run(self) -> None:
-        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
-            self.initialize_ekf(socket)
+        # with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
+            # self.initialize_ekf(socket)
+        self.ekf = CustomEKF(Coordinates(), 0)
 
-            while True:
-                self.process_latest_state_info(socket)
+        while True:
+            # process_queue.update
+            self.process_latest_state_info()
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
@@ -50,7 +51,7 @@ class EKFManager:
 
                     self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
 
-    def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
+    def process_latest_state_info(self) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
                             UpdateType.TRILATERATION: self.ekf.trilateration_update,
                             UpdateType.RANGING: self.ekf.ranging_update,
@@ -65,7 +66,14 @@ class EKFManager:
             update_functions[message.update_type](*update_info)
             print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
             # TODO: update pozyx position value with EKF result?
-            self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
+            # self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
+            save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
+
+            # pas des uwb messages
+            #avg clock offset: il faut que dans la phase de syncro on envoie des messages
+            #envoyer des messages d'un format different (rien pr le moment)
+            #list of neighbors : nouveau type de message
+
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
 
@@ -116,15 +124,19 @@ class EKFManager:
                          self.ekf.get_position().y, coordinates.y,
                          self.ekf.get_yaw(), self.correct_yaw(yaw),
                          linalg.det(self.ekf.P), self.pozyx_id])
-
+    
+    def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float, matrix) -> None:
+        if coordinates is not None:
             csv_data = {
-                'elapsed_time': timestamp - self.start_time,
-                'efk_posx'  : self.ekf.get_position().x, 
-                'coords_x'  : coordinates.x, 
-                'efk_posy'  : self.ekf.get_position().y, 
-                'coords_y'  : coordinates.y,
-                'efk_yaw'   : self.ekf.get_yaw(), 
-                'poszyx_id' : self.pozyx_id
+                'pozyx_id': self.pozyx_id,
+                'timestamp': timestamp,
+                'coords_posx': coordinates.x,
+                'coords_posy': coordinates.y,
+                'efk_posx': self.ekf.get_position().x, 
+                'efk_posy': self.ekf.get_position().y, 
+                'efk_yaw': self.ekf.get_yaw(), 
+                'ekf_covar_matrix': matrix
+                'two_hop_neighbors': ""
             }
 
             writer.writerow(csv_data)
