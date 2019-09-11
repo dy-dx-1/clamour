@@ -144,7 +144,7 @@ class EKFManager:
                 'two_hop_neighbors': ""
             }
 
-            writer.writerow(csv_data)
+            self.writer.writerow(csv_data)
             self.state_csv.flush()
         else:
             print('Coordinates are none')
