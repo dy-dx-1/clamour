@@ -102,7 +102,7 @@ class Synchronization(TDMAState):
                                           neib_logical=(message.synchronized_clock / TRANSMISSION_SCALING))
         sync_msg.offset += COMMUNICATION_DELAY
 
-        if not self.has_done_first_correction:
+        if self.has_done_first_correction:
             if abs(sync_msg.offset) > JUMP_THRESHOLD:
                 self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
             else:
