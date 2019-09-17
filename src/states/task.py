@@ -141,27 +141,47 @@ class Task(TDMAState):
             if device_id not in self.anchors.available_anchors:
                 self.anchors.available_anchors.append(device_id)
 
+    def get_coordinates(self, device_id: int) -> DeviceCoordinates:
+        device_coordinates = Coordinates()
+        self.pozyx.getCoordinates(device_coordinates, device_id)
+        return DeviceCoordinates(device_id, 0, device_coordinates)
+
     def set_manually_measured_anchors(self) -> None:
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
 
-        for anchor_id in self.anchors.available_anchors:
-            if anchor_id in self.anchors.anchors_dict:
-                # For this step, only the anchors (not the tags) must be selected to use their predefined position
-                with self.pozyx_lock:
-                    status = self.pozyx.configureAnchors([self.anchors.anchors_dict[anchor_id]])
-                    # status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
-                if status != POZYX_SUCCESS:
-                    self.handle_error("set_manually_measured_anchors (anchors)")
-            else:
-                device_coordinates = Coordinates()
-                with self.pozyx_lock:
-                    status_coord = self.pozyx.getCoordinates(device_coordinates)
-                    status_device = self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
-                if status_coord != POZYX_SUCCESS:
-                    self.handle_error("set_manually_measured_anchors (tags_coord)")
-                if status_device != POZYX_SUCCESS:
-                    self.handle_error("set_manually_measured_anchors (tags_device)")
+        anchors_to_configure = [self.anchors.anchors_dict[anchor_id] for anchor_id in self.anchors.available_anchors
+                                if anchor_id in self.anchors.available_anchors]
+        print("Anchors to configure:", anchors_to_configure)
+
+        if len(anchors_to_configure) < 3:
+            tags_to_configure = [self.get_coordinates(anchor_id) for anchor_id in self.anchors.available_anchors
+                                 if anchor_id not in self.anchors.available_anchors]
+
+            anchors_to_configure.append(tags_to_configure)
+
+            print("Tags to configure:", tags_to_configure)
+
+        with self.pozyx_lock:
+            self.pozyx.configureAnchors(anchors_to_configure)
+
+        # for anchor_id in self.anchors.available_anchors:
+        #     if anchor_id in self.anchors.anchors_dict:
+        #         # For this step, only the anchors (not the tags) must be selected to use their predefined position
+        #         with self.pozyx_lock:
+        #             status = self.pozyx.configureAnchors([self.anchors.anchors_dict[anchor_id]])
+        #             # status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+        #         if status != POZYX_SUCCESS:
+        #             self.handle_error("set_manually_measured_anchors (anchors)")
+        #     else:
+        #         device_coordinates = Coordinates()
+        #         with self.pozyx_lock:
+        #             status_coord = self.pozyx.getCoordinates(device_coordinates, anchor_id)
+        #             status_device = self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
+        #         if status_coord != POZYX_SUCCESS:
+        #             self.handle_error("set_manually_measured_anchors (tags_coord)")
+        #         if status_device != POZYX_SUCCESS:
+        #             self.handle_error("set_manually_measured_anchors (tags_device)")
 
         # if len(self.anchors.available_anchors) > 4:
         #     with self.pozyx_lock:
