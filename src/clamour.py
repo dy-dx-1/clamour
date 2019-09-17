@@ -34,7 +34,7 @@ def get_pozyx_id(pozyx) -> int:
 
 def main(argv):
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
-    debug = int(argv[0]) # TODO link with ekfManager self.debug
+    debug = int(argv[0])  # TODO link with ekfManager self.debug
     print("Starting everything, have a nice visit (", debug, ")")
 
     with ContextManagedQueue() as multiprocess_communication_queue:
