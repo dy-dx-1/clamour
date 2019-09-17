@@ -7,3 +7,4 @@ services:
     privileged: true
     volumes:
       - /dev/ttyACM0:/dev/ttyACM0
+      - /dev/csv:/dev/csv
