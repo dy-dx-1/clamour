@@ -52,7 +52,7 @@ class TDMANode:
             self.wait(start_time)
 
             # if int(1 / (time() - start_time)) < 59.0:
-            #     print(f"WARNING: --- {int(1 / (time() - start_time))} Hz ---")
+            #     print("WARNING: ---:", int(1 / (time() - start_time)), "Hz ---")
 
     @staticmethod
     def wait(start_time: float):

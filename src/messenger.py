@@ -170,7 +170,7 @@ class Messenger:
                 status = self.pozyx.readRXBufferData(data)
         except struct.error as e:
             status = POZYX_FAILURE
-            print(f"Error while reading from tag: {e}")
+            print("Error while reading from tag:", str(e))
 
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
