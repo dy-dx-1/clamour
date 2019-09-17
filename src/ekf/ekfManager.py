@@ -15,7 +15,7 @@ class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
         self.pozyx_id = pozyx_id
         self.ekf = None
-        self.debug = 0 # TODO connect to main argv
+        self.debug = 0  # TODO connect to main argv
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.communication_queue = communication_queue
@@ -25,7 +25,7 @@ class EKFManager:
         filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
         fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'ekf_posx', 'ekf_posy', 'ekf_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
-        self.state_csv = open(filepath, 'a')
+        self.state_csv = open(filepath, 'w')
         self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
         if isnewfile:
             self.writer.writeheader()
