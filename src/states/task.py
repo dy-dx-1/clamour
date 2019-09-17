@@ -142,20 +142,15 @@ class Task(TDMAState):
                 self.anchors.available_anchors.append(device_id)
 
     def set_manually_measured_anchors(self) -> None:
-        # TODO: Revise this function, which may be causing bugs. Instead of clearDevices() and addDevice(),
-        #  maybe use removeDevice() and configureAnchors()
         """If a discovered anchor's coordinates are known (i.e. were manually measured),
         they will be added to the pozyx."""
-
-        # with self.pozyx_lock:
-        #     self.pozyx.clearDevices()
 
         for anchor_id in self.anchors.available_anchors:
             if anchor_id in self.anchors.anchors_dict:
                 # For this step, only the anchors (not the tags) must be selected to use their predefined position
                 with self.pozyx_lock:
-                    # TODO: Does this add properly if it is just the ID?
-                    status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
+                    status = self.pozyx.configureAnchors([self.anchors.anchors_dict[anchor_id]])
+                    # status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
                 if status != POZYX_SUCCESS:
                     self.handle_error("set_manually_measured_anchors (anchors)")
             else:
@@ -168,9 +163,9 @@ class Task(TDMAState):
                 if status_device != POZYX_SUCCESS:
                     self.handle_error("set_manually_measured_anchors (tags_device)")
 
-        if len(self.anchors.available_anchors) > 4:
-            with self.pozyx_lock:
-                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+        # if len(self.anchors.available_anchors) > 4:
+        #     with self.pozyx_lock:
+        #         self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
