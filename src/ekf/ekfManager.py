@@ -53,6 +53,8 @@ class EKFManager:
 
                     self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
                     self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                else:
+                    print(message.update_type)
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
