@@ -15,13 +15,14 @@ class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
         self.pozyx_id = pozyx_id
         self.ekf = None
+        self.debug = 0 # TODO connect to main argv
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['Arena']
 
-        filepath = '/dev/csv/broadcast_state.csv'
+        filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
         fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'ekf_posx', 'ekf_posy', 'ekf_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
         self.state_csv = open(filepath, 'a')
@@ -30,7 +31,11 @@ class EKFManager:
             self.writer.writeheader()
 
     def run(self) -> None:
-        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
+        if self.debug:
+            remote_host="192.168.4.120"
+        else:
+            remote_host=None
+        with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
             self.initialize_ekf(socket)
             while True:
                 self.process_latest_state_info(socket)

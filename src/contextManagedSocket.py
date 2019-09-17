@@ -12,8 +12,9 @@ class ContextManagedSocket:
         self.port = port
 
     def __enter__(self):
-        self.socket.connect((self.remote_host, self.port))
-        print("Socket connected.")
+        if self.remote_host:
+            self.socket.connect((self.remote_host, self.port))
+            print("Socket connected.")
 
         return self
 
