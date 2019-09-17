@@ -1,5 +1,5 @@
 from multiprocessing import Lock
-from pypozyx import PozyxSerial, SingleRegister, DeviceList
+from pypozyx import PozyxSerial, SingleRegister, DeviceList, UWBSettings
 from pypozyx.definitions.constants import POZYX_SUCCESS
 
 

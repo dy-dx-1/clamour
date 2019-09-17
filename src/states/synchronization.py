@@ -51,7 +51,7 @@ class Synchronization(TDMAState):
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
             self.prepare_next_state()
-            print(f"Entering scheduling at {self.timing.current_time_in_cycle} in cycle; Perf: ({perf_counter()})")
+            print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle; Perf:", perf_counter())
 
         return next_state
 
