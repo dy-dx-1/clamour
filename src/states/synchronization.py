@@ -33,6 +33,7 @@ class Synchronization(TDMAState):
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
+        print("Offset: ", self.timing.synchronization_offset_mean)
 
         self.synchronize()
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
