@@ -26,16 +26,16 @@ class Listen(TDMAState):
 
     def next(self) -> State:
         if ((self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET)
-                and (self.timing.current_time_in_cycle > TASK_START_TIME)) \
-                or self.neighborhood.is_alone_in_state(State.LISTEN):
+                and (self.timing.current_time_in_cycle > TASK_START_TIME)):
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
                 return State.TASK
             else:
                 return State.LISTEN
         else:
+            print("TIME:", self.timing.current_time_in_cycle)
             return State.SYNCHRONIZATION
 
-    "TODO: This is weird, why tf do I need it? Maybe message popping causes bug. Could be replaced by sleep."
+    # TODO: Put back UWB position message
     def listen_for_messages(self):
         if self.messenger.receive_new_message():
             self.messenger.update_neighbor_dictionary(State.LISTEN)
