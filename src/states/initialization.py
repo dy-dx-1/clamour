@@ -42,9 +42,8 @@ class Initialization(TDMAState):
 
     def discover_neighbors(self):
         self.clear_known_devices()
+        devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, POZYX_DISCOVERY_TAGS_ONLY)
 
-        PozyxDiscoverer.discover(self.pozyx, self.pozyx_lock, POZYX_DISCOVERY_TAGS_ONLY)
-        devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock)
         print("Tags discovered: ", devices.data)
 
         self.messenger.update_neighbor_dictionary(devices)

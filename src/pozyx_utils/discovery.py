@@ -1,5 +1,5 @@
 from multiprocessing import Lock
-from pypozyx import PozyxSerial, SingleRegister, DeviceList, UWBSettings
+from pypozyx import PozyxSerial, SingleRegister, DeviceList
 from pypozyx.definitions.constants import POZYX_SUCCESS
 
 
@@ -25,7 +25,8 @@ class PozyxDiscoverer:
         return status, size[0]
 
     @staticmethod
-    def get_device_list(pozyx: PozyxSerial, pozyx_lock: Lock) -> DeviceList:
+    def get_device_list(pozyx: PozyxSerial, pozyx_lock: Lock, discovery_type: int) -> DeviceList:
+        PozyxDiscoverer.discover(pozyx, pozyx_lock, discovery_type)
         status, size = PozyxDiscoverer.get_nb_devices(pozyx, pozyx_lock)
         devices = DeviceList(list_size=size)
 

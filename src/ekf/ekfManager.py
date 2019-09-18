@@ -11,11 +11,12 @@ from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from rooms import Floorplan
 
+
 class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
         self.pozyx_id = pozyx_id
         self.ekf = None
-        self.debug = 0 # TODO connect to main argv
+        self.debug = 0  # TODO connect to main argv
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.communication_queue = communication_queue
@@ -24,17 +25,16 @@ class EKFManager:
 
         filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
-        fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'ekf_posx', 'ekf_posy', 'ekf_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
-        self.state_csv = open(filepath, 'a')
+        fieldnames = ['pozyx_id', 'timestamp', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'raw_yaw',
+                      'ekf_yaw', 'ekf_covariance_matrix', 'two_hop_neighbors']
+        self.state_csv = open(filepath, 'w')
         self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
         if isnewfile:
             self.writer.writeheader()
 
     def run(self) -> None:
-        if self.debug:
-            remote_host="192.168.4.120"
-        else:
-            remote_host=None
+        remote_host = "192.168.4.120" if self.debug else None
+
         with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
             self.initialize_ekf(socket)
             while True:
@@ -53,6 +53,8 @@ class EKFManager:
 
                     self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
                     self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                else:
+                    print(message.update_type)
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
@@ -67,8 +69,7 @@ class EKFManager:
                 update_info = self.generate_zero_update_info(update_info[2])
                 message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
-            print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
-            # TODO: update pozyx position value with EKF result?
+
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
 
@@ -115,8 +116,7 @@ class EKFManager:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
     def broadcast_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        # TODO: Find source of None coordinates
-        if coordinates is not None:
+        if self.debug and coordinates is not None:
             socket.send([timestamp - self.start_time,
                          self.ekf.get_position().x, coordinates.x,
                          self.ekf.get_position().y, coordinates.y,
@@ -128,12 +128,13 @@ class EKFManager:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
-                'coords_posx': coordinates.x,
-                'coords_posy': coordinates.y,
-                'ekf_posx': self.ekf.get_position().x, 
-                'ekf_posy': self.ekf.get_position().y, 
+                'coords_pos_x': coordinates.x,
+                'ekf_pos_x': self.ekf.get_position().x,
+                'coords_pos_y': coordinates.y,
+                'ekf_pos_y': self.ekf.get_position().y,
+                'raw_yaw': yaw,
                 'ekf_yaw': self.ekf.get_yaw(), 
-                'ekf_covar_matrix': self.ekf.P,
+                'ekf_covariance_matrix': linalg.det(self.ekf.P),
                 'two_hop_neighbors': ""
             }
 

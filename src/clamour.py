@@ -34,7 +34,7 @@ def get_pozyx_id(pozyx) -> int:
 
 def main(argv):
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
-    debug = int(argv[0]) # TODO link with ekfManager self.debug
+    debug = int(argv[0])  # TODO link with ekfManager self.debug
     print("Starting everything, have a nice visit (", debug, ")")
 
     with ContextManagedQueue() as multiprocess_communication_queue:
@@ -44,13 +44,14 @@ def main(argv):
 
         ekf_manager = EKFManager(multiprocess_communication_queue, pozyx_id)
         pedometer = Pedometer(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock)
+        tdma_node = TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
 
         with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
             ekf_manager_process.start()
-            with ContextManagedProcess(target=pedometer.run) as pedometer_process:
-                pedometer_process.start()
-                with TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id) as node:
-                    node.run()
+            with ContextManagedProcess(target=tdma_node.run) as tdma_process:
+                tdma_process.start()
+                with ContextManagedProcess(target=pedometer.run) as pedometer_process:
+                    pedometer_process.start()
 
 
 if __name__ == "__main__":
