@@ -27,7 +27,7 @@ class Listen(TDMAState):
     def next(self) -> State:
         if ((self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET)
                 and (self.timing.current_time_in_cycle > TASK_START_TIME)) \
-                or self.neighborhood.is_alone():
+                or self.neighborhood.is_alone_in_state(State.LISTEN):
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
                 return State.TASK
             else:

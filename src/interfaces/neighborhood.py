@@ -25,8 +25,8 @@ class Neighborhood:
         for id in [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - delay]:
             del self.current_neighbors[id]
 
-    def is_alone(self) -> bool:
-        return len(self.current_neighbors) == 0
+    def is_alone_in_state(self, state: State) -> bool:
+        return len([neighbor for neighbor in self.current_neighbors.values() if neighbor[2] == state]) == 0
 
     def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float, state: int) -> None:
         self.current_neighbors[device_id] = (second_degree_neighbors, timestamp, state)

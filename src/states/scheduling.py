@@ -22,7 +22,7 @@ class Scheduling(TDMAState):
         self.messenger.clear_non_scheduling_messages()
         self.slot_assignment.update_free_slots()
 
-        if self.neighborhood.is_alone():
+        if self.neighborhood.is_alone_in_state(State.SCHEDULING):
             self.alone_slot_assignment()
         else:
             self.community_slot_assignment()
@@ -30,7 +30,7 @@ class Scheduling(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        if self.neighborhood.is_alone() or self.timing.current_time_in_cycle > TASK_START_TIME:
+        if self.neighborhood.is_alone_in_state(State.SCHEDULING) or self.timing.current_time_in_cycle > TASK_START_TIME:
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send List: ", self.slot_assignment.pure_send_list)
             print("Entering listen state...")
