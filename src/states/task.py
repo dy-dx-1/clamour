@@ -106,8 +106,6 @@ class Task(TDMAState):
         """We select a target for doing a range measurement.
         Anchors are prioritized because of their lower uncertainty."""
 
-        print("Available devices (tags, anchors):", self.anchors.available_tags, self.anchors.available_anchors)
-
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
         elif len(self.anchors.available_tags) > 0:
@@ -133,9 +131,7 @@ class Task(TDMAState):
             self.anchors.available_anchors = anchors
         else:
             self.anchors.available_tags = [device for device in self.anchors.available_anchors]
-            print("1:", self.anchors.available_tags)
             self.anchors.available_anchors.clear()
-            print("2:", self.anchors.available_tags)
 
     @staticmethod
     def is_anchor(device_id: int) -> bool:
