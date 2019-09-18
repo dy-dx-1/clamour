@@ -1,7 +1,17 @@
+from enum import Enum
 from time import perf_counter
 
 
 OBSOLESCENCE_DELAY = 5  # nb of seconds beyond which a neighbor becomes irrelevant
+
+
+# TODO: import properly
+class State(Enum):
+    INITIALIZATION = 0
+    SYNCHRONIZATION = 1
+    SCHEDULING = 2
+    TASK = 3
+    LISTEN = 4
 
 
 class Neighborhood:
@@ -18,8 +28,8 @@ class Neighborhood:
     def is_alone(self) -> bool:
         return len(self.current_neighbors) == 0
 
-    def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float) -> None:
-        self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
+    def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float, state: int) -> None:
+        self.current_neighbors[device_id] = (second_degree_neighbors, timestamp, state)
 
     def add_synced_neighbor(self, device_id: int) -> None:
         if device_id not in self.synced_neighbors:

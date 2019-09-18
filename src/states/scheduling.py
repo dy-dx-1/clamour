@@ -42,7 +42,7 @@ class Scheduling(TDMAState):
         if self.is_broadcast_slot():
             self.messenger.broadcast_control_message()
         else:
-            self.messenger.receive_message()
+            self.messenger.receive_message(State.SCHEDULING)
 
         self.slot_assignment.update_free_slots()
         self.update_pure_send_list()

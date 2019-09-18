@@ -6,7 +6,7 @@ from time import perf_counter, time
 from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS, POZYX_FAILURE
 
 from contextManagedQueue import ContextManagedQueue
-from interfaces import Neighborhood, SlotAssignment
+from interfaces import Neighborhood, SlotAssignment, State
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
                       UWBSynchronizationMessage, UWBTDMAMessage,
@@ -79,9 +79,9 @@ class Messenger:
         with self.pozyx_lock:
             self.pozyx.sendData(0, Data([message.data], 'i'))
 
-    def receive_message(self) -> None:
+    def receive_message(self, state: State) -> None:
         if self.receive_new_message():
-            self.update_neighbor_dictionary()
+            self.update_neighbor_dictionary(state)
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())
 
@@ -177,14 +177,14 @@ class Messenger:
 
         return info[0], data[0], status
 
-    def update_neighbor_dictionary(self, device_list: list = None) -> None:
+    def update_neighbor_dictionary(self, state: State, device_list: list = None) -> None:
         if device_list is not None:
             for device in device_list:
-                self.neighborhood.add_neighbor(device, [], perf_counter())
+                self.neighborhood.add_neighbor(device, [], perf_counter(), state)
         else:
             new_message = self.message_box.peek_last()
             new_message.decode()
-            self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter())
+            self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter(), state)
 
             if isinstance(new_message, UWBSynchronizationMessage):
                 self.update_synced_neighbors(new_message)

@@ -46,7 +46,7 @@ class Initialization(TDMAState):
 
         print("Tags discovered: ", devices.data)
 
-        self.messenger.update_neighbor_dictionary(devices)
+        self.messenger.update_neighbor_dictionary(State.INITIALIZATION, devices)
 
     def clear_known_devices(self):
         with self.pozyx_lock:

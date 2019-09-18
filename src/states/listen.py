@@ -38,5 +38,5 @@ class Listen(TDMAState):
     "TODO: This is weird, why tf do I need it? Maybe message popping causes bug. Could be replaced by sleep."
     def listen_for_messages(self):
         if self.messenger.receive_new_message():
-            self.messenger.update_neighbor_dictionary()
+            self.messenger.update_neighbor_dictionary(State.LISTEN)
             message = self.messenger.message_box.pop()
