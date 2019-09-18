@@ -165,28 +165,6 @@ class Task(TDMAState):
         with self.pozyx_lock:
             self.pozyx.configureAnchors(anchors_to_configure)
 
-        # for anchor_id in self.anchors.available_anchors:
-        #     if anchor_id in self.anchors.anchors_dict:
-        #         # For this step, only the anchors (not the tags) must be selected to use their predefined position
-        #         with self.pozyx_lock:
-        #             status = self.pozyx.configureAnchors([self.anchors.anchors_dict[anchor_id]])
-        #             # status = self.pozyx.addDevice(self.anchors.anchors_dict[anchor_id])
-        #         if status != POZYX_SUCCESS:
-        #             self.handle_error("set_manually_measured_anchors (anchors)")
-        #     else:
-        #         device_coordinates = Coordinates()
-        #         with self.pozyx_lock:
-        #             status_coord = self.pozyx.getCoordinates(device_coordinates, anchor_id)
-        #             status_device = self.pozyx.addDevice(DeviceCoordinates(anchor_id, 1, device_coordinates))
-        #         if status_coord != POZYX_SUCCESS:
-        #             self.handle_error("set_manually_measured_anchors (tags_coord)")
-        #         if status_device != POZYX_SUCCESS:
-        #             self.handle_error("set_manually_measured_anchors (tags_device)")
-
-        # if len(self.anchors.available_anchors) > 4:
-        #     with self.pozyx_lock:
-        #         self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
-
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
