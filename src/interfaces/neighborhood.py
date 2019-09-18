@@ -28,6 +28,10 @@ class Neighborhood:
     def is_alone_in_state(self, state: State) -> bool:
         if len(self.current_neighbors) == 0:
             print("No neighbors")
+
+        if state == -1:
+            return len(self.current_neighbors) == 0
+
         return len([neighbor for neighbor in self.current_neighbors.values() if neighbor[2] == state]) == 0
 
     def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float, state: int) -> None:
