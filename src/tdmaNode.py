@@ -35,15 +35,6 @@ class TDMANode:
 
         self.current_state = self.states[State.INITIALIZATION]
 
-    def __enter__(self):
-        print("Setting up TDMA node...")
-        return self
-
-    def __exit__(self, exception_type, exception_value, traceback):
-        print(exception_type, exception_value)
-        tb.print_tb(traceback, file=sys.stdout)
-        print("Finished with TDMA node.")
-
     def run(self) -> None:
         while True:
             start_time = time()
