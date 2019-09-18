@@ -62,7 +62,6 @@ class Task(TDMAState):
             self.handle_error("positioning (ranging)")
 
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
-            print("Sending measurement:", position)
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
 
     @staticmethod
@@ -81,7 +80,6 @@ class Task(TDMAState):
         device_range = DeviceRange()
         angles = EulerAngles()
 
-        print("Anchors/tags for ranging:", self.anchors.available_anchors)
         with self.pozyx_lock:
             status_pos = self.pozyx.doRanging(ranging_target_id, device_range) if ranging_target_id > 0 else POZYX_FAILURE
             status_angle = self.pozyx.getEulerAngles_deg(angles)
