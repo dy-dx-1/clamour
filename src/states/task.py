@@ -106,6 +106,8 @@ class Task(TDMAState):
         """We select a target for doing a range measurement.
         Anchors are prioritized because of their lower uncertainty."""
 
+        print("Available devices (tags, anchors):", self.anchors.available_tags, self.anchors.available_anchors)
+
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
         elif len(self.anchors.available_tags) > 0:
@@ -117,6 +119,8 @@ class Task(TDMAState):
         If there aren't enough anchors, will use tags as well."""
 
         self.anchors.available_anchors.clear()
+        self.anchors.available_tags.clear()
+
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
