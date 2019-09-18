@@ -64,6 +64,10 @@ class Synchronization(TDMAState):
     def next(self) -> State:
         current_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS)) - self.first_exec_time
 
+        print("Alone:", self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION), "left behind:",
+              self.is_left_behind(), "exec time:", current_exec_time > SYNCHRONIZATION_PERIOD,
+              "synced:", self.timing.synchronized, "neighbors synced:", self.neighborhood.are_neighbors_synced())
+
         if self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION) or self.is_left_behind() or \
                 (current_exec_time > SYNCHRONIZATION_PERIOD and (self.timing.synchronized or self.is_left_behind())
                  and self.neighborhood.are_neighbors_synced()):
