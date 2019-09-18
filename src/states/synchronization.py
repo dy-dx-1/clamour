@@ -47,6 +47,7 @@ class Synchronization(TDMAState):
             self.time_to_sleep = abs(random.gauss(RANDOM_DELAY_MEAN, RANDOM_DELAY_VARIANCE))
             self.start_t = time()
 
+        self.neighborhood.collect_garbage()
         next_state = self.next()
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
