@@ -71,7 +71,8 @@ class Synchronization(TDMAState):
 
         if self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION) or \
                 current_exec_time > SYNCHRONIZATION_PERIOD or \
-                ((self.timing.synchronized or self.is_left_behind()) and self.neighborhood.are_neighbors_synced()):
+                ((self.timing.synchronized or self.is_left_behind()) and
+                 (self.neighborhood.are_neighbors_synced() and current_exec_time > SYNCHRONIZATION_PERIOD / 3)):
             print("Going to scheduling from sync")
             return State.SCHEDULING
         else:
