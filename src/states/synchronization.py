@@ -1,6 +1,6 @@
 from numpy import mean
 from ctypes import c_int32 as int32
-from time import time, perf_counter
+from time import time, perf_counter, sleep
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
@@ -50,6 +50,11 @@ class Synchronization(TDMAState):
         next_state = self.next()
         if next_state == State.SCHEDULING:
             print("Offset: ", self.timing.synchronization_offset_mean)
+
+            for _ in range(10):
+                sleep(0.005)
+                self.broadcast_synchronization_message()
+
             self.prepare_next_state()
             print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle; Perf:", perf_counter())
 
