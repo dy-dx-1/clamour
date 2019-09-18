@@ -133,8 +133,9 @@ class Task(TDMAState):
             self.anchors.available_anchors = anchors
         else:
             self.anchors.available_tags = self.anchors.available_anchors
+            print("1:", self.anchors.available_tags)
             self.anchors.available_anchors.clear()
-
+            print("2:", self.anchors.available_tags)
 
     @staticmethod
     def is_anchor(device_id: int) -> bool:
