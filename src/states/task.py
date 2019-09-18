@@ -141,13 +141,9 @@ class Task(TDMAState):
             if device_id not in self.anchors.available_anchors:
                 self.anchors.available_anchors.append(device_id)
 
-    def get_coordinates(self, device_id: int) -> DeviceCoordinates:
-        device_coordinates = Coordinates()
-        self.pozyx.getCoordinates(device_coordinates, device_id)
-        return DeviceCoordinates(device_id, 0, device_coordinates)
-
     def set_manually_measured_anchors(self) -> None:
-        self.pozyx.clearDevices()
+        with self.pozyx_lock:
+            self.pozyx.clearDevices()
 
         for anchor in self.anchors.anchors_dict.values():
             with self.pozyx_lock:
