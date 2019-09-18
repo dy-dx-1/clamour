@@ -69,6 +69,9 @@ class Synchronization(TDMAState):
               self.is_left_behind(), "exec time:", current_exec_time > SYNCHRONIZATION_PERIOD,
               "synced:", self.timing.synchronized, "neighbors synced:", self.neighborhood.are_neighbors_synced())
 
+        if current_exec_time < SYNCHRONIZATION_PERIOD / 3 :
+            return State.SCHEDULING
+
         if self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION) or \
                 current_exec_time > SYNCHRONIZATION_PERIOD or \
                 ((self.timing.synchronized or self.is_left_behind()) and
