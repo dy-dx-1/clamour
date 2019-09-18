@@ -150,6 +150,7 @@ class Messenger:
         try:
             if sender_id != 0 and data != 0:
                 received_message = MessageFactory.create(sender_id, data)
+                print("RMSG type: ", type(received_message))
 
                 if received_message not in self.received_messages:
                     self.received_messages.add(received_message)
