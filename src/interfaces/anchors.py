@@ -19,7 +19,7 @@ class Anchors:
 
     @staticmethod
     def add_anchor(anchor_data: list) -> DeviceCoordinates:
-        label = hex(int(anchor_data[0], base=16))
+        label = int(anchor_data[0], base=16)
         x = int(anchor_data[1])
         y = int(anchor_data[2])
         z = int(anchor_data[3])
