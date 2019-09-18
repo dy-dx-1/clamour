@@ -63,12 +63,9 @@ class Task(TDMAState):
         if status_angle != POZYX_SUCCESS:
             self.handle_error("positioning (ranging)")
 
-        yaw = angles.heading
-
-        position = Coordinates(position.x, position.y, position.z)
-
         if status_pos == status_angle == POZYX_SUCCESS:
-            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, yaw)
+            print("Sending measurement:", position.x, position.y, position.z)
+            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
         
         return status_pos and status_angle
 
