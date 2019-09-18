@@ -132,7 +132,7 @@ class Task(TDMAState):
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
         else:
-            self.anchors.available_tags = self.anchors.available_anchors
+            self.anchors.available_tags = [device for device in self.anchors.available_anchors]
             print("1:", self.anchors.available_tags)
             self.anchors.available_anchors.clear()
             print("2:", self.anchors.available_tags)
