@@ -130,7 +130,7 @@ class EKFManager:
                 'timestamp': timestamp,
                 'coords_pos_x': coordinates.x,
                 'ekf_pos_x': self.ekf.get_position().x,
-                'coords_posy': coordinates.y,
+                'coords_pos_y': coordinates.y,
                 'ekf_pos_y': self.ekf.get_position().y,
                 'raw_yaw': yaw,
                 'ekf_yaw': self.ekf.get_yaw(), 
