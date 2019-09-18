@@ -42,7 +42,7 @@ def main(argv):
         shared_pozyx_lock = Lock()
         pozyx_id = get_pozyx_id(shared_pozyx)
 
-        ekf_manager = EKFManager(multiprocess_communication_queue, pozyx_id)
+        ekf_manager = EKFManager(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
         pedometer = Pedometer(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock)
         tdma_node = TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
 

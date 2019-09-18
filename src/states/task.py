@@ -105,8 +105,8 @@ class Task(TDMAState):
 
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
-        elif len(self.neighborhood.current_neighbors) > 0:
-            return random.choice(list(self.neighborhood.current_neighbors))
+        elif len(self.anchors.available_tags) > 0:
+            return random.choice(self.anchors.available_tags)
         else:
             return -1
 
@@ -127,8 +127,11 @@ class Task(TDMAState):
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
             print("Filtered anchors:", self.anchors.available_anchors)
+        else:
+            self.anchors.available_tags = self.anchors.available_anchors
+            print("Filtered tags:", self.anchors.available_tags)
+            self.anchors.available_anchors.clear()
 
-        print("Filtered tags:", self.anchors.available_anchors)
 
     @staticmethod
     def is_anchor(device_id: int) -> bool:
