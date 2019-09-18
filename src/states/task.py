@@ -2,7 +2,7 @@ import random
 from multiprocessing import Lock
 
 from numpy import array, atleast_2d
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ANCHORS_ONLY, POZYX_DISCOVERY_TAGS_ONLY,
+from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceRange,
                      PozyxSerial, DeviceCoordinates, EulerAngles, SingleRegister)
 
@@ -119,12 +119,20 @@ class Task(TDMAState):
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
-        self.discover(POZYX_DISCOVERY_ANCHORS_ONLY)
-        print("Discovered anchors:", self.anchors.available_anchors)
+        self.discover(POZYX_DISCOVERY_ALL_DEVICES)
+        print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        if len(self.anchors.available_anchors) < 3:
-            self.discover(POZYX_DISCOVERY_TAGS_ONLY)
-            print("Tags discovered:", self.anchors.available_anchors)
+        anchors = [device for device in self.anchors.available_anchors if self.is_anchor(device)]
+
+        if len(anchors) >= 1:
+            self.anchors.available_anchors = anchors
+            print("Filtered anchors:", self.anchors.available_anchors)
+
+        print("Filtered tags:", self.anchors.available_anchors)
+
+    @staticmethod
+    def is_anchor(device_id: int) -> bool:
+        return device_id < 0x500
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
