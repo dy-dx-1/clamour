@@ -147,8 +147,9 @@ class Task(TDMAState):
         return DeviceCoordinates(device_id, 0, device_coordinates)
 
     def set_manually_measured_anchors(self) -> None:
+        print([anchor for anchor in self.anchors.anchors_dict.values()])
         with self.pozyx_lock:
-            self.pozyx.configureAnchors([anchor for _, anchor in self.anchors.anchors_dict])
+            self.pozyx.configureAnchors([anchor for anchor in self.anchors.anchors_dict.values()])
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
