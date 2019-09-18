@@ -25,7 +25,8 @@ class EKFManager:
 
         filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
-        fieldnames = ['pozyx_id', 'timestamp', 'coords_posx', 'coords_posy', 'ekf_posx', 'ekf_posy', 'ekf_yaw', 'ekf_covar_matrix', 'two_hop_neighbors']
+        fieldnames = ['pozyx_id', 'timestamp', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'raw_yaw',
+                      'ekf_yaw', 'ekf_covariance_matrix', 'two_hop_neighbors']
         self.state_csv = open(filepath, 'w')
         self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
         if isnewfile:
@@ -127,12 +128,13 @@ class EKFManager:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
-                'coords_posx': coordinates.x,
+                'coords_pos_x': coordinates.x,
+                'ekf_pos_x': self.ekf.get_position().x,
                 'coords_posy': coordinates.y,
-                'ekf_posx': self.ekf.get_position().x, 
-                'ekf_posy': self.ekf.get_position().y, 
+                'ekf_pos_y': self.ekf.get_position().y,
+                'raw_yaw': yaw,
                 'ekf_yaw': self.ekf.get_yaw(), 
-                'ekf_covar_matrix': linalg.det(self.ekf.P),
+                'ekf_covariance_matrix': linalg.det(self.ekf.P),
                 'two_hop_neighbors': ""
             }
 
