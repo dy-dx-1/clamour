@@ -17,7 +17,7 @@ class State(Enum):
 class Neighborhood:
     def __init__(self):
         self.current_neighbors = {}
-        self.synced_neighbors = set()
+        self.synced_neighbors = {}
         self.neighbor_synchronization_received = {}
         self.synchronized_active_neighbor_count = 0
 
@@ -39,14 +39,15 @@ class Neighborhood:
 
     def add_synced_neighbor(self, device_id: int) -> None:
         if device_id not in self.synced_neighbors:
-            print("Adding", device_id, "to synced neibs:", "self.synced_neighbors")
-        self.synced_neighbors.add(device_id)
+            self.synced_neighbors[device_id] = 1
+        else:
+            self.synced_neighbors[device_id] += 1
 
     def remove_synced_neighbor(self, device_id: int) -> None:
         if device_id in self.synced_neighbors:
-            print("Removing", device_id, "from synced neibs:", self.synced_neighbors)
-        self.synced_neighbors.discard(device_id)
-
+            self.synced_neighbors[device_id] = 0
+        
     def are_neighbors_synced(self) -> bool:
-        return all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
+        return all([key in self.synced_neighbors for key in self.current_neighbors.keys()]) \
+            and all([times_synced > 5 for times_synced in self.synced_neighbors.values()])
 
