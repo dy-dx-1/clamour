@@ -27,12 +27,12 @@ class Task(TDMAState):
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.messenger = messenger
+        self.set_manually_measured_anchors()
 
     def execute(self) -> State:
         self.discover_devices()
         self.neighborhood.collect_garbage()
         self.select_localization_method()
-        self.set_manually_measured_anchors()
         self.localize()
 
         return self.next()
@@ -147,23 +147,8 @@ class Task(TDMAState):
         return DeviceCoordinates(device_id, 0, device_coordinates)
 
     def set_manually_measured_anchors(self) -> None:
-        """If a discovered anchor's coordinates are known (i.e. were manually measured),
-        they will be added to the pozyx."""
-
-        anchors_to_configure = [self.anchors.anchors_dict[anchor_id] for anchor_id in self.anchors.available_anchors
-                                if anchor_id in self.anchors.available_anchors]
-        print("Anchors to configure:", anchors_to_configure)
-
-        if len(anchors_to_configure) < 3:
-            tags_to_configure = [self.get_coordinates(anchor_id) for anchor_id in self.anchors.available_anchors
-                                 if anchor_id not in self.anchors.available_anchors]
-
-            anchors_to_configure.append(tags_to_configure)
-
-            print("Tags to configure:", tags_to_configure)
-
         with self.pozyx_lock:
-            self.pozyx.configureAnchors(anchors_to_configure)
+            self.pozyx.configureAnchors([anchor for _, anchor in self.anchors.anchors_dict])
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
