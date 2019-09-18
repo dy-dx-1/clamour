@@ -1,7 +1,7 @@
 from time import perf_counter
 
 
-OBSOLESCENCE_DELAY = 20  # nb of seconds beyond which a neighbor becomes irrelevant
+OBSOLESCENCE_DELAY = 5  # nb of seconds beyond which a neighbor becomes irrelevant
 
 
 class Neighborhood:
