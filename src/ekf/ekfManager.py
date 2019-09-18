@@ -32,13 +32,8 @@ class EKFManager:
             self.writer.writeheader()
 
     def run(self) -> None:
-        remote_host = "192.168.4.120" if self.debug else None
-        print("Remote host:", remote_host)
-
-        with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
-            print("Initializing EKF")
+        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
             self.initialize_ekf(socket)
-            print("Initialized EKF")
             while True:
                 self.process_latest_state_info(socket)
 
@@ -71,8 +66,8 @@ class EKFManager:
                 update_info = self.generate_zero_update_info(update_info[2])
                 message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
-            print("[", message.timestamp, "] Updated position by ", message.update_type, ". New position: ")
-            # TODO: update pozyx position value with EKF result?
+            print("[", message.timestamp, "] Updated position by", message.update_type, ". New position: ")
+
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
 
@@ -119,8 +114,7 @@ class EKFManager:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
     def broadcast_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        # TODO: Find source of None coordinates
-        if coordinates is not None:
+        if self.debug and coordinates is not None:
             socket.send([timestamp - self.start_time,
                          self.ekf.get_position().x, coordinates.x,
                          self.ekf.get_position().y, coordinates.y,
