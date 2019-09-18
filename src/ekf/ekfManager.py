@@ -32,7 +32,9 @@ class EKFManager:
             self.writer.writeheader()
 
     def run(self) -> None:
-        with ContextManagedSocket(remote_host="192.168.4.120", port=10555) as socket:
+        remote_host = "192.168.4.120" if self.debug else None
+
+        with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
             self.initialize_ekf(socket)
             while True:
                 self.process_latest_state_info(socket)
