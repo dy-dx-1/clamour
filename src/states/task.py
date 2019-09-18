@@ -150,7 +150,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.addDevice(anchor)
             except:
-                print("AddDevice error ", anchor[0])
+                print(anchor)
 
         if len(self.anchors.anchors_dict) > 4:
             with self.pozyx_lock:

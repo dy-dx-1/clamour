@@ -22,7 +22,7 @@ class Scheduling(TDMAState):
         self.messenger.clear_non_scheduling_messages()
         self.slot_assignment.update_free_slots()
 
-        if self.neighborhood.is_alone_in_state(State.SCHEDULING):
+        if self.neighborhood.is_alone_in_state(-1):
             self.alone_slot_assignment()
         else:
             self.community_slot_assignment()
