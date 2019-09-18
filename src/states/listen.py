@@ -28,14 +28,10 @@ class Listen(TDMAState):
         if self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET:
             # and (self.timing.current_time_in_cycle > TASK_START_TIME)):
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
-                print("Going to task from listen")
                 return State.TASK
             else:
-                print("Going to listen from listen")
                 return State.LISTEN
         else:
-            print("Going to sync from listen")
-            print("TIME:", self.timing.current_time_in_cycle, "vs", FULL_CYCLE_DURATION - SLOT_FOR_RESET, TASK_START_TIME)
             return State.SYNCHRONIZATION
 
     # TODO: Put back UWB position message

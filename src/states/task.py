@@ -126,10 +126,8 @@ class Task(TDMAState):
 
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
-            print("Filtered anchors:", self.anchors.available_anchors)
         else:
             self.anchors.available_tags = self.anchors.available_anchors
-            print("Filtered tags:", self.anchors.available_tags)
             self.anchors.available_anchors.clear()
 
 
@@ -153,7 +151,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.addDevice(anchor)
             except:
-                print(anchor)
+                print(self.anchors.anchors_dict)
 
         if len(self.anchors.anchors_dict) > 4:
             with self.pozyx_lock:

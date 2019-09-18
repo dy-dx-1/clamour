@@ -24,6 +24,4 @@ class Anchors:
         y = int(anchor_data[2])
         z = int(anchor_data[3])
 
-        print("Adding anchor:", label, x, y, z)
-
         return DeviceCoordinates(label, 1, Coordinates(x, y, z))
