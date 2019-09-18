@@ -11,6 +11,7 @@ from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from rooms import Floorplan
 
+
 class EKFManager:
     def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
         self.pozyx_id = pozyx_id
