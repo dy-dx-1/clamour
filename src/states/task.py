@@ -1,5 +1,6 @@
 import random
 from multiprocessing import Lock
+from time import time
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
@@ -84,9 +85,11 @@ class Task(TDMAState):
             device_range = DeviceRange()
             angles = EulerAngles()
 
+            time_before_ranging = time()
             with self.pozyx_lock:
                 status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
+            print("Time for ranging: ", time() - time_before_ranging)
             
             if status_pos != POZYX_SUCCESS:
                 self.handle_error("ranging (pos)")
@@ -96,6 +99,7 @@ class Task(TDMAState):
             yaw = angles.heading
 
             measured_position = Coordinates(device_range.data[1], 0, 0)
+            print(measured_position)
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
