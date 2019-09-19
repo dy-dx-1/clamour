@@ -13,7 +13,7 @@ class RoomLoader:
 
     @staticmethod
     def create_room(room_data: list) -> Room:
-        label = room_data[0]
+        label = 24#room_data[0]
         x = int(room_data[5])
         y = int(room_data[6])
         x_lim = (int(room_data[3]), int(room_data[3]))
