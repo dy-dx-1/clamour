@@ -4,7 +4,7 @@ from multiprocessing import Lock
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister)
+                     PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -27,6 +27,7 @@ class Task(TDMAState):
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.messenger = messenger
+        self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
