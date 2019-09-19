@@ -84,7 +84,8 @@ class Task(TDMAState):
             angles = EulerAngles()
 
             with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
+                # status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
+                status_pos = POZYX_SUCCESS
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
             
             if status_pos != POZYX_SUCCESS:
