@@ -13,7 +13,7 @@ for r, d, f in os.walk("/home/david/chambord_flacs"):
             X = int(pos[0][1:])
             Y = int(pos[1][1:])
             Z = int(pos[2][1:])
-            files[file]=[X-15, X+15, Y-15, Y+15, Z-15, Z+15]
+            files[file]=[X, X+30, Y, Y+30, Z, Z+30]
 
 arr = np.array([files[key] for key in files])
 print(np.amax(arr, axis=0))

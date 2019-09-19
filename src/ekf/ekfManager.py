@@ -93,7 +93,7 @@ class EKFManager:
             with self.pozyx_lock:
                 self.pozyx.setCoordinates(self.ekf.get_position())
         except:
-            print(self.ekf.get_position())
+            print("Error set coordination on device: ", self.ekf.get_position())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
