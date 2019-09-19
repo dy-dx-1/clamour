@@ -46,8 +46,8 @@ class Task(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        self.update_frame_id()
-        self.update_slot_id()
+        self.timing.update_frame_id()
+        self.timing.update_slot_id()
         if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION +
                                                 (self.timing.current_slot_id) * TASK_SLOT_DURATION):
             return State.LISTEN
