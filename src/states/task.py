@@ -46,8 +46,6 @@ class Task(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        self.timing.update_frame_id()
-        self.timing.update_slot_id()
         if self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET:
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
                 return State.LISTEN
