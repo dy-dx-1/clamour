@@ -1,9 +1,8 @@
 import random
-import struct
 from multiprocessing import Lock
 from time import perf_counter, time
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS, POZYX_FAILURE
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
