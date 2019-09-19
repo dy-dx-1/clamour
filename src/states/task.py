@@ -64,9 +64,10 @@ class Task(TDMAState):
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
 
+
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
-        return not (coordinates.x == coordinates.y == coordinates.z == 0)
+        return not (coordinates.x == coordinates.y == coordinates.z == 0.0)
 
     def ranging(self) -> None:
         ranging_target_id = self.select_ranging_target()

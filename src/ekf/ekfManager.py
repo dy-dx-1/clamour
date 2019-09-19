@@ -60,6 +60,7 @@ class EKFManager:
                     self.start_time = message.timestamp  # This is the first timestamp to be received
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
+                    print("-------INIT EKF-----", message.measured_xyz)
                     self.ekf.trilateration_update(message.measured_xyz,
                                                   self.correct_yaw(message.measured_yaw), message.timestamp)
 
@@ -88,8 +89,11 @@ class EKFManager:
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
         
-        with self.pozyx_lock:
-            self.pozyx.setCoordinates(self.ekf.get_position())
+        try:
+            with self.pozyx_lock:
+                self.pozyx.setCoordinates(self.ekf.get_position())
+        except:
+            print(self.ekf.get_position())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
