@@ -28,5 +28,5 @@ class MessageFactory:
 
     @staticmethod
     def is_custom_message(data: int) -> bool:
-        print(hex((data & CUSTOM_MESSAGE_MASK) >> 32))
+        print(hex((data & CUSTOM_MESSAGE_MASK) >> 32), hex(data))
         return (data & CUSTOM_MESSAGE_MASK) >> 32 == CUSTOM_MESSAGE_SIGNATURE

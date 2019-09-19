@@ -36,7 +36,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0b10101010, message.data], 'Bi'))
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -77,7 +77,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([0b10101010, message.data], 'Bi'))
+            self.pozyx.sendData(0, Data([0xAA, message.data], 'Bi'))
 
     def receive_message(self, state: State) -> None:
         if self.receive_new_message():
@@ -171,7 +171,7 @@ class Messenger:
 
     def obtain_message_from_pozyx(self) -> (int, int, int):
         info = RXInfo()
-        data = Data([0], 'Bi')
+        data = Data([0, 0], 'Bi')
 
         try:
             with self.pozyx_lock:
