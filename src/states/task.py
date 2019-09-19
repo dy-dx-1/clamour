@@ -1,10 +1,11 @@
 import random
 from multiprocessing import Lock
+from time import time
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister)
+                     PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -27,6 +28,7 @@ class Task(TDMAState):
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
         self.messenger = messenger
+        self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
@@ -34,7 +36,9 @@ class Task(TDMAState):
         self.neighborhood.collect_garbage()
         self.select_localization_method()
         self.set_manually_measured_anchors()
-        self.localize()
+
+        if self.timing.enough_time_left():
+            self.localize()
 
         return self.next()
 
@@ -64,7 +68,6 @@ class Task(TDMAState):
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
 
-
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
         return not (coordinates.x == coordinates.y == coordinates.z == 0.0)
@@ -81,27 +84,22 @@ class Task(TDMAState):
             else:
                 ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
-            device_range = DeviceRange()
+            measured_position = DeviceRange()
             angles = EulerAngles()
 
             with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
+                status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
-            
-            if status_pos != POZYX_SUCCESS:
-                self.handle_error("ranging (pos)")
-            if status_angle != POZYX_SUCCESS:
-                self.handle_error("ranging (ranging)")
 
-            yaw = angles.heading
+            if status_pos == POZYX_SUCCESS:
+                measured_position = Coordinates(measured_position.data[1], 0, 0)
+                print(measured_position)
 
-            measured_position = Coordinates(device_range.data[1], 0, 0)
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
-                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
-        else:
-            print("Could not do ranging")
+                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position,
+                                                    angles.heading, atleast_2d(neighbor_position))
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
