@@ -11,6 +11,7 @@ from contextManagedQueue import ContextManagedQueue
 from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, UpdateType
 from rooms import Floorplan
+from soundhandler import SoundSegFaultHandler
 
 
 class EKFManager:
@@ -26,6 +27,10 @@ class EKFManager:
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
 
+
+        self.sh = SoundSegFaultHandler(['python3', 'soundhandler/cyclic_thread.py'])
+
+
         filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
         fieldnames = ['pozyx_id', 'timestamp', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'raw_yaw',
@@ -38,10 +43,14 @@ class EKFManager:
     def run(self) -> None:
         remote_host = "192.168.4.120" if self.debug else None
 
+        self.sh.connect()
+
         with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
             self.initialize_ekf(socket)
             while True:
+                self.sh.check()
                 self.process_latest_state_info(socket)
+                self.sh.send_player([self.ekf.get_position().x,self.ekf.get_position().y,self.ekf.get_position().z])
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
