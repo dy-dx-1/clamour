@@ -173,13 +173,15 @@ class Messenger:
         info = RXInfo()
         data = Data([0], 'Bi')
 
-        # try:
-        with self.pozyx_lock:
-            self.pozyx.getRxInfo(info)
-            status = self.pozyx.readRXBufferData(data)
-        # except struct.error as e:
-        #     status = POZYX_FAILURE
-        #     print("Error while reading from tag:", str(e))
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getRxInfo(info)
+                status = self.pozyx.readRXBufferData(data)
+        except struct.error:
+            data = Data([0], 'i')
+            with self.pozyx_lock:
+                self.pozyx.getRxInfo(info)
+                status = self.pozyx.readRXBufferData(data)
 
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
