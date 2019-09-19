@@ -49,8 +49,8 @@ class Timing:
         self.current_slot_id = int(((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / TASK_SLOT_DURATION)
 
     def enough_time_left(self) -> bool:
-        print((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION)
-        return (self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION < MAX_RANGING_DELAY
+        print(((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / NB_TASK_SLOTS)
+        return ((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / NB_TASK_SLOTS < MAX_RANGING_DELAY
 
     def clear_synchronization_info(self):
         self.clock_differential_stat = []
