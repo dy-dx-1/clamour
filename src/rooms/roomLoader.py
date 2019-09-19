@@ -26,5 +26,7 @@ class RoomLoader:
     def orientation_from_corners(corners: list) -> float:
         diff_x = int(corners[2]) - int(corners[4])
         diff_y = int(corners[3]) - int(corners[5])
-
-        return math.atan2(diff_y, diff_x)
+        if diff_x == 0.0:
+            return 0.0
+        else:
+            return math.atan2(diff_y, diff_x)
