@@ -48,11 +48,13 @@ class Task(TDMAState):
     def next(self) -> State:
         self.timing.update_frame_id()
         self.timing.update_slot_id()
-        if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION +
-                                                (self.timing.current_slot_id) * TASK_SLOT_DURATION):
-            return State.LISTEN
+        if self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET:
+            if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
+                return State.LISTEN
+            else:
+                return State.TASK
         else:
-            return State.TASK
+            return State.SYNCHRONIZATION
 
     def select_localization_method(self) -> None:
         self.localize = self.positioning if len(self.anchors.available_anchors) >= 3 else self.ranging
