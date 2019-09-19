@@ -44,13 +44,13 @@ class Timing:
         self.current_time_in_cycle = int(self.logical_clock.clock - self.cycle_start) % FULL_CYCLE_DURATION
 
     def update_frame_id(self):
-        self.frame_id = int((self.current_time_in_cycle - self.cycle_start) / FRAME_DURATION)
+        self.frame_id = int(self.current_time_in_cycle / FRAME_DURATION)
 
     def update_slot_id(self):
-        self.current_slot_id = int(((self.current_time_in_cycle - self.cycle_start) % FRAME_DURATION) / TASK_SLOT_DURATION)
+        self.current_slot_id = int((self.current_time_in_cycle % FRAME_DURATION) / TASK_SLOT_DURATION)
 
     def enough_time_left(self) -> bool:
-        return ((self.current_time_in_cycle - self.cycle_start) % FRAME_DURATION) / NB_TASK_SLOTS < MAX_RANGING_DELAY
+        return (self.current_time_in_cycle % FRAME_DURATION) / NB_TASK_SLOTS < MAX_RANGING_DELAY
 
     def clear_synchronization_info(self):
         self.clock_differential_stat = []
