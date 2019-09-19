@@ -7,10 +7,6 @@ CUSTOM_MESSAGE_SIGNATURE = 0xAA
 TYPE_BIT_MASK = 0x80000000
 
 
-class InvalidMessageTypeException(Exception):
-    pass
-
-
 class MessageFactory:
     @staticmethod
     def create(sender_id: int, raw_data: Data) -> UWBMessage:
@@ -23,8 +19,6 @@ class MessageFactory:
             elif message_type == MessageType.TDMA:
                 # TODO: Add two-hop neighbor message
                 return UWBTDMAMessage(sender_id, message_type, message_data)
-            else:
-                raise InvalidMessageTypeException("The message type in the received data does not match any known message type.")
 
     @staticmethod
     def is_custom_message(data: int) -> bool:
