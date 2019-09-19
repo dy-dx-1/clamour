@@ -83,17 +83,17 @@ class EKFManager:
                 message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
 
+            try:
+                with self.pozyx_lock:
+                    self.pozyx.setCoordinates(self.ekf.get_position())
+            except:
+                print("Error set coordination on device: ", self.ekf.get_position())
+
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
-        
-        try:
-            with self.pozyx_lock:
-                self.pozyx.setCoordinates(self.ekf.get_position())
-        except:
-            print("Error set coordination on device: ", self.ekf.get_position())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
