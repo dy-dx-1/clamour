@@ -5,6 +5,7 @@ import csv
 class Anchors:
     def __init__(self):
         self.available_anchors = []
+        self.available_tags = []
         self.anchors_list = self.load_anchors_from_csv()
 
         print("Anchor list loaded (", len(self.anchors_list), ")")
@@ -23,4 +24,5 @@ class Anchors:
         x = int(anchor_data[1])
         y = int(anchor_data[2])
         z = int(anchor_data[3])
+
         return DeviceCoordinates(label, 1, Coordinates(x, y, z))

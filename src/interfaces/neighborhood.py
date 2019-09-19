@@ -1,37 +1,53 @@
+from enum import Enum
 from time import perf_counter
 
 
 OBSOLESCENCE_DELAY = 20  # nb of seconds beyond which a neighbor becomes irrelevant
 
 
+# TODO: import properly
+class State(Enum):
+    INITIALIZATION = 0
+    SYNCHRONIZATION = 1
+    SCHEDULING = 2
+    TASK = 3
+    LISTEN = 4
+
+
 class Neighborhood:
     def __init__(self):
         self.current_neighbors = {}
-        self.synced_neighbors = set()
+        self.synced_neighbors = {}
         self.neighbor_synchronization_received = {}
         self.synchronized_active_neighbor_count = 0
 
-    def collect_garbage(self) -> None:
-        for id in [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - OBSOLESCENCE_DELAY]:
+    def collect_garbage(self, delay: float = OBSOLESCENCE_DELAY) -> None:
+        for id in [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - delay]:
             del self.current_neighbors[id]
 
-    def is_alone(self) -> bool:
-        return len(self.current_neighbors) == 0
+    def is_alone_in_state(self, state: State) -> bool:
+        if len(self.current_neighbors) == 0:
+            print("No neighbors")
 
-    def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float) -> None:
-        # print('(STEP) Adding neighbor')
-        self.current_neighbors[device_id] = (second_degree_neighbors, timestamp)
+        if state == -1:
+            return len(self.current_neighbors) == 0
+
+        return len([neighbor for neighbor in self.current_neighbors.values() if neighbor[2] == state]) == 0
+
+    def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float, state: int) -> None:
+        self.current_neighbors[device_id] = (second_degree_neighbors, timestamp, state)
 
     def add_synced_neighbor(self, device_id: int) -> None:
         if device_id not in self.synced_neighbors:
-            print("Adding", device_id, "to synced neibs:", "self.synced_neighbors")
-        self.synced_neighbors.add(device_id)
+            self.synced_neighbors[device_id] = 1
+        else:
+            self.synced_neighbors[device_id] += 1
 
     def remove_synced_neighbor(self, device_id: int) -> None:
         if device_id in self.synced_neighbors:
-            print("Removing", device_id, "from synced neibs:", self.synced_neighbors)
-        self.synced_neighbors.discard(device_id)
-
+            self.synced_neighbors[device_id] = 0
+        
     def are_neighbors_synced(self) -> bool:
-        return all([key in self.synced_neighbors for key in self.current_neighbors.keys()])
+        return all([key in self.synced_neighbors for key in self.current_neighbors.keys()]) \
+            and all([times_synced > 5 for times_synced in self.synced_neighbors.values()])
 

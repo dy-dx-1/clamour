@@ -1,6 +1,6 @@
 from numpy import mean
 from ctypes import c_int32 as int32
-from time import time, perf_counter
+from time import time, perf_counter, sleep
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
@@ -33,6 +33,7 @@ class Synchronization(TDMAState):
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
+        print("Offset: ", self.timing.synchronization_offset_mean)
 
         self.synchronize()
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
@@ -47,9 +48,14 @@ class Synchronization(TDMAState):
             self.time_to_sleep = abs(random.gauss(RANDOM_DELAY_MEAN, RANDOM_DELAY_VARIANCE))
             self.start_t = time()
 
+        self.neighborhood.collect_garbage(delay=1)
         next_state = self.next()
+
         if next_state == State.SCHEDULING:
-            print("Offset: ", self.timing.synchronization_offset_mean)
+            for _ in range(10):
+                sleep(0.005)
+                self.broadcast_synchronization_message()
+
             self.prepare_next_state()
             print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle; Perf:", perf_counter())
 
@@ -58,9 +64,17 @@ class Synchronization(TDMAState):
     def next(self) -> State:
         current_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS)) - self.first_exec_time
 
-        if self.neighborhood.is_alone() or self.is_left_behind() or \
-                (current_exec_time > SYNCHRONIZATION_PERIOD and (self.timing.synchronized or self.is_left_behind())
-                 and self.neighborhood.are_neighbors_synced()):
+        # print("Alone:", self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION), "left behind:",
+        #       self.is_left_behind(), "exec time:", current_exec_time > SYNCHRONIZATION_PERIOD,
+        #       "synced:", self.timing.synchronized, "neighbors synced:", self.neighborhood.are_neighbors_synced())
+
+        if current_exec_time < SYNCHRONIZATION_PERIOD / 3:
+            return State.SYNCHRONIZATION
+
+        if self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION) or \
+                current_exec_time > SYNCHRONIZATION_PERIOD or \
+                ((self.timing.synchronized or self.is_left_behind()) and
+                 self.neighborhood.are_neighbors_synced()):
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
@@ -82,7 +96,7 @@ class Synchronization(TDMAState):
                 self.timing.update_current_time()
                 self.update_offset(message.sender_id, message)
 
-            self.messenger.update_neighbor_dictionary()
+            self.messenger.update_neighbor_dictionary(State.SYNCHRONIZATION)
             self.messenger.receive_new_message()
 
         self.increment_time_alive()

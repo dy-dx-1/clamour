@@ -1,8 +1,9 @@
 import math
 import os.path
 import csv
+from multiprocessing import Lock
 from numpy import linalg
-from pypozyx import Coordinates
+from pypozyx import Coordinates, PozyxSerial
 from time import time
 
 from .ekf import CustomEKF, DT_THRESHOLD
@@ -13,7 +14,7 @@ from rooms import Floorplan
 
 
 class EKFManager:
-    def __init__(self, communication_queue: ContextManagedQueue, pozyx_id: int):
+    def __init__(self, communication_queue: ContextManagedQueue, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, pozyx_id: int):
         self.pozyx_id = pozyx_id
         self.ekf = None
         self.debug = 0  # TODO connect to main argv
@@ -22,6 +23,8 @@ class EKFManager:
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['Arena']
+        self.pozyx = shared_pozyx
+        self.pozyx_lock = shared_pozyx_lock
 
         filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
@@ -75,6 +78,9 @@ class EKFManager:
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
+        
+        with self.pozyx_lock:
+            self.pozyx.setCoordinates(self.ekf.get_position())
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
