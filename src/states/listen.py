@@ -21,8 +21,8 @@ class Listen(TDMAState):
         self.timing.update_slot_id()
         next_state = self.next()
         
-        if next_state == State.LISTEN:
-            sleep(0.002)  # Milliseconds
+        # if next_state == State.LISTEN:
+        #     sleep(0.002)  # Milliseconds
 
         return next_state
 

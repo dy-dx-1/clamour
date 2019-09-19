@@ -34,6 +34,7 @@ class Scheduling(TDMAState):
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send List: ", self.slot_assignment.pure_send_list)
             print("Entering listen state...")
+            print(self.timing.current_time_in_cycle, self.timing.current_slot_id)
             return State.LISTEN
         else:
             return State.SCHEDULING
