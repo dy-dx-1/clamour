@@ -50,9 +50,8 @@ class Synchronization(TDMAState):
 
         self.neighborhood.collect_garbage(delay=1)
         next_state = self.next()
-        if next_state == State.SCHEDULING:
-            print("Offset: ", self.timing.synchronization_offset_mean)
 
+        if next_state == State.SCHEDULING:
             for _ in range(10):
                 sleep(0.005)
                 self.broadcast_synchronization_message()
@@ -69,14 +68,13 @@ class Synchronization(TDMAState):
         #       self.is_left_behind(), "exec time:", current_exec_time > SYNCHRONIZATION_PERIOD,
         #       "synced:", self.timing.synchronized, "neighbors synced:", self.neighborhood.are_neighbors_synced())
 
-        if current_exec_time < SYNCHRONIZATION_PERIOD / 3 :
+        if current_exec_time < SYNCHRONIZATION_PERIOD / 3:
             return State.SYNCHRONIZATION
 
         if self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION) or \
                 current_exec_time > SYNCHRONIZATION_PERIOD or \
                 ((self.timing.synchronized or self.is_left_behind()) and
                  self.neighborhood.are_neighbors_synced()):
-            print("Going to scheduling from sync")
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION

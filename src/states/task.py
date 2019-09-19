@@ -3,8 +3,8 @@ from multiprocessing import Lock
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_FAILURE, Coordinates, DeviceRange,
-                     PozyxSerial, DeviceCoordinates, EulerAngles, SingleRegister)
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
+                     PozyxSerial, EulerAngles, SingleRegister)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -78,7 +78,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.getCoordinates(ref_coordinates)
             else:
-                ref_coordinates = self.anchors.anchors_dict[ranging_target_id]
+                ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
             device_range = DeviceRange()
             angles = EulerAngles()
@@ -149,11 +149,8 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor in self.anchors.anchors_dict.values():
-            try:
-                with self.pozyx_lock:
-                    self.pozyx.addDevice(anchor)
-            except:
-                print(self.anchors.anchors_dict)
+            with self.pozyx_lock:
+                self.pozyx.addDevice(anchor)
 
         if len(self.anchors.anchors_dict) > 4:
             with self.pozyx_lock:

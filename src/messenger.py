@@ -36,7 +36,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([message.data], 'i'))
+            self.pozyx.sendData(destination=0, data=Data([0b10101010, message.data], 'Bi'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -77,7 +77,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([message.data], 'i'))
+            self.pozyx.sendData(0, Data([0b10101010, message.data], 'Bi'))
 
     def receive_message(self, state: State) -> None:
         if self.receive_new_message():
@@ -152,7 +152,15 @@ class Messenger:
                 received_message = MessageFactory.create(sender_id, data)
 
                 if received_message not in self.received_messages:
-                    print("RMSG type: ", type(received_message), hash(received_message))
+                    inter_status = SingleRegister()
+                    with self.pozyx_lock:
+                        self.pozyx.getInterruptStatus(inter_status)
+
+                    print("[", type(received_message), "]: ID", sender_id,
+                          "Data:", str(bin(received_message.data)), "Hash:", hash(received_message),
+                          "inter_status masks", inter_status[0] & 0x01, inter_status[0] & 0x02,
+                          inter_status[0] & 0x04, inter_status[0] & 0x08, inter_status[0] & 0x10)
+
                     self.received_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
@@ -163,15 +171,15 @@ class Messenger:
 
     def obtain_message_from_pozyx(self) -> (int, int, int):
         info = RXInfo()
-        data = Data([0], 'i')
+        data = Data([0], 'Bi')
 
-        try:
-            with self.pozyx_lock:
-                self.pozyx.getRxInfo(info)
-                status = self.pozyx.readRXBufferData(data)
-        except struct.error as e:
-            status = POZYX_FAILURE
-            print("Error while reading from tag:", str(e))
+        # try:
+        with self.pozyx_lock:
+            self.pozyx.getRxInfo(info)
+            status = self.pozyx.readRXBufferData(data)
+        # except struct.error as e:
+        #     status = POZYX_FAILURE
+        #     print("Error while reading from tag:", str(e))
 
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
