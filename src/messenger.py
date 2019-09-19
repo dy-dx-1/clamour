@@ -7,8 +7,7 @@ from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
 from interfaces.timing import NB_TASK_SLOTS
-from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
-                      UWBSynchronizationMessage, UWBTDMAMessage,
+from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UpdateMessage, UpdateType)
 
 
