@@ -78,7 +78,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.getCoordinates(ref_coordinates)
             else:
-                ref_coordinates = self.anchors.anchors_dict[ranging_target_id]
+                ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
             device_range = DeviceRange()
             angles = EulerAngles()
