@@ -75,7 +75,6 @@ class Synchronization(TDMAState):
                 current_exec_time > SYNCHRONIZATION_PERIOD or \
                 ((self.timing.synchronized or self.is_left_behind()) and
                  self.neighborhood.are_neighbors_synced()):
-            self.timing.cycle_start = self.timing.logical_clock.clock
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION
