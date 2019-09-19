@@ -33,6 +33,8 @@ class Task(TDMAState):
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
+        self.timing.update_frame_id()
+        self.timing.update_slot_id()
         print(self.timing.current_time_in_cycle, self.timing.current_slot_id, self.slot_assignment.first_task_slot_in_frame(), self.timing.enough_time_left())
         if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
             self.discover_devices()
