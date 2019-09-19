@@ -148,7 +148,7 @@ class Messenger:
         sender_id, data, status = self.obtain_message_from_pozyx()
 
         try:
-            if sender_id != 0 and data != 0:
+            if sender_id != 0 and data[1] != 0:
                 received_message = MessageFactory.create(sender_id, data)
 
                 if received_message not in self.received_messages:
@@ -167,7 +167,7 @@ class Messenger:
 
         return is_new_message
 
-    def obtain_message_from_pozyx(self) -> (int, int, int):
+    def obtain_message_from_pozyx(self) -> (int, Data, int):
         info = RXInfo()
         data = Data([0, 0], 'Bi')
 
@@ -176,16 +176,12 @@ class Messenger:
                 self.pozyx.getRxInfo(info)
                 status = self.pozyx.readRXBufferData(data)
         except struct.error as s:
-            data = Data([0], 'i')
             print(s, ": Error while getting msg")
-            with self.pozyx_lock:
-                self.pozyx.getRxInfo(info)
-                status = self.pozyx.readRXBufferData(data)
 
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
 
-        return info[0], data[0], status
+        return info[0], data, status
 
     def update_neighbor_dictionary(self, state: State, device_list: list = None) -> None:
         if device_list is not None:

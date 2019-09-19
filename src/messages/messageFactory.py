@@ -1,10 +1,9 @@
+from pypozyx import Data
 from .types import MessageType
 from .uwbMessage import (UWBMessage, UWBSynchronizationMessage, UWBTDMAMessage)
 
 
 CUSTOM_MESSAGE_SIGNATURE = 0xAA
-CUSTOM_MESSAGE_MASK = 0xFF00000000
-CUSTOM_MESSAGE_MASK_INV = 0x00FFFFFFFF
 TYPE_BIT_MASK = 0x80000000
 
 
@@ -14,13 +13,13 @@ class InvalidMessageTypeException(Exception):
 
 class MessageFactory:
     @staticmethod
-    def create(sender_id: int, raw_data: int = 0) -> UWBMessage:
-        message_type = (raw_data & TYPE_BIT_MASK) >> 31
-        message_data = raw_data & CUSTOM_MESSAGE_MASK_INV
+    def create(sender_id: int, raw_data: Data) -> UWBMessage:
+        message_type = (raw_data[1] & TYPE_BIT_MASK) >> 31
+        message_data = raw_data[1]
 
-        if MessageFactory.is_custom_message(raw_data) and message_type == MessageType.SYNC:
+        if MessageFactory.is_custom_message(raw_data[0]) and message_type == MessageType.SYNC:
             return UWBSynchronizationMessage(sender_id, message_type, message_data)
-        elif MessageFactory.is_custom_message(raw_data) and message_type == MessageType.TDMA:
+        elif MessageFactory.is_custom_message(raw_data[0]) and message_type == MessageType.TDMA:
             # TODO: Add two-hop neighbor message
             return UWBTDMAMessage(sender_id, message_type, message_data)
         else:
@@ -28,5 +27,5 @@ class MessageFactory:
 
     @staticmethod
     def is_custom_message(data: int) -> bool:
-        print(hex((data & CUSTOM_MESSAGE_MASK) >> 32), hex(data))
-        return (data & CUSTOM_MESSAGE_MASK) >> 32 == CUSTOM_MESSAGE_SIGNATURE
+        print(hex(data))
+        return data == CUSTOM_MESSAGE_SIGNATURE
