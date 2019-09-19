@@ -82,30 +82,22 @@ class Task(TDMAState):
             else:
                 ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
-            device_range = DeviceRange()
+            measured_position = DeviceRange()
             angles = EulerAngles()
 
-            time_before_ranging = time()
             with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
+                status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
-            print("Time for ranging: ", time() - time_before_ranging)
-            
-            if status_pos != POZYX_SUCCESS:
-                self.handle_error("ranging (pos)")
-            if status_angle != POZYX_SUCCESS:
-                self.handle_error("ranging (ranging)")
 
-            yaw = angles.heading
+            if status_pos == POZYX_SUCCESS:
+                measured_position = Coordinates(measured_position.data[1], 0, 0)
+                print(measured_position)
 
-            measured_position = Coordinates(device_range.data[1], 0, 0)
-            print(measured_position)
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
-                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
-        else:
-            print("Could not do ranging")
+                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position,
+                                                    angles.heading, atleast_2d(neighbor_position))
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
