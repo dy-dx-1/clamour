@@ -157,9 +157,7 @@ class Messenger:
                         self.pozyx.getInterruptStatus(inter_status)
 
                     print("[", type(received_message), "]: ID", sender_id,
-                          "Data:", str(bin(received_message.data)), "Hash:", hash(received_message),
-                          "inter_status masks", inter_status[0] & 0x01, inter_status[0] & 0x02,
-                          inter_status[0] & 0x04, inter_status[0] & 0x08, inter_status[0] & 0x10)
+                          "Data:", str(bin(received_message.data)), "Hash:", hash(received_message))
 
                     self.received_messages.add(received_message)
                     self.message_box.append(received_message)
@@ -177,8 +175,9 @@ class Messenger:
             with self.pozyx_lock:
                 self.pozyx.getRxInfo(info)
                 status = self.pozyx.readRXBufferData(data)
-        except struct.error:
+        except struct.error as s:
             data = Data([0], 'i')
+            print(s, ": Error while getting msg")
             with self.pozyx_lock:
                 self.pozyx.getRxInfo(info)
                 status = self.pozyx.readRXBufferData(data)
