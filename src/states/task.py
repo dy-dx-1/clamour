@@ -68,6 +68,7 @@ class Task(TDMAState):
             self.handle_error("positioning (ranging)")
 
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
+            print(position)
             self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
 
     @staticmethod
@@ -95,7 +96,6 @@ class Task(TDMAState):
 
             if status_pos == POZYX_SUCCESS:
                 measured_position = Coordinates(measured_position.data[1], 0, 0)
-                print(measured_position)
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
