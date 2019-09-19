@@ -86,7 +86,7 @@ class EKFManager:
 
             #try:
             with self.pozyx_lock:
-                self.pozyx.setCoordinates([self.ekf.get_position().x,self.ekf.get_position().y,self.ekf.get_position().z])
+                self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
             #except Exception as e:
             #    print("Error set coordination on device:", type(e), str(e), self.ekf.get_position())
 
