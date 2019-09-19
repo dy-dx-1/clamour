@@ -33,8 +33,6 @@ class Task(TDMAState):
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
-        self.timing.update_frame_id()
-        self.timing.update_slot_id()
         print(self.timing.current_time_in_cycle, self.timing.current_slot_id, self.slot_assignment.first_task_slot_in_frame(), self.timing.enough_time_left())
         if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
             self.discover_devices()
@@ -48,6 +46,8 @@ class Task(TDMAState):
         return self.next()
 
     def next(self) -> State:
+        self.timing.update_frame_id()
+        self.timing.update_slot_id()
         if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION +
                                                 (self.timing.current_slot_id + 1) * TASK_SLOT_DURATION):
             return State.LISTEN
