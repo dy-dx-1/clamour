@@ -36,7 +36,11 @@ class Task(TDMAState):
         self.neighborhood.collect_garbage()
         self.select_localization_method()
         self.set_manually_measured_anchors()
-        self.localize()
+
+        if self.timing.enough_time_left():
+            self.localize()
+        else:
+            print("Not enough time for positioning / ranging")
 
         return self.next()
 
