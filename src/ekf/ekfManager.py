@@ -23,7 +23,7 @@ class EKFManager:
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
-        self.current_room = self.floorplan.rooms[24]
+        self.current_room = self.floorplan.rooms['24']
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
 
