@@ -1,3 +1,5 @@
+from time import sleep
+
 from interfaces import SlotAssignment, Timing, Neighborhood
 from interfaces.timing import FULL_CYCLE_DURATION, SLOT_FOR_RESET, Timing, TASK_START_TIME
 from messenger import Messenger
@@ -20,22 +22,15 @@ class Listen(TDMAState):
         next_state = self.next()
         
         if next_state == State.LISTEN:
-            self.listen_for_messages()
+            sleep(0.002)  # Milliseconds
 
         return next_state
 
     def next(self) -> State:
         if self.timing.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET:
-            # and (self.timing.current_time_in_cycle > TASK_START_TIME)):
             if self.timing.current_slot_id in self.slot_assignment.pure_send_list:
                 return State.TASK
             else:
                 return State.LISTEN
         else:
             return State.SYNCHRONIZATION
-
-    # TODO: Put back UWB position message
-    def listen_for_messages(self):
-        if self.messenger.receive_new_message():
-            self.messenger.update_neighbor_dictionary(State.LISTEN)
-            message = self.messenger.message_box.pop()
