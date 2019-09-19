@@ -168,20 +168,27 @@ class Messenger:
         return is_new_message
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
-        info = RXInfo()
         data = Data([0, 0], 'Bi')
+        sender_id, message_byte_size = self.get_message_metadata()
 
-        try:
+        if message_byte_size == data.byte_size:
             with self.pozyx_lock:
-                self.pozyx.getRxInfo(info)
                 status = self.pozyx.readRXBufferData(data)
-        except struct.error as s:
-            print(s, ": Error while getting msg")
+        else:
+            status = POZYX_FAILURE
 
         if status != POZYX_SUCCESS:
             self.handle_error("obtain_message_from_pozyx")
 
-        return info[0], data, status
+        return sender_id, data, status
+
+    def get_message_metadata(self) -> (int, int):
+        info = RXInfo()
+
+        with self.pozyx_lock:
+            self.pozyx.getRxInfo(info)
+
+        return info[0], info[1]
 
     def update_neighbor_dictionary(self, state: State, device_list: list = None) -> None:
         if device_list is not None:
