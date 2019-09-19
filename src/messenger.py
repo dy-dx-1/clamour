@@ -158,7 +158,9 @@ class Messenger:
 
                     print("[", type(received_message), "]: ID", sender_id,
                           "Data:", str(bin(received_message.data)), "Hash:", hash(received_message),
-                          "inter_status", inter_status[0])
+                          "inter_status masks", inter_status[0] & 0x01, inter_status[0] & 0x02,
+                          inter_status[0] & 0x04, inter_status[0] & 0x08)
+
                     self.received_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
