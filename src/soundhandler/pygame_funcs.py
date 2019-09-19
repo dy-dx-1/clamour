@@ -33,7 +33,7 @@ class Zone(object):
 
 
 class PyGameManager(object):
-    def __init__(self, nb_channels=20):
+    def __init__(self, nb_channels=10):
         pygame.mixer.init(frequency=44100, size=16, channels=2, buffer=4096)
         # create multiple channel for simultanous playback
         pygame.mixer.set_num_channels(nb_channels)
@@ -45,8 +45,6 @@ class PyGameManager(object):
 
         self.incr = 0
         self.lastSound = ""
-        self.lastvolume = 100
-        self.position_str = PLACEHOLDER
 
         self.patternChord = "*" + PLACEHOLDER + "*." + EXTENSION
 
@@ -54,9 +52,6 @@ class PyGameManager(object):
 
         self.position_old = None
         self.lastSound = ""
-
-        self.position_x = 0.0
-        self.position_y = 0.0
 
         self.zones = [Zone(0.0, 0.0, 5.0, 6.0), Zone(0.0, 6.0, 6.0, 12.0), Zone(0.0, 12.0, 6.0, 18.0),
                       Zone(0.0, 18.0, 6.0, 24.0), Zone(0.0, 24.0, 6.0, 30.0), Zone(5.0, 0.0, 9.0, 6.0),
@@ -76,21 +71,23 @@ class PyGameManager(object):
         with open('../sound/files.json', 'r') as fp:
             self.files_dict = json.load(fp)
 
-        # arr = np.array([files_dict[key] for key in files_dict])
-        # print(np.amax(arr, axis=0))
-        # print(np.amin(arr, axis=0))
+        print(len(self.files_dict))
+        arr = np.array([self.files_dict[key] for key in self.files_dict])
+        print(np.amax(arr, axis=0))
+        print(np.amin(arr, axis=0))
 
     def buildFileName(self,coor)->str:
-        posX = math.floor(coor.x)
-        posY = math.floor(coor.y)
-        posZ = math.floor(coor.z)
+        # posX = math.floor(coor.x)
+        # posY = math.floor(coor.y)
+        # posZ = math.floor(coor.z)
 
         # print('Cell grid: ' + str(posX) + '(' + str(coor.x) + ') ' + str(posY) + '(' + str(coor.y) + ') ' + str(
         #     posZ) + '(' + str(coor.z) + ')')
         for fn, bounds in self.files_dict.items():
-            if (posX > bounds[0] and posX < bounds[1]):
-                if (posY > bounds[2] and posY < bounds[3]):
-                    if (posZ > bounds[4] and posZ < bounds[5]):
+            if (coor.x >= bounds[0]) and (coor.x <= bounds[1]):
+                if (coor.y >= bounds[2]) and (coor.y <= bounds[3]):
+                    if (coor.z >= bounds[4]) and (coor.z <= bounds[5]):
+                        print(fn,bounds)
                         return fn
         return ""
 
@@ -108,7 +105,7 @@ class PyGameManager(object):
 
                 # print(theChannel_right, theChannel_left)
                 if channel.get_busy() != 1:
-                    print("In Zone {0}".format(self.find_zone()))
+                    # print("In Zone {0}".format(self.find_zone()))
 
                     sleep(offset_time)
                     if (index % 2) == 0:
@@ -117,7 +114,7 @@ class PyGameManager(object):
                         channel.set_volume(0, 1)
 
                     thePath = PATH + track
-                    print("Play {0}({1}%) on channel {2}".format(thePath, index))
+                    print("Play ", thePath, index, " on channel ", (index % 2))
                     channel_tuple[1] = pygame.mixer.Sound(thePath)
                     try:
                         channel.play(channel_tuple[1])
@@ -132,17 +129,17 @@ class PyGameManager(object):
         while pygame.mixer.get_busy == 1:
             print('waiting for channel to be ready')
 
+        self.soundPlayer(self.patternChord)
+
     def cyclic_call(self, position):
         self.position_x = position.x
         self.position_y = position.y
-        self.position_str = self.buildFileName(position)
-        self.patternChord = self.position_str + EXTENSION
+        self.patternChord = self.buildFileName(position)
 
-#        print("X:",position.x," Y:",position.y," Z:",position.z)
-        if self.position_str != PLACEHOLDER and (position.x != 0 or position.y != 0 or position.z != 0):
+        if (position.x != 0 or position.y != 0 or position.z != 0) and self.patternChord:
             self.buildPlayList()
         else:
-            print("no position receive yet")
+            print("No file found on position: X",position.x," Y:",position.y," Z:",position.z, "(",self.patternChord,")")
 
 
     def play(self, path):
@@ -166,9 +163,11 @@ if __name__ == "__main__":
             self.y = y
             self.z = z
 
-    for index_x in range(0, 30000, 400):
-        for index_y in range(0, 20000, 400):
-            p.cyclic_call(Position(index_x, index_y, 400))
+    # p.cyclic_call(Position(28, 124, 778))
+
+    # for index_x in range(-3150, 3101, 24):
+    #     for index_y in range(-3206, 3206, 24):
+    for index_x in range(-1650, 650, 21):
+        for index_y in range(-143, 912, 21):
+            p.cyclic_call(Position(int(index_x), int(index_y), 2155))
             sleep(0.1)
-#    p.play("083_033_000.flac")
-#    sleep(5)
