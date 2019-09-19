@@ -153,9 +153,11 @@ class Messenger:
 
                 if received_message not in self.received_messages:
                     inter_status = SingleRegister()
+                    self.pozyx.getInterruptStatus(inter_status)
+
                     print("[", type(received_message), "]: ID", sender_id,
                           "Data:", str(bin(received_message.data)), "Hash:", hash(received_message),
-                          "inter_status", self.pozyx.getInterruptStatus(inter_status))
+                          "inter_status", inter_status[0])
                     self.received_messages.add(received_message)
                     self.message_box.append(received_message)
                     is_new_message = True
