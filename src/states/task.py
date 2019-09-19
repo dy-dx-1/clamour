@@ -39,8 +39,6 @@ class Task(TDMAState):
 
         if self.timing.enough_time_left():
             self.localize()
-        else:
-            print("Not enough time for positioning / ranging")
 
         return self.next()
 

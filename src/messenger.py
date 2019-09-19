@@ -149,9 +149,6 @@ class Messenger:
             received_message = MessageFactory.create(sender_id, data)
 
             if received_message not in self.received_messages:
-                print("[", type(received_message), "]: ID", sender_id,
-                      "Data:", str(bin(received_message.data)), "Hash:", hash(received_message))
-
                 self.received_messages.add(received_message)
                 self.message_box.append(received_message)
                 is_new_message = True
