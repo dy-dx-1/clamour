@@ -153,7 +153,8 @@ class Messenger:
 
                 if received_message not in self.received_messages:
                     inter_status = SingleRegister()
-                    self.pozyx.getInterruptStatus(inter_status)
+                    with self.pozyx_lock:
+                        self.pozyx.getInterruptStatus(inter_status)
 
                     print("[", type(received_message), "]: ID", sender_id,
                           "Data:", str(bin(received_message.data)), "Hash:", hash(received_message),
