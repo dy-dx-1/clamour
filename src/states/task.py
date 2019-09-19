@@ -7,7 +7,7 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICE
                      PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
-from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
+from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME, FULL_CYCLE_DURATION, SLOT_FOR_RESET
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
 from pozyx_utils import PozyxDiscoverer
