@@ -13,11 +13,11 @@ class RoomLoader:
 
     @staticmethod
     def create_room(room_data: list) -> Room:
-        label = 24#room_data[0]
-        x = int(room_data[5])
-        y = int(room_data[6])
-        x_lim = (int(room_data[3]), int(room_data[3]))
-        y_lim = (int(room_data[4]), int(room_data[4]))
+        label = room_data[0]
+        x = int(room_data[5]*10)
+        y = int(room_data[6]*10)
+        x_lim = (int(room_data[3]*10), int(room_data[3]*10))
+        y_lim = (int(room_data[4]*10), int(room_data[4]*10))
         theta = RoomLoader.orientation_from_corners(room_data[7:])
 
         return Room(label, x, y, x_lim, y_lim, theta)
