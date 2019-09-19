@@ -84,11 +84,8 @@ class EKFManager:
                 print("Invalid position")
             update_functions[message.update_type](*update_info)
 
-            #try:
             with self.pozyx_lock:
                 self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
-            #except Exception as e:
-            #    print("Error set coordination on device:", type(e), str(e), self.ekf.get_position())
 
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
