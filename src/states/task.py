@@ -95,7 +95,7 @@ class Task(TDMAState):
             yaw = angles.heading
 
             measured_position = Coordinates(device_range.data[1], 0, 0)
-            neighbor_position = array([ref_coordinates.pos.x, ref_coordinates.pos.y, ref_coordinates.pos.z])
+            neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
                 self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
