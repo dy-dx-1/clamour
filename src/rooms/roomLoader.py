@@ -6,7 +6,7 @@ from .room import Room
 class RoomLoader:
     @staticmethod
     def load_rooms_from_csv() -> list:
-        with open('rooms/rooms.csv') as r:
+        with open('rooms/chambord_rooms.csv') as r:
             reader = csv.reader(r, delimiter=';')
             next(reader)  # We don't want to read the header, so we skip it
             return [RoomLoader.create_room(room) for room in reader]
