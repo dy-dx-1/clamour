@@ -149,11 +149,8 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor in self.anchors.anchors_dict.values():
-            try:
-                with self.pozyx_lock:
-                    self.pozyx.addDevice(anchor)
-            except:
-                print(self.anchors.anchors_dict)
+            with self.pozyx_lock:
+                self.pozyx.addDevice(anchor)
 
         if len(self.anchors.anchors_dict) > 4:
             with self.pozyx_lock:
