@@ -145,7 +145,7 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data, status = self.obtain_message_from_pozyx()
+        sender_id, data = self.obtain_message_from_pozyx()
 
         try:
             if sender_id != 0 and data[1] != 0:
@@ -173,14 +173,9 @@ class Messenger:
 
         if message_byte_size == data.byte_size:
             with self.pozyx_lock:
-                status = self.pozyx.readRXBufferData(data)
-        else:
-            status = POZYX_FAILURE
+                self.pozyx.readRXBufferData(data)
 
-        if status != POZYX_SUCCESS:
-            self.handle_error("obtain_message_from_pozyx")
-
-        return sender_id, data, status
+        return sender_id, data
 
     def get_message_metadata(self) -> (int, int):
         info = RXInfo()
