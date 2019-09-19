@@ -2,9 +2,10 @@ import random
 from multiprocessing import Lock
 
 from numpy import array, atleast_2d
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister)
+from pypozyx import *
+# from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
+#                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
+#                      PozyxSerial, EulerAngles, SingleRegister)
 
 from interfaces import Anchors, Neighborhood, Timing
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
@@ -85,7 +86,7 @@ class Task(TDMAState):
             angles = EulerAngles()
 
             with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
+                status_pos = self.doRanging(ranging_target_id, device_range)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
             
             if status_pos != POZYX_SUCCESS:
@@ -166,3 +167,23 @@ class Task(TDMAState):
 
         if error_code != 0x0:
             print("Error in", function_name, ":", message)
+
+    def doRanging(self, destination_id, device_range, remote_id=None):
+        if not dataCheck(destination_id):
+            destination_id = NetworkID(destination_id)
+        if destination_id < 0 or destination_id > 0xFFFF:
+            warn("Destination ID should be between 0x0000 and 0xFFFF, not {}".format(destination_id))
+
+        self.pozyx.clearInterruptStatus()
+
+        int_flag = PozyxBitmasks.INT_STATUS_FUNC
+        if remote_id is not None:
+            int_flag = PozyxBitmasks.INT_STATUS_RX_DATA
+
+        status = self.pozyx.useFunction(PozyxRegisters.DO_RANGING, destination_id, Data([]), remote_id)
+        if status == POZYX_SUCCESS:
+            status = self.pozyx.checkForFlag(int_flag, PozyxConstants.DELAY_RANGING)
+            if status == POZYX_SUCCESS:
+                self.pozyx.getDeviceRangeInfo(destination_id, device_range, remote_id)
+            return status
+        return POZYX_FAILURE
