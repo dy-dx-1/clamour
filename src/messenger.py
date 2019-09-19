@@ -162,7 +162,7 @@ class Messenger:
                     self.message_box.append(received_message)
                     is_new_message = True
         except InvalidMessageTypeException as e:
-            pass  # TODO: print(e)
+            print(e)
 
         return is_new_message
 
