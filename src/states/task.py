@@ -4,9 +4,9 @@ from multiprocessing import Lock
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister)
+                     PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
 
-from interfaces import Anchors, Neighborhood, Timing
+from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
 from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
@@ -18,7 +18,8 @@ from .tdmaState import TDMAState
 
 class Task(TDMAState):
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood,
-                 id: int, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, messenger: Messenger):
+                 id: int, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, messenger: Messenger,
+                 slot_assignment: SlotAssignment):
         self.timing = timing
         self.anchors = anchors
         self.id = id
@@ -26,15 +27,20 @@ class Task(TDMAState):
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
         self.neighborhood = neighborhood
+        self.slot_assignment = slot_assignment
         self.messenger = messenger
+        self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
-        self.discover_devices()
-        self.neighborhood.collect_garbage()
-        self.select_localization_method()
-        self.set_manually_measured_anchors()
-        self.localize()
+        if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
+            self.discover_devices()
+            self.neighborhood.collect_garbage()
+            self.select_localization_method()
+            self.set_manually_measured_anchors()
+
+        if self.timing.enough_time_left():
+            self.localize()
 
         return self.next()
 
@@ -66,7 +72,7 @@ class Task(TDMAState):
 
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
-        return not (coordinates.x == coordinates.y == coordinates.z == 0)
+        return not (coordinates.x == coordinates.y == coordinates.z == 0.0)
 
     def ranging(self) -> None:
         ranging_target_id = self.select_ranging_target()
@@ -80,27 +86,22 @@ class Task(TDMAState):
             else:
                 ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
-            device_range = DeviceRange()
+            measured_position = DeviceRange()
             angles = EulerAngles()
 
             with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, device_range)
+                status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
-            
-            if status_pos != POZYX_SUCCESS:
-                self.handle_error("ranging (pos)")
-            if status_angle != POZYX_SUCCESS:
-                self.handle_error("ranging (ranging)")
 
-            yaw = angles.heading
+            if status_pos == POZYX_SUCCESS:
+                measured_position = Coordinates(measured_position.data[1], 0, 0)
+                print(measured_position)
 
-            measured_position = Coordinates(device_range.data[1], 0, 0)
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
-                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position, yaw, atleast_2d(neighbor_position))
-        else:
-            print("Could not do ranging")
+                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position,
+                                                    angles.heading, atleast_2d(neighbor_position))
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
@@ -111,7 +112,7 @@ class Task(TDMAState):
         elif len(self.anchors.available_tags) > 0:
             return random.choice(self.anchors.available_tags)
 
-    def discover_devices(self):  # todo @yanjun: This pozys.doDiscover can not be done in every task slot because it is too time consuming. We do it once in all the FRAME_DURATION * NB_FULL_CYCLES.
+    def discover_devices(self):
         """Discovers the devices available for localization/ranging.
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""

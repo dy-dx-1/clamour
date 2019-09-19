@@ -1,15 +1,13 @@
 import random
-import struct
 from multiprocessing import Lock
 from time import perf_counter, time
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates, POZYX_SUCCESS, POZYX_FAILURE
+from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
 from interfaces.timing import NB_TASK_SLOTS
-from messages import (MessageBox, MessageFactory, InvalidMessageTypeException,
-                      UWBSynchronizationMessage, UWBTDMAMessage,
+from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UpdateMessage, UpdateType)
 
 
@@ -145,43 +143,35 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data, status = self.obtain_message_from_pozyx()
+        sender_id, data = self.obtain_message_from_pozyx()
 
-        try:
-            if sender_id != 0 and data[1] != 0:
-                received_message = MessageFactory.create(sender_id, data)
+        if sender_id != 0 and data[1] != 0:
+            received_message = MessageFactory.create(sender_id, data)
 
-                if received_message not in self.received_messages:
-                    inter_status = SingleRegister()
-                    with self.pozyx_lock:
-                        self.pozyx.getInterruptStatus(inter_status)
-
-                    print("[", type(received_message), "]: ID", sender_id,
-                          "Data:", str(bin(received_message.data)), "Hash:", hash(received_message))
-
-                    self.received_messages.add(received_message)
-                    self.message_box.append(received_message)
-                    is_new_message = True
-        except InvalidMessageTypeException as e:
-            pass  # TODO: print(e)
+            if received_message not in self.received_messages:
+                self.received_messages.add(received_message)
+                self.message_box.append(received_message)
+                is_new_message = True
 
         return is_new_message
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
-        info = RXInfo()
         data = Data([0, 0], 'Bi')
+        sender_id, message_byte_size = self.get_message_metadata()
 
-        try:
+        if message_byte_size == data.byte_size:
             with self.pozyx_lock:
-                self.pozyx.getRxInfo(info)
-                status = self.pozyx.readRXBufferData(data)
-        except struct.error as s:
-            print(s, ": Error while getting msg")
+                self.pozyx.readRXBufferData(data)
 
-        if status != POZYX_SUCCESS:
-            self.handle_error("obtain_message_from_pozyx")
+        return sender_id, data
 
-        return info[0], data, status
+    def get_message_metadata(self) -> (int, int):
+        info = RXInfo()
+
+        with self.pozyx_lock:
+            self.pozyx.getRxInfo(info)
+
+        return info[0], info[1]
 
     def update_neighbor_dictionary(self, state: State, device_list: list = None) -> None:
         if device_list is not None:

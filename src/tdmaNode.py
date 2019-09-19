@@ -1,5 +1,3 @@
-import sys
-import traceback as tb
 from multiprocessing import Lock
 from pypozyx import PozyxSerial
 from time import sleep, time
@@ -30,7 +28,8 @@ class TDMANode:
             State.SYNCHRONIZATION: Synchronization(neighborhood, slot_assignment, self.timing, messenger,
                                                    pozyx_id, multiprocess_communication_queue),
             State.SCHEDULING: Scheduling(neighborhood, slot_assignment, self.timing, pozyx_id, messenger),
-            State.TASK: Task(self.timing, anchors, neighborhood, pozyx_id, shared_pozyx, shared_pozyx_lock, messenger),
+            State.TASK: Task(self.timing, anchors, neighborhood, pozyx_id, shared_pozyx, shared_pozyx_lock, messenger,
+                             slot_assignment),
             State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
 
         self.current_state = self.states[State.INITIALIZATION]

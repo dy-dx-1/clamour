@@ -7,6 +7,7 @@ from logicalClock import LogicalClock
 SECONDS_TO_MILLISECONDS = 1000
 
 COMMUNICATION_DELAY = 5
+MAX_RANGING_DELAY = 15
 SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 15
 
@@ -46,6 +47,9 @@ class Timing:
 
     def update_slot_id(self):
         self.current_slot_id = int(((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / TASK_SLOT_DURATION)
+
+    def enough_time_left(self) -> bool:
+        return ((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / NB_TASK_SLOTS < MAX_RANGING_DELAY
 
     def clear_synchronization_info(self):
         self.clock_differential_stat = []
