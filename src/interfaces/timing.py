@@ -41,16 +41,18 @@ class Timing:
         self.cycle_start = self.logical_clock.clock
         self.hist_list = []
 
+    def in_cycle(self) -> bool:
+        self.update_current_time()
+        return (self.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET)
+
+    def in_taskslot(self, assign_list) -> bool:
+        self.update_current_time()
+        return (self.current_slot_id in assign_list)
+
     def update_current_time(self):
         self.logical_clock.update_clock()
         self.current_time_in_cycle = int(self.logical_clock.clock - self.cycle_start) % FULL_CYCLE_DURATION
-        self.update_frame_id()
-        self.update_slot_id()
-
-    def update_frame_id(self):
         self.frame_id = floor(self.current_time_in_cycle / FRAME_DURATION)
-
-    def update_slot_id(self):
         self.current_slot_id = floor((self.current_time_in_cycle % FRAME_DURATION) / TASK_SLOT_DURATION)
 
     def enough_time_left(self) -> bool:
