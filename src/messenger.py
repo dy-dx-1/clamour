@@ -85,11 +85,14 @@ class Messenger:
         with self.pozyx_lock:
             self.pozyx.sendData(0, Data([0xAA, message.data], 'Bi'))
 
-    def receive_message(self, state: State) -> None:
-        if self.receive_new_message():
+    def receive_message(self, state: State) -> bool:
+        is_new_message, should_go_to_sync = self.receive_new_message(state)
+        if is_new_message:
             self.update_topology(state)
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())
+
+        return should_go_to_sync
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
         if control_message.code == -1:
@@ -145,12 +148,12 @@ class Messenger:
 
         self.slot_assignment.receive_list[message.slot] = -1
 
-    def receive_new_message(self) -> bool:
+    def receive_new_message(self, state: State) -> (bool, bool):
         """Attempts to get a message from the Pozyx tag.
         If the attempt fails or if the same message was received before,
         returns False."""
 
-        is_new_message = False
+        is_new_message, should_go_back_to_sync = False, False
         sender_id, data = self.obtain_message_from_pozyx()
 
         if sender_id != 0 and data[1] != 0:
@@ -162,8 +165,9 @@ class Messenger:
                 self.received_messages.add(received_message)
                 self.message_box.append(received_message)
                 is_new_message = True
+                should_go_back_to_sync = state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage)
 
-        return is_new_message
+        return is_new_message, should_go_back_to_sync
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
         data = Data([0, 0], 'Bi')

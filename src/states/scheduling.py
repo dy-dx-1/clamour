@@ -16,6 +16,7 @@ class Scheduling(TDMAState):
         self.id = id
         self.messenger = messenger
         self.first_scheduling_execution = True
+        self.should_go_back_to_sync = False
 
     def execute(self) -> State:
         self.messenger.clear_non_scheduling_messages()
@@ -29,6 +30,10 @@ class Scheduling(TDMAState):
         return self.next()
 
     def next(self) -> State:
+        if self.should_go_back_to_sync:
+            self.should_go_back_to_sync = False
+            return State.SYNCHRONIZATION
+
         if self.neighborhood.is_alone_in_state(-1) or self.timing.current_time_in_cycle > self.timing.task_start_time:
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send List: ", self.slot_assignment.pure_send_list)
@@ -42,7 +47,7 @@ class Scheduling(TDMAState):
         if self.is_broadcast_slot():
             self.messenger.broadcast_control_message()
         else:
-            self.messenger.receive_message(State.SCHEDULING)
+            self.should_go_back_to_sync = self.messenger.receive_message(State.SCHEDULING)
 
         self.slot_assignment.update_free_slots()
         self.update_pure_send_list()

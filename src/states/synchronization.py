@@ -88,7 +88,7 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self) -> None:
-        self.messenger.receive_new_message()
+        self.messenger.receive_new_message(State.SYNCHRONIZATION)
         while not self.messenger.message_box.empty():
             message = self.messenger.message_box.pop()
             if isinstance(message, UWBSynchronizationMessage):
@@ -97,7 +97,7 @@ class Synchronization(TDMAState):
                 self.update_offset(message.sender_id, message)
 
             self.messenger.update_topology(State.SYNCHRONIZATION)
-            self.messenger.receive_new_message()
+            self.messenger.receive_new_message(State.SYNCHRONIZATION)
 
         self.increment_time_alive()
 

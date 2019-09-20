@@ -55,10 +55,7 @@ class Task(TDMAState):
 
     def next(self) -> State:
         if self.timing.in_cycle():
-            if self.timing.in_taskslot(self.slot_assignment.pure_send_list):
-                return State.TASK
-            else:
-                return State.LISTEN
+            return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN
         else:
             return State.SYNCHRONIZATION
 
