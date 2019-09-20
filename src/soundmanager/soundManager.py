@@ -55,12 +55,12 @@ class SoundManager(object):
                 if channel.get_busy() != 1:
                     sleep(offset_time)
 
-                    print(" ", index, " on channel ", (index % 2))
+                    print("---------------> on channel ", index)
                     channel_tuple[1] = pygame.mixer.Sound(the_path)
                     try:
                         channel.play(channel_tuple[1])
                     except:
-                        pass
+                        print("FAILED on channel ", index)
                     break
 
     @staticmethod
