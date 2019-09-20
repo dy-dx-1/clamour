@@ -33,7 +33,7 @@ class Task(TDMAState):
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
-        self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.slot_assignment.first_task_slot_in_frame(), self.timing.enough_time_left()])
+        self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
         if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
             self.discover_devices()
             self.neighborhood.collect_garbage()

@@ -45,9 +45,9 @@ class Timing:
         self.update_current_time()
         return (self.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET)
 
-    def in_taskslot(self, assign_list) -> bool:
+    def in_taskslot(self, assigned_list) -> bool:
         self.update_current_time()
-        return (self.current_slot_id in assign_list)
+        return (self.current_slot_id in assigned_list)
 
     def update_current_time(self):
         self.logical_clock.update_clock()
