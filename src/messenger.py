@@ -96,7 +96,7 @@ class Messenger:
         return should_go_to_sync
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
-        if control_message.slot not in self.slot_assignment.receive_list:
+        if control_message.slot > len(self.slot_assignment.receive_list):
             print("INVALID SLOT, WILL CRASH", control_message.slot, self.slot_assignment.receive_list)
         if control_message.code == -1:
             self.handle_assignment_request(control_message)
