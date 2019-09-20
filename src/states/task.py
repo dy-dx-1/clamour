@@ -157,7 +157,7 @@ class Task(TDMAState):
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
-        for anchor in self.anchors.anchors_dict.values():
+        for anchor in self.anchors.available_anchors:
             with self.pozyx_lock:
                 self.pozyx.addDevice(anchor)
 
