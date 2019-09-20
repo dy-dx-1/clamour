@@ -40,6 +40,10 @@ class Timing:
         self.frame_id = 0
         self.cycle_start = self.logical_clock.clock
         self.hist_list = []
+        self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES / 2
+
+    def update_task_start_time(self, nb):
+        self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES / 2
 
     def in_cycle(self) -> bool:
         self.update_current_time()
