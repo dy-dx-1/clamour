@@ -41,9 +41,9 @@ class PozyxDiscoverer:
             PozyxDiscoverer.handle_error(pozyx, pozyx_lock, "get_device_list")
 
         if discovery_type == POZYX_DISCOVERY_TAGS_ONLY:
-            devices = [device for device in devices if not self.is_anchor(device)]
+            devices = [device for device in devices if not PozyxDiscoverer.is_anchor(device)]
         elif discovery_type == POZYX_DISCOVERY_ANCHORS_ONLY:
-            devices = [device for device in devices if self.is_anchor(device)]
+            devices = [device for device in devices if PozyxDiscoverer.is_anchor(device)]
 
         return devices
 
