@@ -39,7 +39,6 @@ class Messenger:
             self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
 
     def broadcast_control_message(self) -> None:
-        broadcast_origin = -1
         if self.message_box.empty():
             # No priority message to broadcast (such as rejection). Proposal can be made.
             code = -1

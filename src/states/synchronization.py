@@ -33,7 +33,6 @@ class Synchronization(TDMAState):
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
-        print("Offset: ", self.timing.synchronization_offset_mean)
 
         self.synchronize()
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
@@ -57,7 +56,8 @@ class Synchronization(TDMAState):
                 self.broadcast_synchronization_message()
 
             self.prepare_next_state()
-            print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle; Perf:", perf_counter())
+            print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle with offset",
+                  self.timing.synchronization_offset_mean)
 
         return next_state
 
