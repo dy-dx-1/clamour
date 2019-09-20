@@ -1,5 +1,6 @@
 import os
 import sys
+from math import floor
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from logicalClock import LogicalClock
@@ -37,19 +38,25 @@ class Timing:
         self.synchronized = False
         self.current_slot_id = -1
         self.frame_id = 0
+        self.cycle_start = self.logical_clock.clock
+        self.hist_list = []
+
+    def in_cycle(self) -> bool:
+        self.update_current_time()
+        return (self.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET)
+
+    def in_taskslot(self, assigned_list) -> bool:
+        self.update_current_time()
+        return (self.current_slot_id in assigned_list)
 
     def update_current_time(self):
         self.logical_clock.update_clock()
-        self.current_time_in_cycle = int(self.logical_clock.clock) % FULL_CYCLE_DURATION
-
-    def update_frame_id(self):
-        self.frame_id = int((self.current_time_in_cycle - TASK_START_TIME) / FRAME_DURATION)
-
-    def update_slot_id(self):
-        self.current_slot_id = int(((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / TASK_SLOT_DURATION)
+        self.current_time_in_cycle = int(self.logical_clock.clock - self.cycle_start) % FULL_CYCLE_DURATION
+        self.frame_id = floor(self.current_time_in_cycle / FRAME_DURATION)
+        self.current_slot_id = floor((self.current_time_in_cycle % FRAME_DURATION) / TASK_SLOT_DURATION)
 
     def enough_time_left(self) -> bool:
-        return ((self.current_time_in_cycle - TASK_START_TIME) % FRAME_DURATION) / NB_TASK_SLOTS < MAX_RANGING_DELAY
+        return (self.current_time_in_cycle % TASK_SLOT_DURATION) < MAX_RANGING_DELAY
 
     def clear_synchronization_info(self):
         self.clock_differential_stat = []

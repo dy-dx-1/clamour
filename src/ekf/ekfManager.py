@@ -24,11 +24,11 @@ class EKFManager:
         self.last_know_neighbors = {}
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
-        self.current_room = self.floorplan.rooms['Arena']
+        self.current_room = self.floorplan.rooms['24']
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
 
-        # self.sh = SoundSegFaultHandler(['python3', 'soundhandler/cyclic_thread.py'])
+        self.sh = SoundSegFaultHandler(['python3', 'soundhandler/cyclic_thread.py'])
 
         filepath = 'broadcast_state.csv'
         isnewfile = os.path.exists(filepath)
@@ -42,15 +42,15 @@ class EKFManager:
     def run(self) -> None:
         remote_host = "192.168.4.120" if self.debug else None
 
-        # self.sh.connect()
+        self.sh.connect()
 
         with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
             self.initialize_ekf(socket)
 
             while True:
-                # self.sh.check()
+                self.sh.check()
                 self.process_latest_state_info(socket)
-                # self.sh.send_player([self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z])
+                self.sh.send_player([self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z])
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
@@ -86,11 +86,8 @@ class EKFManager:
                 message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
 
-            try:
-                with self.pozyx_lock:
-                    self.pozyx.setCoordinates(self.ekf.get_position())
-            except Exception as e:
-                print("Error set coordination on device:", type(e), str(e), self.ekf.get_position())
+            with self.pozyx_lock:
+                self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
 
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])

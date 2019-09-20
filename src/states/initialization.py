@@ -44,7 +44,7 @@ class Initialization(TDMAState):
         self.clear_known_devices()
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, POZYX_DISCOVERY_TAGS_ONLY)
 
-        print("Tags discovered: ", devices.data)
+        print("Tags discovered: ", devices)
 
         self.messenger.update_topology(State.SYNCHRONIZATION, devices)  # Put state to Sync for next phase
 

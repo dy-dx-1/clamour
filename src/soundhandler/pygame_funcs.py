@@ -13,7 +13,7 @@ import numpy as np
 # variable needed to find the right sphere and to play them accordingly to the user position
 PLACEHOLDER = "xxx_yyy_zzz"  # file name gabarit exemple: xxx_yyy_zzz_HH_FF_TTTTT
 
-PATH = "/home/david/chambord_flacs/" #ExportsFactices/" #Flac/"  # ExportsFactices/" #Flac/"
+PATH = "../../chambord_flacs/" #ExportsFactices/" #Flac/"  # ExportsFactices/" #Flac/"
 EXTENSION = ".flac"
 
 class Zone(object):
