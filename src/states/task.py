@@ -29,20 +29,20 @@ class Task(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
-        self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
+        #self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
         self.frame_id_done_discover = -1
 
     def execute(self) -> State:
-        self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
+        # self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
         if self.frame_id_done_discover != self.timing.frame_id:
             self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
             self.set_manually_measured_anchors()
-            print(self.timing.hist_list)
-            self.timing.hist_list.clear()
+            # print(self.timing.hist_list)
+            # self.timing.hist_list.clear()
 
         if self.timing.enough_time_left():
             self.localize()
@@ -133,17 +133,13 @@ class Task(TDMAState):
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
         print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        anchors = [device for device in self.anchors.available_anchors if self.is_anchor(device)]
+        anchors = [device for device in self.anchors.available_anchors if self.discover.is_anchor(device)]
 
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
         else:
             self.anchors.available_tags = [device for device in self.anchors.available_anchors]
             self.anchors.available_anchors.clear()
-
-    @staticmethod
-    def is_anchor(device_id: int) -> bool:
-        return device_id < 0x500
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)

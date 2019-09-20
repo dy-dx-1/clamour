@@ -1,5 +1,5 @@
 from multiprocessing import Lock
-from pypozyx import PozyxSerial, SingleRegister, DeviceList
+from pypozyx import PozyxSerial, SingleRegister, DeviceList, POZYX_DISCOVERY_ALL_DEVICES, POZYX_DISCOVERY_TAGS_ONLY, POZYX_DISCOVERY_ANCHORS_ONLY
 from pypozyx.definitions.constants import POZYX_SUCCESS
 
 
@@ -25,8 +25,12 @@ class PozyxDiscoverer:
         return status, size[0]
 
     @staticmethod
+    def is_anchor(device_id: int) -> bool:
+        return device_id < 0x500
+
+    @staticmethod
     def get_device_list(pozyx: PozyxSerial, pozyx_lock: Lock, discovery_type: int) -> DeviceList:
-        PozyxDiscoverer.discover(pozyx, pozyx_lock, discovery_type)
+        PozyxDiscoverer.discover(pozyx, pozyx_lock, POZYX_DISCOVERY_ALL_DEVICES)
         status, size = PozyxDiscoverer.get_nb_devices(pozyx, pozyx_lock)
         devices = DeviceList(list_size=size)
 
@@ -35,6 +39,11 @@ class PozyxDiscoverer:
                 pozyx.getDeviceIds(devices)
         elif status != POZYX_SUCCESS:
             PozyxDiscoverer.handle_error(pozyx, pozyx_lock, "get_device_list")
+
+        if discovery_type == POZYX_DISCOVERY_TAGS_ONLY:
+            devices = [device for device in devices if not self.is_anchor(device)]
+        else if discovery_type == POZYX_DISCOVERY_ANCHORS_ONLY:
+            devices = [device for device in devices if self.is_anchor(device)]
 
         return devices
 
