@@ -22,7 +22,7 @@ class Listen(TDMAState):
         next_state = self.next()
         
         if next_state == State.LISTEN:
-            sleep(0.002)  # Milliseconds
+            self.messenger.receive_new_message()
 
         return next_state
 

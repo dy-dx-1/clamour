@@ -46,7 +46,7 @@ class Initialization(TDMAState):
 
         print("Tags discovered: ", devices.data)
 
-        self.messenger.update_neighbor_dictionary(State.SYNCHRONIZATION, devices)  # Put state to Sync for next phase
+        self.messenger.update_topology(State.SYNCHRONIZATION, devices)  # Put state to Sync for next phase
 
     def clear_known_devices(self):
         with self.pozyx_lock:
