@@ -76,5 +76,5 @@ if __name__ == "__main__":
         debug = bool(int(sys.argv[1]))
         if len(sys.argv) > 2:
             sound = bool(int(sys.argv[2]))
-    print(debug, sound)
+
     main(debug, sound)
