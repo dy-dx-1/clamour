@@ -66,5 +66,6 @@ def main(debug: bool):
 
 
 if __name__ == "__main__":
-    debug = bool(int(sys.argv[1:][0]))  # An argument of anything else than 0 sets debug to True.
+    # An argument of anything else than 0 sets debug to True.
+    debug = bool(int(sys.argv[1:][0])) if len(sys.argv) > 0 else False
     main(debug)
