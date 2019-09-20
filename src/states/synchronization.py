@@ -64,10 +64,6 @@ class Synchronization(TDMAState):
     def next(self) -> State:
         current_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS)) - self.first_exec_time
 
-        # print("Alone:", self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION), "left behind:",
-        #       self.is_left_behind(), "exec time:", current_exec_time > SYNCHRONIZATION_PERIOD,
-        #       "synced:", self.timing.synchronized, "neighbors synced:", self.neighborhood.are_neighbors_synced())
-
         if current_exec_time < SYNCHRONIZATION_PERIOD / 3:
             return State.SYNCHRONIZATION
 
@@ -112,6 +108,7 @@ class Synchronization(TDMAState):
         self.timing.update_task_start_time(len(self.neighborhood.current_neighbors))
         self.messenger.message_box.clear()
         self.messenger.received_messages.clear()
+        self.messenger.should_go_back_to_sync = 0
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage) -> None:
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
