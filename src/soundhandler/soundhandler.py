@@ -31,7 +31,7 @@ class SoundSegFaultHandler(object):
         if pos is None:
             return
         else:
-            pos_st = "ST{0};{1};{2}".format(pos[0]/10, pos[1]/10, pos[2]/10).encode('utf-8')
+            pos_st = "ST{0};{1};{2}".format(int(pos[0]/10), int(pos[1]/10), int(pos[2]/10)).encode('utf-8')
         try:
             self.conn.sendall(pos_st)
 #                print("Sent: ", pos)

@@ -43,6 +43,7 @@ class Timing:
         self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES / 2
 
     def update_task_start_time(self, nb):
+        if nb == 0: nb = 2
         self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES / 2
 
     def in_cycle(self) -> bool:
