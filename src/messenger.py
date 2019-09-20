@@ -103,7 +103,9 @@ class Messenger:
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
         if control_message.slot > len(self.slot_assignment.receive_list):
-            print("INVALID SLOT, WILL CRASH", control_message.slot, self.slot_assignment.receive_list)
+            print("INVALID SLOT, SKIPPING MSG", control_message.slot, self.slot_assignment.receive_list)
+            return
+
         if control_message.code == -1:
             self.handle_assignment_request(control_message)
         elif control_message.code == self.id:

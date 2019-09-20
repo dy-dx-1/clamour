@@ -1,6 +1,6 @@
 from numpy import mean
 from ctypes import c_int32 as int32
-from time import time, perf_counter, sleep
+from time import time, sleep
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
