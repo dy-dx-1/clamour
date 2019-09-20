@@ -71,7 +71,7 @@ def main(debug: bool, sound: bool):
 
 if __name__ == "__main__":
     # An argument of anything else than 0 sets debug to True.
-    debug, sound = False
+    debug, sound = False, False
     if len(sys.argv[:1]) > 0:
         debug = bool(int(sys.argv[1:][0]))
         if len(sys.argv[:1]) > 1:
