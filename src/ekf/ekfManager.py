@@ -27,17 +27,22 @@ class EKFManager:
         self.current_room = self.floorplan.rooms['24']
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
+        self.state_csv, self.writer = self.initialize_csv()
 
         self.sh = SoundSegFaultHandler(['python3', 'soundhandler/cyclic_thread.py'])
 
+    def initialize_csv(self):
         filepath = 'broadcast_state.csv'
-        isnewfile = os.path.exists(filepath)
+        is_new_file = os.path.exists(filepath)
         fieldnames = ['pozyx_id', 'timestamp', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'raw_yaw',
                       'ekf_yaw', 'ekf_covariance_matrix', 'two_hop_neighbors']
-        self.state_csv = open(filepath, 'w')
-        self.writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)  
-        if isnewfile:
-            self.writer.writeheader()
+
+        state_csv = open(filepath, 'w')
+        writer = csv.DictWriter(self.state_csv, delimiter=',', fieldnames=fieldnames)
+        if is_new_file:
+            writer.writeheader()
+
+        return state_csv, writer
 
     def run(self) -> None:
         remote_host = "192.168.4.120" if self.debug else None
