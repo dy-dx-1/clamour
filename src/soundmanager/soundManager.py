@@ -45,7 +45,6 @@ class SoundManager(object):
     def sound_player(self, track):
         # loop trough the channel to find an available one and use it to play the track
         the_path = PATH + track
-        print("Play ", the_path)
         if track != self.last_sound:
             self.last_sound = track
 
@@ -56,7 +55,7 @@ class SoundManager(object):
                 if channel.get_busy() != 1:
                     sleep(offset_time)
 
-                    print("---------------> on channel ", index)
+                    print("Play ", the_path, "---> on channel ", index)
                     channel_tuple[1] = pygame.mixer.Sound(the_path)
                     try:
                         channel.play(channel_tuple[1])
