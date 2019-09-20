@@ -32,9 +32,8 @@ def get_pozyx_id(pozyx) -> int:
     return data[1] * 256 + data[0]
 
 
-def main(argv):
+def main(debug: bool):
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
-    debug = int(argv[0])  # TODO link with ekfManager self.debug
     print("Starting everything, have a nice visit (", debug, ")")
 
     with ContextManagedQueue() as multiprocess_communication_queue:
@@ -42,7 +41,7 @@ def main(argv):
         shared_pozyx_lock = Lock()
         pozyx_id = get_pozyx_id(shared_pozyx)
 
-        ekf_manager = EKFManager(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
+        ekf_manager = EKFManager(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, debug)
         pedometer = Pedometer(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock)
         tdma_node = TDMANode(multiprocess_communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
 
@@ -55,4 +54,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main(debug=bool(sys.argv[1:][0]))
