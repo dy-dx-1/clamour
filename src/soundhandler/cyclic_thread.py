@@ -34,7 +34,7 @@ def main():
                 pos = pos.decode('utf-8')
                 #print("Received: ", pos)
                 pos = pos.split("ST")[-1].split(";")
-                position = Position(float(pos[0]), float(pos[1]), float(pos[2]))
+                position = Position(int(pos[0]), int(pos[1]), int(pos[2]))
             except Exception as e:
                 print(e)
                 position = old_position
