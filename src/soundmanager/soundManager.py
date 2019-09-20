@@ -3,13 +3,16 @@ import pygame
 from pypozyx import Coordinates
 from random import randint
 from time import sleep
+import sys, os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from contextManagedQueue import ContextManagedQueue
 from messages import SoundMessage
 
 # variable needed to find the right sphere and to play them accordingly to the user position
 PLACEHOLDER = "xxx_yyy_zzz"  # file name template example: xxx_yyy_zzz_HH_FF_TTTTT
-PATH = "../../chambord_flacs/"
+PATH = "../../../chambord_flacs/"
 SOUND_XYZ_FILES_JSON = '../sound/xyz_files.json'
 EXTENSION = ".flac"
 ORIGIN = [28, 4, 1959]
@@ -93,3 +96,13 @@ class SoundManager(object):
                                               message.coordinates.y / 10,
                                               message.coordinates.z / 10)
                 self.cyclic_call(scaled_position)
+
+def main():
+    sm = SoundManager(None)
+    for posX in range(-1800, -1400, 23):
+        for posY in range(-1800, -1400, 23):
+            sm.cyclic_call(Coordinates(posX, posY, 1900))
+            sleep(0.1)
+
+if __name__ == "__main__":
+    main()
