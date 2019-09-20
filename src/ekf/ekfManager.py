@@ -50,7 +50,7 @@ class EKFManager:
             while True:
                 self.sh.check()
                 self.process_latest_state_info(socket)
-                self.sh.send_player([self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z])
+                self.sh.send_player([int(self.ekf.get_position().x / 10), int(self.ekf.get_position().y / 10), int(self.ekf.get_position().z / 10)])
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
