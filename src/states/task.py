@@ -133,7 +133,7 @@ class Task(TDMAState):
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
         print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        anchors = [device for device in self.anchors.available_anchors if self.discover.is_anchor(device)]
+        anchors = [device for device in self.anchors.available_anchors if PozyxDiscoverer.is_anchor(device)]
 
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
