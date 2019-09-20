@@ -36,7 +36,11 @@ class Neighborhood:
         return len([neighbor for neighbor in self.current_neighbors.values() if neighbor[2] == state]) == 0
 
     def add_neighbor(self, device_id: int, timestamp: float, state: int, second_degree_neighbors: list = None) -> None:
-        updated_second_degree_neighbors = second_degree_neighbors or self.current_neighbors[device_id][0]
+        if device_id in self.current_neighbors:
+            updated_second_degree_neighbors = second_degree_neighbors or self.current_neighbors[device_id][0]
+        else:
+            updated_second_degree_neighbors = second_degree_neighbors
+
         self.current_neighbors[device_id] = (updated_second_degree_neighbors, timestamp, state)
         self.changed = True
 
