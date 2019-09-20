@@ -8,6 +8,7 @@ import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from contextManagedQueue import ContextManagedQueue
+from contextManagedProcess import ContextManagedProcess
 from messages import SoundMessage
 
 # variable needed to find the right sphere and to play them accordingly to the user position
@@ -98,13 +99,15 @@ class SoundManager(object):
                                               message.coordinates.z / 10)
                 self.cyclic_call(scaled_position)
 
-def main():
-    sm = SoundManager(None)
-    for posX in range(-1800, -1400, 10):
-        for posY in range(-1800, -1400, 10):
-            print(posX, posY, 1896)
-            sm.cyclic_call(Coordinates(posX, posY, 1896))
-            sleep(0.1)
+    def main(self):
+        for posX in range(-1800, -1400, 10):
+            for posY in range(-1800, -1400, 10):
+                print(posX, posY, 1896)
+                self.cyclic_call(Coordinates(posX, posY, 1896))
+                sleep(0.1)
 
 if __name__ == "__main__":
-    main()
+    sm = SoundManager(None)
+
+    with ContextManagedProcess(target=sm.main) as p:
+            p.start()
