@@ -13,8 +13,8 @@ class UpdateMessage:
         self.measured_xyz = measured_xyz
         self.measured_yaw = measured_yaw
         self.timestamp = timestamp
-        self.neighbors = neighbors or []
-        self.topology = topology or {}
+        self.neighbors = neighbors if neighbors is not None else []
+        self.topology = topology if topology is not None else {}
 
     @staticmethod
     def save(message):

@@ -93,7 +93,7 @@ class UWBTopologyMessage(UWBMessage):
         self.TAG_BASE_VALUE = 0x2000
         self.NB_BITS = 30  # Only the last 30 bits are used for data, because the 2 MSB are for message type
         self.data = data
-        self.neighborhood = topology or []
+        self.neighborhood = topology if topology is not None else []
         self.bitwise_neighbors = 0
 
     def decode(self):
