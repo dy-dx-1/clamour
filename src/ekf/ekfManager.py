@@ -56,7 +56,6 @@ class EKFManager:
                 self.process_latest_state_info(socket)
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
-        print("Initializing....")
         while self.ekf is None:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
@@ -71,7 +70,7 @@ class EKFManager:
                     self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
                 else:
                     print(message.update_type)
-        print("done.")
+        print("EKF Initializing Done.")
 
     def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
