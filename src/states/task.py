@@ -157,13 +157,13 @@ class Task(TDMAState):
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
-        for anchor in self.anchors.anchors_dict.values():
+        for anchor in self.anchors.available_anchors:
             with self.pozyx_lock:
-                self.pozyx.addDevice(anchor)
+                self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
 
-        if len(self.anchors.anchors_dict) > 4:
+        if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
-                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.anchors_dict))
+                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()

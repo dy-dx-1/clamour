@@ -9,7 +9,7 @@ class Anchors:
         self.floor_height = 13800
         self.anchors_list = self.load_anchors_from_csv()
 
-        print("Anchor list loaded (", len(self.anchors_list), ")")
+        # print("Anchor list loaded (", len(self.anchors_list), ")")
 
         self.anchors_dict = {anchor.data[0]: anchor for (_, anchor) in enumerate(self.anchors_list)}
 

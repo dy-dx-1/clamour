@@ -1,6 +1,5 @@
 import json
 import pygame
-import numpy as np
 from pypozyx import Coordinates
 from random import randint
 from time import sleep
@@ -11,7 +10,9 @@ from messages import SoundMessage
 # variable needed to find the right sphere and to play them accordingly to the user position
 PLACEHOLDER = "xxx_yyy_zzz"  # file name template example: xxx_yyy_zzz_HH_FF_TTTTT
 PATH = "../../chambord_flacs/"
+SOUND_XYZ_FILES_JSON = '../sound/xyz_files.json'
 EXTENSION = ".flac"
+ORIGIN = [28, 4, 1959]
 
 
 class SoundManager(object):
@@ -25,50 +26,44 @@ class SoundManager(object):
             self.channels.append([pygame.mixer.Channel(index), None, -1])
 
         self.incr = 0
-        self.patternChord = "*" + PLACEHOLDER + "*." + EXTENSION
-        self.lastSound = ""
+        self.pattern_chord = "*" + PLACEHOLDER + "*." + EXTENSION
+        self.position_old = None
+        self.last_sound = ""
 
-        self.files_dict = None
-        self.make_dict()
+        with open(SOUND_XYZ_FILES_JSON) as fp:
+            self.xyz_files = json.load(fp)
 
-    def make_dict(self) -> None:
-        with open('../sound/files.json') as fp:
-            self.files_dict = json.load(fp)
+        print(len(self.xyz_files))
 
-        print(len(self.files_dict))
-        arr = np.array([self.files_dict[key] for key in self.files_dict])
-        print(np.amax(arr, axis=0))
-        print(np.amin(arr, axis=0))
+    def build_file_name(self, coordinates: Coordinates) -> str:
+        return self.xyz_files.get(self.convert_coordinates_to_indexes(coordinates), "")
 
-    def buildFileName(self, coordinates: Coordinates) -> str:
-        for fn, bounds in self.files_dict.items():
-            if (coordinates.x >= bounds[0]) and (coordinates.x <= bounds[1]):
-                if (coordinates.y >= bounds[2]) and (coordinates.y <= bounds[3]):
-                    if (coordinates.z >= bounds[4]) and (coordinates.z <= bounds[5]):
-                        print(fn, bounds)
-                        return fn
-        return ""
-
-    def soundPlayer(self, track):
+    def sound_player(self, track):
         # loop trough the channel to find an available one and use it to play the track
-        if track != self.lastSound:
-            self.lastSound = track
+        if track != self.last_sound:
+            self.last_sound = track
+
             for index, channel_tuple in enumerate(self.channels):
                 offset_time = randint(80, 200) * 0.001
-
                 channel = channel_tuple[0]
 
                 if channel.get_busy() != 1:
                     sleep(offset_time)
 
-                    thePath = PATH + track
-                    print("Play ", thePath, index, " on channel ", (index % 2))
-                    channel_tuple[1] = pygame.mixer.Sound(thePath)
+                    the_path = PATH + track
+                    print("Play ", the_path, index, " on channel ", (index % 2))
+                    channel_tuple[1] = pygame.mixer.Sound(the_path)
                     try:
                         channel.play(channel_tuple[1])
                     except:
                         pass
                     break
+
+    @staticmethod
+    def convert_coordinates_to_indexes(coordinates: Coordinates):
+        return "{}_{}_{}".format(int(round((coordinates.x - ORIGIN[0]) / 30)),
+                                 int(round((coordinates.y - ORIGIN[1]) / 30)),
+                                 int(round((coordinates.z - ORIGIN[2]) / 30)))
 
     def buildPlayList(self):
         """This function switches the different stats and call the sound that must be played."""
@@ -76,18 +71,19 @@ class SoundManager(object):
         while pygame.mixer.get_busy == 1:  # wait for the last instance to finish
             print('waiting for channel to be ready')
 
-        self.soundPlayer(self.patternChord)
+        self.sound_player(self.pattern_chord)
 
     def cyclic_call(self, position: Coordinates):
-        self.patternChord = self.buildFileName(position)
+        self.pattern_chord = self.build_file_name(position)
 
-        if (position.x != 0 or position.y != 0 or position.z != 0) and self.patternChord:
+        if (position.x != 0 or position.y != 0 or position.z != 0) and self.pattern_chord:
             self.buildPlayList()
         else:
-            print("No file found on position: X", position.x, " Y:", position.y, "Z:", position.z, "(", self.patternChord, ")")
+            print("No file found on position: X", position.x, " Y:", position.y, "Z:", position.z,
+                  "(", self.pattern_chord, ")")
 
     def play(self, path):
-        self.patternChord = path
+        self.pattern_chord = path
         self.buildPlayList()
 
     def run(self) -> None:
