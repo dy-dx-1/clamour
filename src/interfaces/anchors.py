@@ -19,8 +19,7 @@ class Anchors:
             next(reader)  # We don't want to read the header, so we skip it
             return [self.add_anchor(anc) for anc in reader]
 
-    @staticmethod
-    def add_anchor(anchor_data: list) -> DeviceCoordinates:
+    def add_anchor(self, anchor_data: list) -> DeviceCoordinates:
         label = int(anchor_data[0], base=16)
         lvl = int(anchor_data[1])
         x = int(anchor_data[2])
