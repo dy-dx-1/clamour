@@ -79,7 +79,7 @@ class EKFManager:
             update_info = self.extract_update_info(message)
 
             if message.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
-                self.last_know_neighbors = update_info[3]
+                self.last_know_neighbors = message.topology
 
             if not self.validate_new_state(update_info[0]):
                 update_info = self.generate_zero_update_info(update_info[2])
@@ -101,8 +101,10 @@ class EKFManager:
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
             return self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp
-        elif msg.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
-            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp, msg.topology
+        elif msg.update_type == UpdateType.TRILATERATION:
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp
+        elif msg.update_type == UpdateType.RANGING:
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp, msg.neighbors
 
     def infer_coordinates(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
