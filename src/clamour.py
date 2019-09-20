@@ -72,9 +72,9 @@ def main(debug: bool, sound: bool):
 if __name__ == "__main__":
     # An argument of anything else than 0 sets debug to True.
     debug, sound = False, False
-    if len(sys.argv[1:]) > 0:
-        debug = bool(int(sys.argv[1:][0]))
-        if len(sys.argv[1:]) > 1:
-            sound = bool(int(sys.argv[1:][1]))
+    if len(sys.argv) > 1:
+        debug = bool(int(sys.argv[1]))
+        if len(sys.argv) > 2:
+            sound = bool(int(sys.argv[2]))
     print(debug, sound)
     main(debug, sound)
