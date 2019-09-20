@@ -31,10 +31,12 @@ class Task(TDMAState):
         self.messenger = messenger
         self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
+        self.frame_id_done_discover = -1
 
     def execute(self) -> State:
         self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
-        if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
+        if self.frame_id_done_discover != self.timing.frame_id:
+            self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
