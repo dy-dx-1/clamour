@@ -21,6 +21,7 @@ class EKFManager:
         self.debug = 0  # TODO connect to main argv
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
+        self.last_know_neighbors = {}
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['24']
@@ -44,9 +45,7 @@ class EKFManager:
         self.sh.connect()
 
         with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
-            print("INIT EKF")
             self.initialize_ekf(socket)
-            print("INIT EKF DONE")
 
             while True:
                 self.sh.check()
@@ -78,10 +77,13 @@ class EKFManager:
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
             update_info = self.extract_update_info(message)
+
+            if message.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
+                self.last_know_neighbors = message.topology
+
             if not self.validate_new_state(update_info[0]):
                 update_info = self.generate_zero_update_info(update_info[2])
                 message.update_type = UpdateType.ZERO_MOVEMENT
-                print("Invalid position")
             update_functions[message.update_type](*update_info)
 
             with self.pozyx_lock:
@@ -96,8 +98,10 @@ class EKFManager:
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
             return self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp
-        elif msg.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
+        elif msg.update_type == UpdateType.TRILATERATION:
             return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp
+        elif msg.update_type == UpdateType.RANGING:
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp, msg.neighbors
 
     def infer_coordinates(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
@@ -152,7 +156,7 @@ class EKFManager:
                 'raw_yaw': yaw,
                 'ekf_yaw': self.ekf.get_yaw(), 
                 'ekf_covariance_matrix': linalg.det(self.ekf.P),
-                'two_hop_neighbors': ""
+                'two_hop_neighbors': self.last_know_neighbors
             }
 
             self.writer.writerow(csv_data)

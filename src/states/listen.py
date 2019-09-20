@@ -1,5 +1,3 @@
-from time import sleep
-
 from interfaces import SlotAssignment, Timing, Neighborhood
 from interfaces.timing import Timing
 from messenger import Messenger
@@ -19,8 +17,8 @@ class Listen(TDMAState):
     def execute(self) -> State:
         next_state = self.next()
         
-        # if next_state == State.LISTEN:
-        #     sleep(0.002)  # Milliseconds
+        if next_state == State.LISTEN:
+            self.messenger.receive_new_message()
 
         return next_state
 
