@@ -54,7 +54,7 @@ def main(debug: bool):
             ekf_manager = EKFManager(sound_queue, communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, debug)
             pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
             tdma_node = TDMANode(communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
-            # sound_player = SoundManager(sound_queue)
+            sound_player = SoundManager(sound_queue)
 
             with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
                 ekf_manager_process.start()
@@ -62,7 +62,7 @@ def main(debug: bool):
                     tdma_process.start()
                     with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                         pedometer_process.start()
-                        # keep_alive(sound_player)
+                        keep_alive(sound_player)
 
 
 if __name__ == "__main__":
