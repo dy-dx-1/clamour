@@ -3,6 +3,7 @@ from pygame_funcs import PyGameManager
 
 BUFFER_SIZE = 4480
 
+
 class Position(object):
     def __init__(self, x, y, z):
         self.x = x
@@ -32,7 +33,7 @@ def main():
         if valid_pos and pos != b"":
             try:
                 pos = pos.decode('utf-8')
-                #print("Received: ", pos)
+                # print("Received: ", pos)
                 pos = pos.split("ST")[-1].split(";")
                 position = Position(int(pos[0]), int(pos[1]), int(pos[2]))
             except Exception as e:

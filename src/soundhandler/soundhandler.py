@@ -2,6 +2,7 @@ import socket
 import psutil
 import subprocess as sp
 
+
 class SoundSegFaultHandler(object):
     def __init__(self, popen_call):
         self.popen_call = popen_call
@@ -26,7 +27,8 @@ class SoundSegFaultHandler(object):
             self.conn, _ = self.socket.accept()
             self.conn.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 2)
 
-        #pos = self.main_func()
+        # pos = self.main_func()
+
     def send_player(self,pos):
         if pos is None:
             return
@@ -41,7 +43,7 @@ class SoundSegFaultHandler(object):
     def is_process_alive(self):
         try:
             process = psutil.Process(self.process.pid)
-            #print(process.status())
+            # print(process.status())
             if process.status() in ["running", "sleeping", "disk-sleep"]:
                 return True
         except:

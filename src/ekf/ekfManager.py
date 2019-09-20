@@ -9,27 +9,27 @@ from time import time
 from .ekf import CustomEKF, DT_THRESHOLD
 from contextManagedQueue import ContextManagedQueue
 from contextManagedSocket import ContextManagedSocket
-from messages import UpdateMessage, UpdateType
+from messages import UpdateMessage, SoundMessage, UpdateType
 from rooms import Floorplan
-from soundhandler import SoundSegFaultHandler
 
 
 class EKFManager:
-    def __init__(self, communication_queue: ContextManagedQueue, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, pozyx_id: int, debug: int):
+    def __init__(self, sound_queue: ContextManagedQueue, communication_queue: ContextManagedQueue,
+                 shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock,
+                 pozyx_id: int, debug: int):
         self.pozyx_id = pozyx_id
         self.ekf = None
         self.debug = debug
         self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.last_know_neighbors = {}
+        self.sound_queue = sound_queue
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['24']
         self.pozyx = shared_pozyx
         self.pozyx_lock = shared_pozyx_lock
         self.state_csv, self.writer = self.initialize_csv()
-
-        self.sh = SoundSegFaultHandler(['python3', 'soundhandler/cyclic_thread.py'])
 
     def initialize_csv(self):
         filepath = 'broadcast_state.csv'
@@ -47,13 +47,10 @@ class EKFManager:
     def run(self) -> None:
         remote_host = "192.168.4.120" if self.debug else None
 
-        self.sh.connect()
-
         with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
             self.initialize_ekf(socket)
 
             while True:
-                self.sh.check()
                 self.process_latest_state_info(socket)
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
@@ -96,7 +93,9 @@ class EKFManager:
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
             print(self.ekf.get_position())
-            self.sh.send_player([self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z])
+
+            sound_message = SoundMessage(self.ekf.get_position())
+            self.sound_queue.put(SoundMessage.save(sound_message))
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))

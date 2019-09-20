@@ -1,1 +1,1 @@
-from .soundhandler import SoundSegFaultHandler
+from .pygame_funcs import SoundManager
