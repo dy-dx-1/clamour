@@ -24,13 +24,14 @@ class Messenger:
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.received_messages = set()
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None) -> None:
-        message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors)
+    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
+                             neighbors: list = None, topology: dict = None) -> None:
+        message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors, topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
-    def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
+    def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
-        message.synchronized_clock = time
+        message.synchronized_clock = timestamp
         message.encode()
 
         with self.pozyx_lock:
@@ -57,7 +58,7 @@ class Messenger:
         self.broadcast(slot, code)
 
     def broadcast_topology_message(self):
-        message = UWBTopologyMessage(sender_id=self.id, neighborhood=self.neighborhood.current_neighbors.keys())
+        message = UWBTopologyMessage(sender_id=self.id, topology=self.neighborhood.current_neighbors.keys())
         message.encode()
 
         with self.pozyx_lock:
