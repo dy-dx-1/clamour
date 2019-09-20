@@ -4,10 +4,9 @@ from multiprocessing import Lock
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
+                     PozyxSerial, EulerAngles, SingleRegister)
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
-from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME, SLOT_FOR_RESET
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
 from pozyx_utils import PozyxDiscoverer
@@ -29,20 +28,16 @@ class Task(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
-        #self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
         self.frame_id_done_discover = -1
 
     def execute(self) -> State:
-        # self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
         if self.frame_id_done_discover != self.timing.frame_id:
             self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
             self.set_manually_measured_anchors()
-            # print(self.timing.hist_list)
-            # self.timing.hist_list.clear()
 
         if self.timing.enough_time_left():
             self.localize()
