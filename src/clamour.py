@@ -35,10 +35,10 @@ def get_pozyx_id(pozyx) -> int:
 
 def keep_alive(process: RunnableProcess) -> None:
     while True:
-        with ContextManagedProcess(target=process.run) as p:
-            p.start()
-
-        print("A process that needs to be kept alive died and will be restarted.")
+        try:
+            process.run()
+        except Exception as e:
+            print("A process that needs to be kept alive died and will be restarted. Error:", str(e))
 
 
 def main(debug: bool):
