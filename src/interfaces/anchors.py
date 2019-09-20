@@ -6,7 +6,7 @@ class Anchors:
     def __init__(self):
         self.available_anchors = []
         self.available_tags = []
-        self.floor_height = 13800
+        self.floor_height = 18900 - 300
         self.anchors_list = self.load_anchors_from_csv()
 
         # print("Anchor list loaded (", len(self.anchors_list), ")")
