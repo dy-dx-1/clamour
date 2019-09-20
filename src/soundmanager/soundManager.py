@@ -12,7 +12,7 @@ from messages import SoundMessage
 
 # variable needed to find the right sphere and to play them accordingly to the user position
 PLACEHOLDER = "xxx_yyy_zzz"  # file name template example: xxx_yyy_zzz_HH_FF_TTTTT
-PATH = "../../../chambord_flacs/"
+PATH = "../../chambord_flacs/"
 SOUND_XYZ_FILES_JSON = '../sound/xyz_files.json'
 EXTENSION = ".flac"
 ORIGIN = [28, 4, 1959]
