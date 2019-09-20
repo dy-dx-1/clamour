@@ -62,7 +62,7 @@ def main(debug: bool):
                     tdma_process.start()
                     with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                         pedometer_process.start()
-                        keep_alive(sound_player.run)
+                        keep_alive(sound_player)
 
 
 if __name__ == "__main__":
