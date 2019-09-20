@@ -79,8 +79,7 @@ class SoundManager(object):
         if (position.x != 0 or position.y != 0 or position.z != 0) and self.pattern_chord:
             self.buildPlayList()
         else:
-            print("No file found on position: X", position.x, " Y:", position.y, "Z:", position.z,
-                  "(", self.pattern_chord, ")")
+            print("No file found on position:", position, "(", self.pattern_chord, ")")
 
     def play(self, path):
         self.pattern_chord = path
