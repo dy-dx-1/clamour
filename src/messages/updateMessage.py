@@ -13,7 +13,7 @@ class UpdateMessage:
         self.measured_xyz = measured_xyz
         self.measured_yaw = measured_yaw
         self.timestamp = timestamp
-        self.neighbors = neighbors if neighbors is not None else []
+        self.neighbors = neighbors or []
 
     @staticmethod
     def save(message):
