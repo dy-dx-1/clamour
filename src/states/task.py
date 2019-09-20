@@ -33,12 +33,14 @@ class Task(TDMAState):
         self.set_manually_measured_anchors()
 
     def execute(self) -> State:
-        # print(self.timing.current_time_in_cycle, self.timing.current_slot_id, self.slot_assignment.first_task_slot_in_frame(), self.timing.enough_time_left())
+        self.timing.hist_dict[self.timing.current_time_in_cycle] = [self.timing.current_slot_id, self.slot_assignment.first_task_slot_in_frame(), self.timing.enough_time_left()]
         if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
             self.set_manually_measured_anchors()
+            print(self.timing.hist_dict)
+            self.timing.hist_dict.clear()
 
         if self.timing.enough_time_left():
             self.localize()
