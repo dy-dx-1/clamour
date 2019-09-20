@@ -42,6 +42,10 @@ class Task(TDMAState):
         if self.timing.enough_time_left():
             self.localize()
 
+        if self.neighborhood.changed:
+            self.messenger.broadcast_topology_message()
+            self.neighborhood.changed = False
+
         return self.next()
 
     def next(self) -> State:

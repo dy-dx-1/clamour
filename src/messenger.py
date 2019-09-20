@@ -8,7 +8,7 @@ from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
-                      UpdateMessage, UpdateType)
+                      UWBTopologyMessage, UpdateMessage, UpdateType)
 
 
 class Messenger:
@@ -55,6 +55,13 @@ class Messenger:
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
+
+    def broadcast_topology_message(self):
+        message = UWBTopologyMessage(sender_id=self.id, neighborhood=self.neighborhood.current_neighbors.keys())
+        message.encode()
+
+        with self.pozyx_lock:
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \

@@ -2,9 +2,9 @@ from enum import IntEnum
 
 
 class MessageType(IntEnum):
-    SYNC = 0
-    TDMA = 1
-    UNKNOWN = 2
+    SYNC = 0  # 0b0(0/1)
+    TDMA = 2  # 0b10
+    TOPOLOGY = 3  # 0b11
 
 
 class UpdateType(IntEnum):

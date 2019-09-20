@@ -20,6 +20,7 @@ class Neighborhood:
         self.synced_neighbors = {}
         self.neighbor_synchronization_received = {}
         self.synchronized_active_neighbor_count = 0
+        self.changed = False  # Indicates if the neighborhood has changed since the last topology broadcast
 
     def collect_garbage(self, delay: float = OBSOLESCENCE_DELAY) -> None:
         for id in [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - delay]:
@@ -36,6 +37,7 @@ class Neighborhood:
 
     def add_neighbor(self, device_id: int, second_degree_neighbors: list, timestamp: float, state: int) -> None:
         self.current_neighbors[device_id] = (second_degree_neighbors, timestamp, state)
+        self.changed = True
 
     def add_synced_neighbor(self, device_id: int) -> None:
         if device_id not in self.synced_neighbors:
