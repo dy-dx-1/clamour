@@ -23,8 +23,8 @@ class UWBMessage(object):
 
 
 class UWBSynchronizationMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType=MessageType.SYNC,
-                 data: int=0, synchronized: bool = False):
+    def __init__(self, sender_id: int, message_type: MessageType = MessageType.SYNC,
+                 data: int = 0, synchronized: bool = False):
         super(UWBSynchronizationMessage, self).__init__(sender_id, message_type, data)
         self.CLOCK_MASK = 0x3FFFFFFF
         self.SYNC_MASK = 0x40000000
@@ -52,7 +52,8 @@ class UWBSynchronizationMessage(UWBMessage):
 
 
 class UWBTDMAMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType=MessageType.TDMA, data: int=0, slot: int=-1, code: int=-5):
+    def __init__(self, sender_id: int, message_type: MessageType = MessageType.TDMA,
+                 data: int = 0, slot: int = -1, code: int = -5):
         super(UWBTDMAMessage, self).__init__(sender_id, message_type, data)
         self.SLOT_MASK = 0x3FFF8000
         self.TDMA_CODE_MASK = 0x7FFF
@@ -72,7 +73,7 @@ class UWBTDMAMessage(UWBMessage):
         if self.code < 0:
             self.code = 16384 - self.code
         
-        self.data = int32((bool(self.message_type) << 31) | (self.slot << 15) | self.code).value
+        self.data = int32((self.message_type << 30) | (self.slot << 15) | self.code).value
 
     def __hash__(self):
         return hash(str(self.sender_id) + str(self.data))
@@ -82,3 +83,33 @@ class UWBTDMAMessage(UWBMessage):
 
     def __eq__(self, other: 'UWBTDMAMessage'):
         return self.__hash__() == other.__hash__()
+
+
+class UWBTopologyMessage(UWBMessage):
+    def __init__(self, sender_id: int, message_type: MessageType = MessageType.TDMA,
+                 data: int = 0, topology: list = None):
+        super(UWBTopologyMessage, self).__init__(sender_id, message_type, data)
+        self.TAG_ID_MASK = 0xFF
+        self.TAG_BASE_VALUE = 0x2000
+        self.NB_BITS = 30  # Only the last 30 bits are used for data, because the 2 MSB are for message type
+        self.data = data
+        self.neighborhood = topology if topology is not None else []
+        self.bitwise_neighbors = 0
+
+    def decode(self):
+        self.neighborhood = [(i + 1 | self.TAG_BASE_VALUE) for i in range(self.NB_BITS) if (self.data >> i) & 0x1 == 1]
+
+    def encode(self):
+        self.calculate_bitwise_neighbors()
+        self.data = int32((self.message_type << 30) | self.bitwise_neighbors).value
+
+    def calculate_bitwise_neighbors(self) -> None:
+        self.bitwise_neighbors = 0
+        for neighbor in self.neighborhood:
+            self.bitwise_neighbors |= 1 << ((neighbor & self.TAG_ID_MASK) - 1)
+
+    def __eq__(self, other: 'UWBTDMAMessage'):
+        return self.__hash__() == other.__hash__()
+
+    def __hash__(self):
+        return hash(str(self.sender_id) + str(self.data))

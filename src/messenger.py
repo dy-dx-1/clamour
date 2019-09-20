@@ -8,7 +8,7 @@ from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
-                      UpdateMessage, UpdateType)
+                      UWBTopologyMessage, UpdateMessage, UpdateType)
 
 
 class Messenger:
@@ -24,13 +24,14 @@ class Messenger:
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.received_messages = set()
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float, neighbors: list = None) -> None:
-        message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors)
+    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
+                             neighbors: list = None, topology: dict = None) -> None:
+        message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors, topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
-    def broadcast_synchronization_message(self, time: int, synchronized: bool) -> None:
+    def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:
         message = UWBSynchronizationMessage(sender_id=self.id, synchronized=synchronized)
-        message.synchronized_clock = time
+        message.synchronized_clock = timestamp
         message.encode()
 
         with self.pozyx_lock:
@@ -55,6 +56,13 @@ class Messenger:
             slot, code = message.slot, message.code
 
         self.broadcast(slot, code)
+
+    def broadcast_topology_message(self):
+        message = UWBTopologyMessage(sender_id=self.id, topology=self.neighborhood.current_neighbors.keys())
+        message.encode()
+
+        with self.pozyx_lock:
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -79,7 +87,7 @@ class Messenger:
 
     def receive_message(self, state: State) -> None:
         if self.receive_new_message():
-            self.update_neighbor_dictionary(state)
+            self.update_topology(state)
             if isinstance(self.message_box.peek_last(), UWBTDMAMessage):
                 self.handle_control_message(self.message_box.pop())
 
@@ -147,8 +155,10 @@ class Messenger:
 
         if sender_id != 0 and data[1] != 0:
             received_message = MessageFactory.create(sender_id, data)
-
-            if received_message not in self.received_messages:
+            if isinstance(received_message, UWBTopologyMessage):
+                received_message.decode()
+                self.update_topology(State.LISTEN, topology_info=received_message.neighbors)
+            elif received_message not in self.received_messages:
                 self.received_messages.add(received_message)
                 self.message_box.append(received_message)
                 is_new_message = True
@@ -173,14 +183,17 @@ class Messenger:
 
         return info[0], info[1]
 
-    def update_neighbor_dictionary(self, state: State, device_list: list = None) -> None:
+    def update_topology(self, state: State, device_list: list = None, topology_info: dict = None) -> None:
         if device_list is not None:
             for device in device_list:
-                self.neighborhood.add_neighbor(device, [], perf_counter(), state)
+                self.neighborhood.add_neighbor(device, perf_counter(), state)
+        elif topology_info is not None:
+            neighbor_id = next(iter(topology_info))  # Gets the first key (the dict contains only one neighbor.)
+            self.neighborhood.add_neighbor(neighbor_id, perf_counter(), state, topology_info[neighbor_id])
         else:
             new_message = self.message_box.peek_last()
             new_message.decode()
-            self.neighborhood.add_neighbor(new_message.sender_id, [], perf_counter(), state)
+            self.neighborhood.add_neighbor(new_message.sender_id, perf_counter(), state)
 
             if isinstance(new_message, UWBSynchronizationMessage):
                 self.update_synced_neighbors(new_message)

@@ -1,6 +1,5 @@
 from interfaces import Neighborhood, SlotAssignment, Timing
-from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, TASK_START_TIME,
-                               SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS)
+from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS)
 from messenger import Messenger
 from random import sample
 
@@ -30,10 +29,11 @@ class Scheduling(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        if self.neighborhood.is_alone_in_state(-1) or self.timing.current_time_in_cycle > TASK_START_TIME:
+        if self.neighborhood.is_alone_in_state(-1) or self.timing.current_time_in_cycle > self.timing.task_start_time:
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send List: ", self.slot_assignment.pure_send_list)
             print("Entering listen state...")
+            self.timing.cycle_start = self.timing.logical_clock.clock
             return State.LISTEN
         else:
             return State.SCHEDULING

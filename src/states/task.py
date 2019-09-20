@@ -7,7 +7,7 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICE
                      PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
-from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME
+from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME, FULL_CYCLE_DURATION, SLOT_FOR_RESET
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
 from pozyx_utils import PozyxDiscoverer
@@ -29,27 +29,38 @@ class Task(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
-        self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
+        #self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
+        self.frame_id_done_discover = -1
 
     def execute(self) -> State:
-        if self.timing.current_slot_id == self.slot_assignment.first_task_slot_in_frame():
+        # self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
+        if self.frame_id_done_discover != self.timing.frame_id:
+            self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
             self.set_manually_measured_anchors()
+            # print(self.timing.hist_list)
+            # self.timing.hist_list.clear()
 
         if self.timing.enough_time_left():
             self.localize()
 
+        if self.neighborhood.changed:
+            self.messenger.broadcast_topology_message()
+            self.neighborhood.changed = False
+
         return self.next()
 
     def next(self) -> State:
-        if self.timing.current_time_in_cycle > (TASK_START_TIME + self.timing.frame_id * FRAME_DURATION +
-                                                (self.timing.current_slot_id + 1) * TASK_SLOT_DURATION):
-            return State.LISTEN
+        if self.timing.in_cycle():
+            if self.timing.in_taskslot(self.slot_assignment.pure_send_list):
+                return State.TASK
+            else:
+                return State.LISTEN
         else:
-            return State.TASK
+            return State.SYNCHRONIZATION
 
     def select_localization_method(self) -> None:
         self.localize = self.positioning if len(self.anchors.available_anchors) >= 3 else self.ranging
@@ -68,7 +79,8 @@ class Task(TDMAState):
             self.handle_error("positioning (ranging)")
 
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
-            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
+            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading,
+                                                topology=self.neighborhood.current_neighbors)
 
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
@@ -95,13 +107,13 @@ class Task(TDMAState):
 
             if status_pos == POZYX_SUCCESS:
                 measured_position = Coordinates(measured_position.data[1], 0, 0)
-                print(measured_position)
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
                 self.messenger.send_new_measurement(UpdateType.RANGING, measured_position,
-                                                    angles.heading, atleast_2d(neighbor_position))
+                                                    angles.heading, atleast_2d(neighbor_position),
+                                                    topology=self.neighborhood.current_neighbors)
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
@@ -126,17 +138,13 @@ class Task(TDMAState):
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
         print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        anchors = [device for device in self.anchors.available_anchors if self.is_anchor(device)]
+        anchors = [device for device in self.anchors.available_anchors if PozyxDiscoverer.is_anchor(device)]
 
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
         else:
             self.anchors.available_tags = [device for device in self.anchors.available_anchors]
             self.anchors.available_anchors.clear()
-
-    @staticmethod
-    def is_anchor(device_id: int) -> bool:
-        return device_id < 0x500
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
@@ -149,13 +157,13 @@ class Task(TDMAState):
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
-        for anchor in self.anchors.anchors_dict.values():
+        for anchor in self.anchors.available_anchors:
             with self.pozyx_lock:
-                self.pozyx.addDevice(anchor)
+                self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
 
-        if len(self.anchors.anchors_dict) > 4:
+        if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
-                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.anchors_dict))
+                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()

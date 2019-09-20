@@ -96,7 +96,7 @@ class Synchronization(TDMAState):
                 self.timing.update_current_time()
                 self.update_offset(message.sender_id, message)
 
-            self.messenger.update_neighbor_dictionary(State.SYNCHRONIZATION)
+            self.messenger.update_topology(State.SYNCHRONIZATION)
             self.messenger.receive_new_message()
 
         self.increment_time_alive()
@@ -109,6 +109,7 @@ class Synchronization(TDMAState):
         self.neighborhood.synchronized_active_neighbor_count = 0
         self.slot_assignment.reset()
         self.timing.clear_synchronization_info()
+        self.timing.update_task_start_time(len(self.neighborhood.current_neighbors))
         self.messenger.message_box.clear()
         self.messenger.received_messages.clear()
 

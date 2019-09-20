@@ -26,7 +26,7 @@ class SlotAssignment:
                 self.free_slots += 1
 
     def first_task_slot_in_frame(self) -> int:
-        return self.pure_send_list[0]
+        return [slot for slot in self.pure_send_list if slot != -1][0]
 
     def reset(self):
         self.block = [-1] * len(self.block)
