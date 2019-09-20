@@ -50,7 +50,6 @@ class EKFManager:
             while True:
                 self.sh.check()
                 self.process_latest_state_info(socket)
-                self.sh.send_player([int(self.ekf.get_position().x / 10), int(self.ekf.get_position().y / 10), int(self.ekf.get_position().z / 10)])
 
     def initialize_ekf(self, socket: ContextManagedSocket) -> None:
         while self.ekf is None:
@@ -91,6 +90,8 @@ class EKFManager:
 
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
+            print(self.ekf.get_position())
+            self.sh.send_player([int(self.ekf.get_position().x / 10), int(self.ekf.get_position().y / 10), int(self.ekf.get_position().z / 10)])
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))

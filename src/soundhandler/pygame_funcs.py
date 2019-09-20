@@ -132,8 +132,6 @@ class PyGameManager(object):
         self.soundPlayer(self.patternChord)
 
     def cyclic_call(self, position):
-        self.position_x = position.x
-        self.position_y = position.y
         self.patternChord = self.buildFileName(position)
 
         if (position.x != 0 or position.y != 0 or position.z != 0) and self.patternChord:
