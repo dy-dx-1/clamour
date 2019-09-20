@@ -14,7 +14,7 @@ from contextManagedQueue import ContextManagedQueue
 from contextManagedProcess import ContextManagedProcess
 from pedometer import Pedometer
 from runnableProcess import RunnableProcess
-from soundhandler import PyGameManager
+from soundmanager import SoundManager
 
 
 def connect_pozyx() -> PozyxSerial:
@@ -54,7 +54,7 @@ def main(debug: bool):
             ekf_manager = EKFManager(sound_queue, communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, debug)
             pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
             tdma_node = TDMANode(communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
-            sound_player = PyGameManager(sound_queue)
+            sound_player = SoundManager(sound_queue)
 
             with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
                 ekf_manager_process.start()
