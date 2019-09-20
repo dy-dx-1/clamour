@@ -65,7 +65,7 @@ class SoundManager(object):
                                  int(round((coordinates.y - ORIGIN[1]) / 30)),
                                  int(round((coordinates.z - ORIGIN[2]) / 30)))
 
-    def buildPlayList(self):
+    def build_play_list(self):
         """This function switches the different stats and call the sound that must be played."""
 
         while pygame.mixer.get_busy == 1:  # wait for the last instance to finish
@@ -77,17 +77,19 @@ class SoundManager(object):
         self.pattern_chord = self.build_file_name(position)
 
         if (position.x != 0 or position.y != 0 or position.z != 0) and self.pattern_chord:
-            self.buildPlayList()
+            self.build_play_list()
         else:
             print("No file found on position:", position, "(", self.pattern_chord, ")")
 
     def play(self, path):
         self.pattern_chord = path
-        self.buildPlayList()
+        self.build_play_list()
 
     def run(self) -> None:
         while True:
             if not self.sound_queue.empty():
                 message = SoundMessage.load(*self.sound_queue.get_nowait())
-                scaled_position = Coordinates(message.position.x / 10, message.position.y / 10, message.position.z / 10)
+                scaled_position = Coordinates(message.coordinates.x / 10,
+                                              message.coordinates.y / 10,
+                                              message.coordinates.z / 10)
                 self.cyclic_call(scaled_position)
