@@ -83,13 +83,13 @@ class PyGameManager(object):
 
         # print('Cell grid: ' + str(posX) + '(' + str(coor.x) + ') ' + str(posY) + '(' + str(coor.y) + ') ' + str(
         #     posZ) + '(' + str(coor.z) + ')')
-#        for fn, bounds in self.files_dict.items():
-#            if (coor.x >= bounds[0]) and (coor.x <= bounds[1]):
-#                if (coor.y >= bounds[2]) and (coor.y <= bounds[3]):
-#                    if (coor.z >= bounds[4]) and (coor.z <= bounds[5]):
-#                        print(fn,bounds)
-#                        return fn
-        return choice(list(self.files_dict.keys())) #""
+        for fn, bounds in self.files_dict.items():
+            if (coor.x >= bounds[0]) and (coor.x <= bounds[1]):
+                if (coor.y >= bounds[2]) and (coor.y <= bounds[3]):
+                    if (coor.z >= bounds[4]) and (coor.z <= bounds[5]):
+                        print(fn,bounds)
+                        return fn
+        return ""
 
     def soundPlayer(self, track):
 
