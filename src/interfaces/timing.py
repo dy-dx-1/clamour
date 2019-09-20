@@ -19,7 +19,7 @@ SCHEDULING_SLOT_DURATION = 30
 NB_SCHEDULING_CYCLES = 30
 TASK_SLOT_DURATION = 30
 NB_TASK_SLOTS = 35
-NB_FULL_CYCLES = 1000
+NB_FULL_CYCLES = 500
 
 # |<---------------------------------FULL_CYCLE_DURATION------------------------------------->|
 # |<----------TASK_START_TIME------>|  + |-------FRAME_DURATION * NB_FULL_CYCLES------------->|
@@ -42,13 +42,16 @@ class Timing:
         self.hist_list = []
         self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES / 2
 
+    def get_full_cycle_duration(self):
+        return self.task_start_time + FRAME_DURATION * NB_FULL_CYCLES
+
     def update_task_start_time(self, nb):
         if nb == 0: nb = 2
         self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES / 2
 
     def in_cycle(self) -> bool:
         self.update_current_time()
-        return (self.current_time_in_cycle < FULL_CYCLE_DURATION - SLOT_FOR_RESET)
+        return (self.current_time_in_cycle < self.get_full_cycle_duration() - SLOT_FOR_RESET)
 
     def in_taskslot(self, assigned_list) -> bool:
         self.update_current_time()
@@ -56,7 +59,7 @@ class Timing:
 
     def update_current_time(self):
         self.logical_clock.update_clock()
-        self.current_time_in_cycle = int(self.logical_clock.clock - self.cycle_start) % FULL_CYCLE_DURATION
+        self.current_time_in_cycle = int(self.logical_clock.clock - self.cycle_start) % self.get_full_cycle_duration()
         self.frame_id = floor(self.current_time_in_cycle / FRAME_DURATION)
         self.current_slot_id = floor((self.current_time_in_cycle % FRAME_DURATION) / TASK_SLOT_DURATION)
 
