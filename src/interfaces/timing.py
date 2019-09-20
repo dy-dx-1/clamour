@@ -39,7 +39,7 @@ class Timing:
         self.current_slot_id = -1
         self.frame_id = 0
         self.cycle_start = self.logical_clock.clock
-        self.hist_dict = {}
+        self.hist_list = []
 
     def update_current_time(self):
         self.logical_clock.update_clock()
