@@ -6,7 +6,7 @@ import math
 import queue
 import multiprocessing as mp
 from time import sleep
-from random import randint
+from random import randint, choice
 import json
 import numpy as np
 
@@ -34,7 +34,7 @@ class Zone(object):
 
 class PyGameManager(object):
     def __init__(self, nb_channels=10):
-        pygame.mixer.init(frequency=44100, size=16, channels=2, buffer=4096)
+        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=4096)
         # create multiple channel for simultanous playback
         pygame.mixer.set_num_channels(nb_channels)
 
@@ -83,13 +83,13 @@ class PyGameManager(object):
 
         # print('Cell grid: ' + str(posX) + '(' + str(coor.x) + ') ' + str(posY) + '(' + str(coor.y) + ') ' + str(
         #     posZ) + '(' + str(coor.z) + ')')
-        for fn, bounds in self.files_dict.items():
-            if (coor.x >= bounds[0]) and (coor.x <= bounds[1]):
-                if (coor.y >= bounds[2]) and (coor.y <= bounds[3]):
-                    if (coor.z >= bounds[4]) and (coor.z <= bounds[5]):
-                        print(fn,bounds)
-                        return fn
-        return ""
+#        for fn, bounds in self.files_dict.items():
+#            if (coor.x >= bounds[0]) and (coor.x <= bounds[1]):
+#                if (coor.y >= bounds[2]) and (coor.y <= bounds[3]):
+#                    if (coor.z >= bounds[4]) and (coor.z <= bounds[5]):
+#                        print(fn,bounds)
+#                        return fn
+        return choice(list(self.files_dict.keys())) #""
 
     def soundPlayer(self, track):
 
@@ -108,10 +108,10 @@ class PyGameManager(object):
                     # print("In Zone {0}".format(self.find_zone()))
 
                     sleep(offset_time)
-                    if (index % 2) == 0:
-                        channel.set_volume(1,0)
-                    else:
-                        channel.set_volume(0, 1)
+#                    if (index % 2) == 0:
+#                        channel.set_volume(1,0)
+#                    else:
+#                        channel.set_volume(0, 1)
 
                     thePath = PATH + track
                     print("Play ", thePath, index, " on channel ", (index % 2))
