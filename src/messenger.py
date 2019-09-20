@@ -23,6 +23,7 @@ class Messenger:
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
         self.received_messages = set()
+        self.should_go_back_to_sync = 0
 
     def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
                              neighbors: list = None, topology: dict = None) -> None:
@@ -153,7 +154,7 @@ class Messenger:
         If the attempt fails or if the same message was received before,
         returns False."""
 
-        is_new_message, should_go_back_to_sync = False, False
+        is_new_message = False
         sender_id, data = self.obtain_message_from_pozyx()
 
         if sender_id != 0 and data[1] != 0:
@@ -165,9 +166,9 @@ class Messenger:
                 self.received_messages.add(received_message)
                 self.message_box.append(received_message)
                 is_new_message = True
-                should_go_back_to_sync = state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage)
+                self.should_go_back_to_sync += int(state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage))
 
-        return is_new_message, should_go_back_to_sync
+        return is_new_message, (self.should_go_back_to_sync > 10)
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
         data = Data([0, 0], 'Bi')
