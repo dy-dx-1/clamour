@@ -12,25 +12,17 @@ import numpy as np
 
 # variable needed to find the right sphere and to play them accordingly to the user position
 PLACEHOLDER = "xxx_yyy_zzz"  # file name gabarit exemple: xxx_yyy_zzz_HH_FF_TTTTT
-
+SOUND_XYZ_FILES_JSON = '../sound/xyz_files.json'
 PATH = "../../chambord_flacs/" #ExportsFactices/" #Flac/"  # ExportsFactices/" #Flac/"
 EXTENSION = ".flac"
+ORIGIN = [28, 4, 1959]
 
-class Zone(object):
-    def __init__(self, x_min, y_min, x_max, y_max):
-        self.x_min = x_min * 1000.0
-        self.x_max = x_max * 1000.0
-        self.y_min = y_min * 1000.0
-        self.y_max = y_max * 1000.0
-
-    def is_in(self, x, y) -> bool:
-
-        if self.x_min <= x and x < self.x_max:
-            if self.y_min <= y and y < self.y_max:
-                return True
-
-        return False
-
+def convert_xyz_to_indexes(x, y, z):
+    return "{}_{}_{}".format(
+        int(round((x - ORIGIN[0]) / 30))
+        , int(round((y - ORIGIN[1]) / 30))
+        , int(round((z - ORIGIN[2]) / 30))
+    )
 
 class PyGameManager(object):
     def __init__(self, nb_channels=10):
@@ -48,48 +40,16 @@ class PyGameManager(object):
 
         self.patternChord = "*" + PLACEHOLDER + "*." + EXTENSION
 
-        self.make_dict(PATH)
-
         self.position_old = None
         self.lastSound = ""
+        with open(SOUND_XYZ_FILES_JSON, 'r') as fp:
+            self.xyz_files = json.load(fp)
 
-        self.zones = [Zone(0.0, 0.0, 5.0, 6.0), Zone(0.0, 6.0, 6.0, 12.0), Zone(0.0, 12.0, 6.0, 18.0),
-                      Zone(0.0, 18.0, 6.0, 24.0), Zone(0.0, 24.0, 6.0, 30.0), Zone(5.0, 0.0, 9.0, 6.0),
-                      Zone(5.0, 6.0, 9.0, 12.0), Zone(5.0, 12.0, 9.0, 18.0), Zone(5.0, 18.0, 9.0, 24.0),
-                      Zone(5.0, 24.0, 9.0, 27.0), Zone(5.0, 27.0, 9.0, 30.0), Zone(9.0, 0.0, 11.0, 6.0),
-                      Zone(9.0, 6.0, 11.0, 12.0), Zone(9.0, 12.0, 11.0, 18.0), Zone(9.0, 18.0, 11.0, 24.0),
-                      Zone(9.0, 24.0, 11.0, 30.0), Zone(11.0, 0.0, 15.0, 6.0), Zone(11.0, 6.0, 15.0, 12.0),
-                      Zone(11.0, 12.0, 15.0, 18.0), Zone(11.0, 18.0, 15.0, 24.0), Zone(11.0, 24.0, 15.0, 30.0),
-                      Zone(15.0, 0.0, 20.0, 6.0), Zone(15.0, 6.0, 20.0, 12.0), Zone(15.0, 12.0, 20.0, 18.0),
-                      Zone(15.0, 18.0, 20.0, 24.0), Zone(15.0, 24.0, 20.0, 30.0),]
+        print(len(self.xyz_files))
 
-    def make_dict(self,path)->None:
-        # files = os.listdir(path)
-        # files_dict = {}
-        # for filename in files:
-        #     files_dict[filename] = True
-        with open('../sound/files.json', 'r') as fp:
-            self.files_dict = json.load(fp)
-
-        print(len(self.files_dict))
-        arr = np.array([self.files_dict[key] for key in self.files_dict])
-        print(np.amax(arr, axis=0))
-        print(np.amin(arr, axis=0))
-
-    def buildFileName(self,coor)->str:
-        # posX = math.floor(coor.x)
-        # posY = math.floor(coor.y)
-        # posZ = math.floor(coor.z)
-
-        # print('Cell grid: ' + str(posX) + '(' + str(coor.x) + ') ' + str(posY) + '(' + str(coor.y) + ') ' + str(
-        #     posZ) + '(' + str(coor.z) + ')')
-        for fn, bounds in self.files_dict.items():
-            if (coor.x >= bounds[0]) and (coor.x <= bounds[1]):
-                if (coor.y >= bounds[2]) and (coor.y <= bounds[3]):
-                    if (coor.z >= bounds[4]) and (coor.z <= bounds[5]):
-                        print(fn,bounds)
-                        return fn
-        return ""
+    def buildFileName(self, coor) -> str:
+        indexes = convert_xyz_to_indexes(coor.x, coor.y, coor.z)
+        return self.xyz_files.get(indexes, "")
 
     def soundPlayer(self, track):
 
@@ -105,7 +65,6 @@ class PyGameManager(object):
 
                 # print(theChannel_right, theChannel_left)
                 if channel.get_busy() != 1:
-                    # print("In Zone {0}".format(self.find_zone()))
 
                     sleep(offset_time)
 #                    if (index % 2) == 0:
