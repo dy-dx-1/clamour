@@ -101,7 +101,7 @@ class UWBTopologyMessage(UWBMessage):
 
     def encode(self):
         self.calculate_bitwise_neighbors()
-        self.data = int32((self.message_type << 30) | self.bitwise_neighbors)
+        self.data = int32((self.message_type << 30) | self.bitwise_neighbors).value
 
     def calculate_bitwise_neighbors(self) -> None:
         self.bitwise_neighbors = 0
