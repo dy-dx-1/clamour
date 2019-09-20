@@ -42,7 +42,7 @@ class PozyxDiscoverer:
 
         if discovery_type == POZYX_DISCOVERY_TAGS_ONLY:
             devices = [device for device in devices if not self.is_anchor(device)]
-        else if discovery_type == POZYX_DISCOVERY_ANCHORS_ONLY:
+        elif discovery_type == POZYX_DISCOVERY_ANCHORS_ONLY:
             devices = [device for device in devices if self.is_anchor(device)]
 
         return devices
