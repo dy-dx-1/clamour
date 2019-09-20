@@ -73,7 +73,8 @@ class Task(TDMAState):
 
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
             print(position)
-            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading)
+            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading,
+                                                topology=self.neighborhood.current_neighbors)
 
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
@@ -105,7 +106,8 @@ class Task(TDMAState):
 
             if status_pos == status_angle == POZYX_SUCCESS:
                 self.messenger.send_new_measurement(UpdateType.RANGING, measured_position,
-                                                    angles.heading, atleast_2d(neighbor_position))
+                                                    angles.heading, atleast_2d(neighbor_position),
+                                                    topology=self.neighborhood.current_neighbors)
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
