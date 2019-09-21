@@ -4,28 +4,31 @@ from numpy import array, array_split, append
 from concurrent.futures import process as mp
 from pydub import AudioSegment
 
+WAV_DIRECTORY = "/media/david/OLKHON 4TB/NEW_WAV"
 
 def process_directory(directory: str) -> None:
-    for _, _, files in os.walk(f"/media/david/OLKHON 4TB/EXPORT-TIMBRES-WAV/{directory}"):
+    for _, _, files in os.walk(f"{WAV_DIRECTORY}/{directory}"):
         for file in files:
             filename, ext = os.path.splitext(file)
             if ".wav" in ext:
                 newfile = filename.split('spharm_', 1)[-1] + ".flac"
                 #print(newfile)
-                if not os.path.exists(os.path.join("chambord_flacs/", newfile)):
+                if not os.path.exists(os.path.join("/home/david/new_chambord_flacs/", newfile)):
                     try:
-                        song = AudioSegment.from_wav(f"/media/david/OLKHON 4TB/EXPORT-TIMBRES-WAV/{directory}/{file}")
+                        song = AudioSegment.from_wav(f"{WAV_DIRECTORY}/{directory}/{file}")
                     except:
                         try:
-                            song = AudioSegment.from_file(f"/media/david/OLKHON 4TB/EXPORT-TIMBRES-WAV/{directory}/{file}", 'aiff')
+                            song = AudioSegment.from_file(f"{WAV_DIRECTORY}/{directory}/{file}", 'aiff')
                         except:
-                            pass
+                            print("Wrong here")
                     
                     if 'song' in locals():
                         try:
-                            song.export(os.path.join("chambord_flacs/", newfile),format = "flac")
+                            song.export(os.path.join("/home/david/new_chambord_flacs/", newfile),format = "flac")
                         except:
-                            pass
+                            print("Wrong here too")
+                else:
+                    print("Already converted!")
 
 
 def process_batch(directories: array) -> None:
@@ -36,7 +39,7 @@ def process_batch(directories: array) -> None:
 def main():
     directories = array([])
 
-    for _, d, _ in os.walk("/media/david/OLKHON 4TB/EXPORT-TIMBRES-WAV/"):
+    for _, d, _ in os.walk(f"{WAV_DIRECTORY}"):
         directories = append(directories, d)
 
     with mp.ProcessPoolExecutor() as executor:
