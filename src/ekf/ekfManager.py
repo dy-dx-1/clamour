@@ -85,9 +85,9 @@ class EKFManager:
             if message.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING]:
                 self.last_know_neighbors = message.topology
 
-            if not self.validate_new_state(update_info[0]):
-                update_info = self.generate_zero_update_info(update_info[2])
-                message.update_type = UpdateType.ZERO_MOVEMENT
+            # if not self.validate_new_state(update_info[0]):
+            #     update_info = self.generate_zero_update_info(update_info[2])
+            #     message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
 
             with self.pozyx_lock:
@@ -132,10 +132,10 @@ class EKFManager:
         if self.current_room.within_bounds(new_coordinates):
             return True
 
-        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates)
+        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates, self.floorplan.rooms)
         if new_neighbor is not None:
             print("Changed room.")
-            self.current_room = self.floorplan[new_neighbor]
+            self.current_room = self.floorplan.rooms[new_neighbor]
             return True
 
         return False

@@ -39,10 +39,10 @@ class Room:
         homogeneous_xy_coordinates = Coordinates(world_coordinates[0], world_coordinates[1], 1)
         return Coordinates(*np.matmul(np.linalg.inv(self.transformation_matrix), homogeneous_xy_coordinates))
 
-    def within_neighbor_bounds(self, coordinate: Coordinates) -> Union[str, None]:
+    def within_neighbor_bounds(self, coordinate: Coordinates, rooms: dict) -> Union[str, None]:
         for neighbor in self.neighbors:
-            if neighbor.within_bounds(coordinate):
-                return neighbor.label
+            if rooms[neighbor].within_bounds(coordinate):
+                return rooms[neighbor].label
 
         return None
 
