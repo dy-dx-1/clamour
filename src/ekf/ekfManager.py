@@ -95,7 +95,6 @@ class EKFManager:
 
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
-            #print(self.ekf.get_position())
 
             sound_message = SoundMessage(self.ekf.get_position())
             self.sound_queue.put(SoundMessage.save(sound_message))
