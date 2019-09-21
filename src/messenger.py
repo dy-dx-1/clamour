@@ -1,5 +1,6 @@
 import random
 from multiprocessing import Lock
+from struct import error as StructError
 from time import perf_counter, time
 
 from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
@@ -196,8 +197,11 @@ class Messenger:
     def get_message_metadata(self) -> (int, int):
         info = RXInfo()
 
-        with self.pozyx_lock:
-            self.pozyx.getRxInfo(info)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getRxInfo(info)
+        except StructError as s:
+            print("RxInfo crashes! ", str(s))
 
         return info[0], info[1]
 
