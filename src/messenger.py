@@ -234,6 +234,7 @@ class Messenger:
                 self.pozyx.getErrorCode(error_code)
                 message = self.pozyx.getErrorMessage(error_code)
         except StructError as s:
+            message = ""
             print(str(s))
 
         if error_code != 0x0:

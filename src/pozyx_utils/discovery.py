@@ -21,6 +21,7 @@ class PozyxDiscoverer:
             with pozyx_lock:
                 status = pozyx.getDeviceListSize(size)
         except StructError as s:
+            status = 0
             print(str(s))
         
         if status != POZYX_SUCCESS:
@@ -63,6 +64,7 @@ class PozyxDiscoverer:
                 pozyx.getErrorCode(error_code)
                 message = pozyx.getErrorMessage(error_code)
         except StructError as s:
+            message = ""
             print(str(s))
 
         if error_code != 0x0:

@@ -67,6 +67,7 @@ class Task(TDMAState):
                 status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
         except StructError as s:
+            status_pos, status_angle = 0, 0
             print(str(s))
 
         if status_pos != POZYX_SUCCESS:
@@ -105,6 +106,7 @@ class Task(TDMAState):
                     status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
                     status_angle = self.pozyx.getEulerAngles_deg(angles)
             except StructError as s:
+                status_angle, status_pos = 0, 0
                 print(s)
 
             if status_pos == POZYX_SUCCESS:
@@ -179,6 +181,7 @@ class Task(TDMAState):
                 self.pozyx.getErrorCode(error_code)
                 message = self.pozyx.getErrorMessage(error_code)
         except StructError as s:
+            message = ""
             print(str(s))
 
         if error_code != 0x0:
