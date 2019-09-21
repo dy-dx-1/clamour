@@ -36,7 +36,7 @@ class Scheduling(TDMAState):
 
         if self.neighborhood.is_alone_in_state(-1) or self.timing.current_time_in_cycle > self.timing.task_start_time:
             print("Receive List: ", self.slot_assignment.receive_list)
-            print("Entering listen state...")
+            print("Send list:", self.slot_assignment.pure_send_list)
             self.timing.cycle_start = self.timing.logical_clock.clock
 
             if len(self.slot_assignment.pure_send_list) == 0:

@@ -179,10 +179,10 @@ class Messenger:
                 is_new_message = True
                 self.should_go_back_to_sync += int(state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage))
 
-            if self.should_go_back_to_sync > len(self.neighborhood.current_neighbors) * 3:
+            if self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10):
                 print("Received sync messages, going back to sync.")
 
-        return is_new_message, (self.should_go_back_to_sync > len(self.neighborhood.current_neighbors) * 3)
+        return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
         data = Data([0, 0], 'Bi')
