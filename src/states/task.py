@@ -113,8 +113,8 @@ class Task(TDMAState):
 
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
-        elif len(self.anchors.available_tags) > 0:
-            return random.choice(self.anchors.available_tags)
+        # elif len(self.anchors.available_tags) > 0:
+        #     return random.choice(self.anchors.available_tags)
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
@@ -122,7 +122,7 @@ class Task(TDMAState):
         If there aren't enough anchors, will use tags as well."""
 
         self.anchors.available_anchors.clear()
-        self.anchors.available_tags.clear()
+        # self.anchors.available_tags.clear()
 
         with self.pozyx_lock:
             self.pozyx.clearDevices()
@@ -134,9 +134,9 @@ class Task(TDMAState):
 
         if len(anchors) >= 1:
             self.anchors.available_anchors = anchors
-        else:
-            self.anchors.available_tags = [device for device in self.anchors.available_anchors]
-            self.anchors.available_anchors.clear()
+        # else:
+        #     self.anchors.available_tags = [device for device in self.anchors.available_anchors]
+        #     self.anchors.available_anchors.clear()
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
