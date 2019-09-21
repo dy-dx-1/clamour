@@ -95,7 +95,7 @@ class SoundManager(object):
                 message = SoundMessage.load(*self.sound_queue.get_nowait())
                 scaled_position = Coordinates(message.coordinates.x / 10,
                                               message.coordinates.y / 10,
-                                              message.coordinates.z / 10)
+                                              min(message.coordinates.z / 10, 2250))
                 self.cyclic_call(scaled_position)
 
     def main(self):
@@ -104,6 +104,7 @@ class SoundManager(object):
                 print(posX, posY, 1896)
                 self.cyclic_call(Coordinates(posX, posY, 1896))
                 sleep(0.1)
+
 
 if __name__ == "__main__":
     sm = SoundManager(None)
