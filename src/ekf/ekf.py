@@ -91,7 +91,7 @@ class CustomEKF(ExtendedKalmanFilter):
     def h_ranging(x, nei_pose) -> array:
         """Compute Jacobian of H matrix for state x """
         num_nei = nei_pose.shape
-        deltas = [0, 0, 0, 0, 0, 0, 0, 0]
+        deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
         for i in range(3):
             if num_nei[0] > i:
