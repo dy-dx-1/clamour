@@ -36,14 +36,15 @@ class Scheduling(TDMAState):
 
         if self.neighborhood.is_alone_in_state(-1) or self.timing.current_time_in_cycle > self.timing.task_start_time:
             print("Receive List: ", self.slot_assignment.receive_list)
-            print("Send List: ", self.slot_assignment.pure_send_list)
             print("Entering listen state...")
             self.timing.cycle_start = self.timing.logical_clock.clock
-            return State.LISTEN
-        else:
+
             if len(self.slot_assignment.pure_send_list) == 0:
                 print("-------- Artificially adding slots -------")
                 self.slot_assignment.pure_send_list.extend({randint(0, NB_TASK_SLOTS) for _ in range(2)})
+
+            return State.LISTEN
+        else:
             return State.SCHEDULING
 
     def community_slot_assignment(self):
