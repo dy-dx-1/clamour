@@ -101,8 +101,11 @@ class Pedometer:
 
     def holding_angle(self) -> float:
         gravity = LinearAcceleration()
-        with self.pozyx_lock:
-            self.pozyx.getGravityVector_mg(gravity)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getGravityVector_mg(gravity)
+        except StructError as s:
+            print(str(s))
 
         return math.atan(abs(gravity[2]/gravity[1])) if gravity[1] != 0 else 0
 
