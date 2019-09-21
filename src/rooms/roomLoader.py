@@ -20,7 +20,6 @@ class RoomLoader:
         y_lim = (int(room_data[4])*10, int(room_data[4])*10)
         theta = RoomLoader.orientation_from_corners(room_data[7:])
         neighbors = list(room_data[-1].split(','))
-        print("ADJACENT ROOMS:", neighbors)
 
         return Room(label, neighbors, x, y, x_lim, y_lim, theta)
 

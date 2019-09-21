@@ -130,10 +130,11 @@ class Task(TDMAState):
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
         print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        anchors = [device for device in self.anchors.available_anchors if PozyxDiscoverer.is_anchor(device)]
+        self.anchors.available_anchors = [device for device in self.anchors.available_anchors
+                                          if PozyxDiscoverer.is_anchor(device)]
 
-        if len(anchors) >= 1:
-            self.anchors.available_anchors = anchors
+        # if len(anchors) >= 1:
+        #     self.anchors.available_anchors = anchors
         # else:
         #     self.anchors.available_tags = [device for device in self.anchors.available_anchors]
         #     self.anchors.available_anchors.clear()
@@ -150,8 +151,11 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor in self.anchors.available_anchors:
-            with self.pozyx_lock:
-                self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
+            if anchor in self.anchors.anchors_dict:
+                with self.pozyx_lock:
+                    self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
+            else:
+                print("Not an anchor:", anchor)
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
