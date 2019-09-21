@@ -88,11 +88,10 @@ class Pedometer:
 
         zero_cross = self.zero_crossing(self.buffer, local_max_index)
         if local_max.y > min_acc and delta_time >= min_delay and zero_cross:
-            self.steps.append(local_max)
-            self.update_trajectory()
-        else:
             print("FROOOOOOMMMM PEDOOOOOOO:", "local max:", local_max.y, "min acc:", min_acc, "delta:",
                   delta_time, "min_delay:", min_delay, zero_cross)
+            self.steps.append(local_max)
+            self.update_trajectory()
 
     @staticmethod
     def zero_crossing(local_acc: np.ndarray, local_max: int) -> bool:
