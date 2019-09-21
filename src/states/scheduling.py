@@ -1,7 +1,7 @@
 from interfaces import Neighborhood, SlotAssignment, Timing
 from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS)
 from messenger import Messenger
-from random import sample
+from random import sample, randint
 
 from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState
@@ -41,6 +41,9 @@ class Scheduling(TDMAState):
             self.timing.cycle_start = self.timing.logical_clock.clock
             return State.LISTEN
         else:
+            if len(self.slot_assignment.pure_send_list) == 0:
+                print("-------- Artificially adding slots -------")
+                self.slot_assignment.pure_send_list.extend({randint(0, NB_TASK_SLOTS) for _ in range(2)})
             return State.SCHEDULING
 
     def community_slot_assignment(self):
