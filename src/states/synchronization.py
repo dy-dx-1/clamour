@@ -116,7 +116,7 @@ class Synchronization(TDMAState):
         sync_msg.offset += COMMUNICATION_DELAY
 
         if self.has_done_first_correction:
-            if abs(sync_msg.offset) > JUMP_THRESHOLD:
+            if JUMP_THRESHOLD < abs(sync_msg.offset) < SAFE_THRESHOLD:
                 self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
             else:
                 self.collaborative_offset_compensation(sync_msg)
