@@ -89,10 +89,7 @@ class Pedometer:
         last_time = 0 if len(self.steps) == 0 else self.steps[-1].x
         delta_time = local_max.x - last_time
 
-        zero_cross = self.zero_crossing(self.buffer, local_max_index)
-        if local_max.y > min_acc and delta_time >= min_delay and zero_cross:
-            print("FROOOOOOMMMM PEDOOOOOOO:", "local max:", local_max.y, "min acc:", min_acc, "delta:",
-                  delta_time, "min_delay:", min_delay, zero_cross)
+        if local_max.y > min_acc and delta_time >= min_delay and self.zero_crossing(self.buffer, local_max_index):
             self.steps.append(local_max)
             self.update_trajectory()
 
