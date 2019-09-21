@@ -41,8 +41,11 @@ class Pedometer:
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
-        with self.pozyx_lock:
-            self.pozyx.getAcceleration_mg(linear_acceleration)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getAcceleration_mg(linear_acceleration)
+        except StructError as s:
+            print(str(s))
 
         return linear_acceleration
 

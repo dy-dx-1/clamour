@@ -229,9 +229,12 @@ class Messenger:
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
-        with self.pozyx_lock:
-            self.pozyx.getErrorCode(error_code)
-            message = self.pozyx.getErrorMessage(error_code)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getErrorCode(error_code)
+                message = self.pozyx.getErrorMessage(error_code)
+        except StructError as s:
+            print(str(s))
 
         if error_code != 0x0:
             print("Error in", function_name, ":", message)

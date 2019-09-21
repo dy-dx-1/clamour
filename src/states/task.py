@@ -1,5 +1,6 @@
 import random
 from multiprocessing import Lock
+from struct import error as StructError
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
@@ -61,9 +62,12 @@ class Task(TDMAState):
         position = Coordinates()
         angles = EulerAngles()
 
-        with self.pozyx_lock:
-            status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
-            status_angle = self.pozyx.getEulerAngles_deg(angles)
+        try:
+            with self.pozyx_lock:
+                status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
+                status_angle = self.pozyx.getEulerAngles_deg(angles)
+        except StructError as s:
+            print(str(s))
 
         if status_pos != POZYX_SUCCESS:
             self.handle_error("positioning (pos)")
@@ -85,17 +89,23 @@ class Task(TDMAState):
             ref_coordinates = Coordinates()
 
             if ranging_target_id not in self.anchors.anchors_dict:
-                with self.pozyx_lock:
-                    self.pozyx.getCoordinates(ref_coordinates)
+                try:
+                    with self.pozyx_lock:
+                        self.pozyx.getCoordinates(ref_coordinates)
+                except StructError as s:
+                    print(str(s))
             else:
                 ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
             measured_position = DeviceRange()
             angles = EulerAngles()
 
-            with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
-                status_angle = self.pozyx.getEulerAngles_deg(angles)
+            try:
+                with self.pozyx_lock:
+                    status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
+                    status_angle = self.pozyx.getEulerAngles_deg(angles)
+            except StructError as s:
+                print(s)
 
             if status_pos == POZYX_SUCCESS:
                 measured_position = Coordinates(measured_position.data[1], 0, 0)
@@ -164,9 +174,12 @@ class Task(TDMAState):
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
-        with self.pozyx_lock:
-            self.pozyx.getErrorCode(error_code)
-            message = self.pozyx.getErrorMessage(error_code)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getErrorCode(error_code)
+                message = self.pozyx.getErrorMessage(error_code)
+        except StructError as s:
+            print(str(s))
 
         if error_code != 0x0:
             print("Error in", function_name, ":", message)

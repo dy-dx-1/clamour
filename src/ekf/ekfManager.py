@@ -4,6 +4,7 @@ import csv
 from multiprocessing import Lock
 from numpy import linalg
 from pypozyx import Coordinates, PozyxSerial
+from struct import error as StructError
 from time import time
 
 from .ekf import CustomEKF, DT_THRESHOLD
@@ -90,8 +91,11 @@ class EKFManager:
             #     message.update_type = UpdateType.ZERO_MOVEMENT
             update_functions[message.update_type](*update_info)
 
-            with self.pozyx_lock:
-                self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
+            try:
+                with self.pozyx_lock:
+                    self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
+            except StructError as s:
+                print(str(s))
 
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
