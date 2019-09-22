@@ -99,15 +99,14 @@ class SoundManager(object):
                 self.cyclic_call(scaled_position)
 
     def main(self):
-        for posX in range(-1800, -1400, 10):
-            for posY in range(-1800, -1400, 10):
+        for posX in range(-2000, 2000, 40):
+            for posY in range(-2000, 2000, 40):
                 print(posX, posY, 1896)
                 self.cyclic_call(Coordinates(posX, posY, 1896))
-                sleep(0.1)
+                sleep(0.4)
 
 
 if __name__ == "__main__":
     sm = SoundManager(None)
 
-    with ContextManagedProcess(target=sm.main) as p:
-            p.start()
+    sm.main()
