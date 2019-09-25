@@ -1,6 +1,6 @@
 from numpy import mean
 from ctypes import c_int32 as int32
-from time import time, perf_counter, sleep
+from time import time, sleep
 import random
 
 from interfaces import Neighborhood, SlotAssignment, Timing
@@ -33,7 +33,6 @@ class Synchronization(TDMAState):
 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
-        print("Offset: ", self.timing.synchronization_offset_mean)
 
         self.synchronize()
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
@@ -57,16 +56,13 @@ class Synchronization(TDMAState):
                 self.broadcast_synchronization_message()
 
             self.prepare_next_state()
-            print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle; Perf:", perf_counter())
+            print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle with offset",
+                  self.timing.synchronization_offset_mean)
 
         return next_state
 
     def next(self) -> State:
         current_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS)) - self.first_exec_time
-
-        # print("Alone:", self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION), "left behind:",
-        #       self.is_left_behind(), "exec time:", current_exec_time > SYNCHRONIZATION_PERIOD,
-        #       "synced:", self.timing.synchronized, "neighbors synced:", self.neighborhood.are_neighbors_synced())
 
         if current_exec_time < SYNCHRONIZATION_PERIOD / 3:
             return State.SYNCHRONIZATION
@@ -88,7 +84,7 @@ class Synchronization(TDMAState):
         self.messenger.broadcast_synchronization_message(t, self.timing.synchronized)
 
     def synchronize(self) -> None:
-        self.messenger.receive_new_message()
+        self.messenger.receive_new_message(State.SYNCHRONIZATION)
         while not self.messenger.message_box.empty():
             message = self.messenger.message_box.pop()
             if isinstance(message, UWBSynchronizationMessage):
@@ -97,7 +93,7 @@ class Synchronization(TDMAState):
                 self.update_offset(message.sender_id, message)
 
             self.messenger.update_topology(State.SYNCHRONIZATION)
-            self.messenger.receive_new_message()
+            self.messenger.receive_new_message(State.SYNCHRONIZATION)
 
         self.increment_time_alive()
 
@@ -112,6 +108,7 @@ class Synchronization(TDMAState):
         self.timing.update_task_start_time(len(self.neighborhood.current_neighbors))
         self.messenger.message_box.clear()
         self.messenger.received_messages.clear()
+        self.messenger.should_go_back_to_sync = 0
 
     def update_offset(self, sender_id: int, message: UWBSynchronizationMessage) -> None:
         sync_msg = SynchronizationMessage(sender_id=sender_id, clock=self.timing.logical_clock.clock,
@@ -119,7 +116,7 @@ class Synchronization(TDMAState):
         sync_msg.offset += COMMUNICATION_DELAY
 
         if self.has_done_first_correction:
-            if abs(sync_msg.offset) > JUMP_THRESHOLD:
+            if JUMP_THRESHOLD < abs(sync_msg.offset) < SAFE_THRESHOLD:
                 self.timing.logical_clock.correct_logical_offset(sync_msg.offset)
             else:
                 self.collaborative_offset_compensation(sync_msg)

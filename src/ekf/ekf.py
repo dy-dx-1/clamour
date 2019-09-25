@@ -77,8 +77,8 @@ class CustomEKF(ExtendedKalmanFilter):
     @staticmethod
     def hx_ranging(x, neighbor_positions: ndarray, yaw: float) -> ndarray:
         nb_neighbors = neighbor_positions.shape[0]
-        hx = array([0, 0, 0, x[1], x[3], x[5], yaw, 0])
 
+        hx = array([0, 0, 0, yaw])
         for i in range(3):
             if nb_neighbors > i:
                 hx[i] = linalg.norm([x[0] - neighbor_positions[i][0],
@@ -91,7 +91,7 @@ class CustomEKF(ExtendedKalmanFilter):
     def h_ranging(x, nei_pose) -> array:
         """Compute Jacobian of H matrix for state x """
         num_nei = nei_pose.shape
-        deltas = [0, 0, 0, 0, 0, 0, 0, 0]
+        deltas = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
         for i in range(3):
             if num_nei[0] > i:

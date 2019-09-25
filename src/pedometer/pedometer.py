@@ -5,6 +5,7 @@ import numpy as np
 from multiprocessing import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles
 from time import sleep, time
+from struct import error as StructError
 from messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
@@ -40,15 +41,22 @@ class Pedometer:
 
     def get_acceleration_measurement(self) -> LinearAcceleration:
         linear_acceleration = LinearAcceleration()
-        with self.pozyx_lock:
-            self.pozyx.getAcceleration_mg(linear_acceleration)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getAcceleration_mg(linear_acceleration)
+        except StructError as s:
+            print(str(s))
 
         return linear_acceleration
 
     def get_filtered_yaw_measurement(self, previous_angles: np.ndarray, i: int) -> (np.ndarray, np.ndarray):
         angles = EulerAngles()
-        with self.pozyx_lock:
-            self.pozyx.getEulerAngles_deg(angles)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getEulerAngles_deg(angles)
+        except StructError as s:
+            print(s)
+
         yaw = angles.heading
 
         if self.jump(previous_angles[-1], yaw):
@@ -81,7 +89,10 @@ class Pedometer:
         last_time = 0 if len(self.steps) == 0 else self.steps[-1].x
         delta_time = local_max.x - last_time
 
-        if local_max.y > min_acc and delta_time >= min_delay and self.zero_crossing(self.buffer, local_max_index):
+        zero_cross = self.zero_crossing(self.buffer, local_max_index)
+        if local_max.y > min_acc and delta_time >= min_delay and zero_cross:
+            print("FROOOOOOMMMM PEDOOOOOOO:", "local max:", local_max.y, "min acc:", min_acc, "delta:",
+                  delta_time, "min_delay:", min_delay, zero_cross)
             self.steps.append(local_max)
             self.update_trajectory()
 
@@ -96,8 +107,11 @@ class Pedometer:
 
     def holding_angle(self) -> float:
         gravity = LinearAcceleration()
-        with self.pozyx_lock:
-            self.pozyx.getGravityVector_mg(gravity)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getGravityVector_mg(gravity)
+        except StructError as s:
+            print(str(s))
 
         return math.atan(abs(gravity[2]/gravity[1])) if gravity[1] != 0 else 0
 

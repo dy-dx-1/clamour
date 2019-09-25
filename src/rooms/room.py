@@ -5,7 +5,7 @@ from typing import Union
 
 
 class Room:
-    def __init__(self, label: str, x: int, y: int, x_lim: tuple, y_lim: tuple, theta: float = 0.0):
+    def __init__(self, label: str, neighbors: list, x: int, y: int, x_lim: tuple, y_lim: tuple, theta: float = 0.0):
         """x, y are the center's coordinates;
         x_lim, y_lim are the limits of the room relative to its own center."""
 
@@ -15,7 +15,7 @@ class Room:
         self.x_lim = x_lim
         self.y_lim = y_lim
         self.theta = theta  # Orientation of the local X-axis of the room relative to the global X-axis
-        self.neighbors = []
+        self.neighbors = neighbors
         self.transformation_matrix = self.calculate_transformation_matrix()
 
     def calculate_transformation_matrix(self) -> np.ndarray:
@@ -39,10 +39,10 @@ class Room:
         homogeneous_xy_coordinates = Coordinates(world_coordinates[0], world_coordinates[1], 1)
         return Coordinates(*np.matmul(np.linalg.inv(self.transformation_matrix), homogeneous_xy_coordinates))
 
-    def within_neighbor_bounds(self, coordinate: Coordinates) -> Union[str, None]:
+    def within_neighbor_bounds(self, coordinate: Coordinates, rooms: dict) -> Union[str, None]:
         for neighbor in self.neighbors:
-            if neighbor.within_bounds(coordinate):
-                return neighbor.label
+            if rooms[neighbor].within_bounds(coordinate):
+                return rooms[neighbor].label
 
         return None
 

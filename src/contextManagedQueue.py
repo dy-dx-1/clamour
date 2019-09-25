@@ -5,7 +5,7 @@ from multiprocessing import Queue
 
 class ContextManagedQueue:
     def __init__(self):
-        self.queue = Queue()
+        self.queue = Queue(maxsize=20)
 
     def __enter__(self):
         return self.queue

@@ -7,7 +7,7 @@ class RoomLoader:
     @staticmethod
     def load_rooms_from_csv() -> list:
         with open('rooms/chambord_rooms.csv') as r:
-            reader = csv.reader(r, delimiter=';')
+            reader = csv.reader(r, delimiter=',')
             next(reader)  # We don't want to read the header, so we skip it
             return [RoomLoader.create_room(room) for room in reader]
 
@@ -19,8 +19,9 @@ class RoomLoader:
         x_lim = (int(room_data[3])*10, int(room_data[3])*10)
         y_lim = (int(room_data[4])*10, int(room_data[4])*10)
         theta = RoomLoader.orientation_from_corners(room_data[7:])
+        neighbors = list(room_data[-1].split(','))
 
-        return Room(label, x, y, x_lim, y_lim, theta)
+        return Room(label, neighbors, x, y, x_lim, y_lim, theta)
 
     @staticmethod
     def orientation_from_corners(corners: list) -> float:

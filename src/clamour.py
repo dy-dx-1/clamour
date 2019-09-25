@@ -35,13 +35,13 @@ def get_pozyx_id(pozyx) -> int:
 
 def keep_alive(process: RunnableProcess) -> None:
     while True:
-        with ContextManagedProcess(target=process.run) as p:
-            p.start()
+        try:
+            process.run()
+        except Exception as e:
+            print("A process that needs to be kept alive died and will be restarted. Error:", str(e))
 
-        print("A process that needs to be kept alive died and will be restarted.")
 
-
-def main(debug: bool):
+def main(debug: bool, sound: bool):
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
     print("Starting everything, have a nice visit (", debug, ")")
 
@@ -54,7 +54,9 @@ def main(debug: bool):
             ekf_manager = EKFManager(sound_queue, communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, debug)
             pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
             tdma_node = TDMANode(communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
-            sound_player = SoundManager(sound_queue)
+
+            if sound:
+                sound_player = SoundManager(sound_queue)
 
             with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
                 ekf_manager_process.start()
@@ -62,9 +64,17 @@ def main(debug: bool):
                     tdma_process.start()
                     with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                         pedometer_process.start()
-                        keep_alive(sound_player)
+
+                        if sound:
+                            keep_alive(sound_player)
 
 
 if __name__ == "__main__":
-    debug = bool(int(sys.argv[1:][0]))  # An argument of anything else than 0 sets debug to True.
-    main(debug)
+    # An argument of anything else than 0 sets debug to True.
+    debug, sound = False, False
+    if len(sys.argv) > 1:
+        debug = bool(int(sys.argv[1]))
+        if len(sys.argv) > 2:
+            sound = bool(int(sys.argv[2]))
+
+    main(debug, sound)

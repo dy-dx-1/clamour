@@ -3,8 +3,12 @@ import pygame
 from pypozyx import Coordinates
 from random import randint
 from time import sleep
+import sys, os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from contextManagedQueue import ContextManagedQueue
+from contextManagedProcess import ContextManagedProcess
 from messages import SoundMessage
 
 # variable needed to find the right sphere and to play them accordingly to the user position
@@ -40,6 +44,7 @@ class SoundManager(object):
 
     def sound_player(self, track):
         # loop trough the channel to find an available one and use it to play the track
+        the_path = PATH + track
         if track != self.last_sound:
             self.last_sound = track
 
@@ -50,13 +55,12 @@ class SoundManager(object):
                 if channel.get_busy() != 1:
                     sleep(offset_time)
 
-                    the_path = PATH + track
-                    print("Play ", the_path, index, " on channel ", (index % 2))
+                    print("Play ", the_path, "---> on channel ", index)
                     channel_tuple[1] = pygame.mixer.Sound(the_path)
                     try:
                         channel.play(channel_tuple[1])
                     except:
-                        pass
+                        print("FAILED on channel ", index)
                     break
 
     @staticmethod
@@ -91,5 +95,18 @@ class SoundManager(object):
                 message = SoundMessage.load(*self.sound_queue.get_nowait())
                 scaled_position = Coordinates(message.coordinates.x / 10,
                                               message.coordinates.y / 10,
-                                              message.coordinates.z / 10)
+                                              min(message.coordinates.z / 10, 2250))
                 self.cyclic_call(scaled_position)
+
+    def main(self):
+        for posX in range(-2000, 2000, 40):
+            for posY in range(-2000, 2000, 40):
+                print(posX, posY, 1896)
+                self.cyclic_call(Coordinates(posX, posY, 1896))
+                sleep(0.4)
+
+
+if __name__ == "__main__":
+    sm = SoundManager(None)
+
+    sm.main()

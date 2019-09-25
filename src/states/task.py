@@ -1,13 +1,13 @@
 import random
 from multiprocessing import Lock
+from struct import error as StructError
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister, POZYX_RANGE_PROTOCOL_FAST)
+                     PozyxSerial, EulerAngles, SingleRegister)
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
-from interfaces.timing import FRAME_DURATION, TASK_SLOT_DURATION, TASK_START_TIME, FULL_CYCLE_DURATION, SLOT_FOR_RESET
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
 from pozyx_utils import PozyxDiscoverer
@@ -29,20 +29,16 @@ class Task(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
-        #self.pozyx.setRangingProtocol(POZYX_RANGE_PROTOCOL_FAST)
         self.set_manually_measured_anchors()
         self.frame_id_done_discover = -1
 
     def execute(self) -> State:
-        # self.timing.hist_list.append([self.timing.current_time_in_cycle, self.timing.current_slot_id, self.timing.current_slot_id in self.slot_assignment.pure_send_list, self.timing.enough_time_left()])
         if self.frame_id_done_discover != self.timing.frame_id:
             self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
             self.set_manually_measured_anchors()
-            # print(self.timing.hist_list)
-            # self.timing.hist_list.clear()
 
         if self.timing.enough_time_left():
             self.localize()
@@ -55,10 +51,7 @@ class Task(TDMAState):
 
     def next(self) -> State:
         if self.timing.in_cycle():
-            if self.timing.in_taskslot(self.slot_assignment.pure_send_list):
-                return State.TASK
-            else:
-                return State.LISTEN
+            return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN
         else:
             return State.SYNCHRONIZATION
 
@@ -69,9 +62,13 @@ class Task(TDMAState):
         position = Coordinates()
         angles = EulerAngles()
 
-        with self.pozyx_lock:
-            status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
-            status_angle = self.pozyx.getEulerAngles_deg(angles)
+        try:
+            with self.pozyx_lock:
+                status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
+                status_angle = self.pozyx.getEulerAngles_deg(angles)
+        except StructError as s:
+            status_pos, status_angle = 0, 0
+            print(str(s))
 
         if status_pos != POZYX_SUCCESS:
             self.handle_error("positioning (pos)")
@@ -93,17 +90,24 @@ class Task(TDMAState):
             ref_coordinates = Coordinates()
 
             if ranging_target_id not in self.anchors.anchors_dict:
-                with self.pozyx_lock:
-                    self.pozyx.getCoordinates(ref_coordinates)
+                try:
+                    with self.pozyx_lock:
+                        self.pozyx.getCoordinates(ref_coordinates)
+                except StructError as s:
+                    print(str(s))
             else:
                 ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
             measured_position = DeviceRange()
             angles = EulerAngles()
 
-            with self.pozyx_lock:
-                status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
-                status_angle = self.pozyx.getEulerAngles_deg(angles)
+            try:
+                with self.pozyx_lock:
+                    status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
+                    status_angle = self.pozyx.getEulerAngles_deg(angles)
+            except StructError as s:
+                status_angle, status_pos = 0, 0
+                print(s)
 
             if status_pos == POZYX_SUCCESS:
                 measured_position = Coordinates(measured_position.data[1], 0, 0)
@@ -121,8 +125,8 @@ class Task(TDMAState):
 
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
-        elif len(self.anchors.available_tags) > 0:
-            return random.choice(self.anchors.available_tags)
+        # elif len(self.anchors.available_tags) > 0:
+        #     return random.choice(self.anchors.available_tags)
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
@@ -130,7 +134,7 @@ class Task(TDMAState):
         If there aren't enough anchors, will use tags as well."""
 
         self.anchors.available_anchors.clear()
-        self.anchors.available_tags.clear()
+        # self.anchors.available_tags.clear()
 
         with self.pozyx_lock:
             self.pozyx.clearDevices()
@@ -138,13 +142,14 @@ class Task(TDMAState):
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
         print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        anchors = [device for device in self.anchors.available_anchors if PozyxDiscoverer.is_anchor(device)]
+        self.anchors.available_anchors = [device for device in self.anchors.available_anchors
+                                          if PozyxDiscoverer.is_anchor(device)]
 
-        if len(anchors) >= 1:
-            self.anchors.available_anchors = anchors
-        else:
-            self.anchors.available_tags = [device for device in self.anchors.available_anchors]
-            self.anchors.available_anchors.clear()
+        # if len(anchors) >= 1:
+        #     self.anchors.available_anchors = anchors
+        # else:
+        #     self.anchors.available_tags = [device for device in self.anchors.available_anchors]
+        #     self.anchors.available_anchors.clear()
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
@@ -158,8 +163,11 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor in self.anchors.available_anchors:
-            with self.pozyx_lock:
-                self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
+            if anchor in self.anchors.anchors_dict:
+                with self.pozyx_lock:
+                    self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
+            else:
+                print("Not an anchor:", anchor)
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
@@ -168,9 +176,13 @@ class Task(TDMAState):
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
-        with self.pozyx_lock:
-            self.pozyx.getErrorCode(error_code)
-            message = self.pozyx.getErrorMessage(error_code)
+        try:
+            with self.pozyx_lock:
+                self.pozyx.getErrorCode(error_code)
+                message = self.pozyx.getErrorMessage(error_code)
+        except StructError as s:
+            message = ""
+            print(str(s))
 
         if error_code != 0x0:
             print("Error in", function_name, ":", message)
