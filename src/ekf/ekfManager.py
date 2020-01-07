@@ -100,9 +100,9 @@ class EKFManager:
             self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
 
-            if not self.debug:
-                sound_message = SoundMessage(self.ekf.get_position())
-                self.sound_queue.put(SoundMessage.save(sound_message))
+            # Uncomment for sound
+            # sound_message = SoundMessage(self.ekf.get_position())
+            # self.sound_queue.put(SoundMessage.save(sound_message))
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
