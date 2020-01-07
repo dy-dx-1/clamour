@@ -1,6 +1,7 @@
 import random
 from multiprocessing import Lock
 from struct import error as StructError
+from time import perf_counter
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
@@ -140,16 +141,33 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
-        print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        self.anchors.available_anchors = [device for device in self.anchors.available_anchors
-                                          if PozyxDiscoverer.is_anchor(device)]
+        new_anchors, new_tags = [], []
+        for device in self.anchors.available_anchors:
+            if PozyxDiscoverer.is_anchor(device):
+                new_anchors.append(device)
+            else:
+                new_tags.append(device)
+
+        print("Discovered anchors/tags:", new_anchors, new_tags)
+        self.anchors.available_anchors = new_anchors
+        self.update_neighborhood(new_tags)
+
+        # self.anchors.available_anchors = [device for device in self.anchors.available_anchors
+        #                                   if PozyxDiscoverer.is_anchor(device)]
 
         # if len(anchors) >= 1:
         #     self.anchors.available_anchors = anchors
         # else:
         #     self.anchors.available_tags = [device for device in self.anchors.available_anchors]
         #     self.anchors.available_anchors.clear()
+
+    def update_neighborhood(self, new_tags: list) -> None:
+        if set(new_tags) != set(self.neighborhood.current_neighbors.keys()):
+            self.neighborhood.current_neighbors.clear()
+            for tag in new_tags:
+                self.neighborhood.add_neighbor(tag, perf_counter(), State.TASK)
+                self.neighborhood.changed = True
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
