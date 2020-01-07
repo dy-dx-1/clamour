@@ -1,5 +1,6 @@
 from .types import MessageType
 from ctypes import c_int32 as int32
+from ctypes import c_uint32 as uint32
 
 
 class InvalidValueException(Exception):
@@ -86,7 +87,7 @@ class UWBTDMAMessage(UWBMessage):
 
 
 class UWBTopologyMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType = MessageType.TDMA,
+    def __init__(self, sender_id: int, message_type: MessageType = MessageType.TOPOLOGY,
                  data: int = 0, topology: list = None):
         super(UWBTopologyMessage, self).__init__(sender_id, message_type, data)
         self.TAG_ID_MASK = 0xFF
@@ -101,7 +102,7 @@ class UWBTopologyMessage(UWBMessage):
 
     def encode(self):
         self.calculate_bitwise_neighbors()
-        self.data = int32((self.message_type << 30) | self.bitwise_neighbors).value
+        self.data = uint32((self.message_type << 30) | self.bitwise_neighbors).value
 
     def calculate_bitwise_neighbors(self) -> None:
         self.bitwise_neighbors = 0

@@ -4,7 +4,8 @@ from .uwbMessage import (UWBMessage, UWBSynchronizationMessage, UWBTDMAMessage, 
 
 
 CUSTOM_MESSAGE_SIGNATURE = 0xAA
-TYPE_BIT_MASK = 0x80000000
+TYPE_A_BIT_MASK = 0x80000000
+TYPE_B_BIT_MASK = 0xC0000000
 
 
 class MessageFactory:
@@ -14,8 +15,8 @@ class MessageFactory:
         For  TDMA and topology, the 2 MSB are used for type. The difference in nb bits used for type
         explains the 2 message_type variables.
         """
-        message_type_a = (raw_data[1] & TYPE_BIT_MASK) >> 31
-        message_type_b = (raw_data[1] & TYPE_BIT_MASK) >> 30
+        message_type_a = (raw_data[1] & TYPE_A_BIT_MASK) >> 31
+        message_type_b = (raw_data[1] & TYPE_B_BIT_MASK) >> 30
         message_data = raw_data[1]
 
         if MessageFactory.is_custom_message(raw_data[0]):

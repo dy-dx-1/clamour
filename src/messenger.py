@@ -172,7 +172,7 @@ class Messenger:
             received_message = MessageFactory.create(sender_id, data)
             if isinstance(received_message, UWBTopologyMessage):
                 received_message.decode()
-                self.update_topology(State.LISTEN, topology_info=received_message.neighbors)
+                self.update_topology(State.LISTEN, topology_info=received_message.neighborhood, sender_id=sender_id)
             elif received_message not in self.received_messages:
                 self.received_messages.add(received_message)
                 self.message_box.append(received_message)
@@ -205,13 +205,12 @@ class Messenger:
 
         return info[0], info[1]
 
-    def update_topology(self, state: State, device_list: list = None, topology_info: dict = None) -> None:
+    def update_topology(self, state: State, device_list: list=None, topology_info: list=None, sender_id:int=None) -> None:
         if device_list is not None:
             for device in device_list:
                 self.neighborhood.add_neighbor(device, perf_counter(), state)
         elif topology_info is not None:
-            neighbor_id = next(iter(topology_info))  # Gets the first key (the dict contains only one neighbor.)
-            self.neighborhood.add_neighbor(neighbor_id, perf_counter(), state, topology_info[neighbor_id])
+            self.neighborhood.add_neighbor(sender_id, perf_counter(), state, topology_info)
         else:
             new_message = self.message_box.peek_last()
             new_message.decode()
