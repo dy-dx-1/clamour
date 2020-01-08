@@ -55,7 +55,7 @@ class EKFManager:
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
                     self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
-                    self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.save_to_csv(message.timestamp, message.update_type, self.ekf.get_position(), self.ekf.get_yaw())
 
         print("EKF Initializing Done.")
 
@@ -84,7 +84,7 @@ class EKFManager:
             except StructError as s:
                 print(str(s))
 
-            self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
+            self.save_to_csv(self.ekf.last_measurement_time, message.update_type, update_info[0], update_info[1])
 
             if self.sound:
                 sound_message = SoundMessage(self.ekf.get_position())
@@ -139,11 +139,12 @@ class EKFManager:
     def update_neighbors(self, neighbors: dict):
         self.last_know_neighbors = neighbors
 
-    def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
+    def save_to_csv(self, timestamp: float, update_type: UpdateType, coordinates: Coordinates, yaw: float) -> None:
         if coordinates is not None:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
+                'update_type': update_type,
                 'coords_pos_x': coordinates.x,
                 'ekf_pos_x': self.ekf.get_position().x,
                 'coords_pos_y': coordinates.y,
