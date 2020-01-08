@@ -37,7 +37,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -70,7 +70,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -91,7 +91,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([0xAA, message.data], 'Bi'))
+            self.pozyx.sendData(0, Data([0xAA, message.data], 'BI'))
 
     def receive_message(self, state: State) -> bool:
         is_new_message, should_go_to_sync = self.receive_new_message(state)
@@ -185,7 +185,7 @@ class Messenger:
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
-        data = Data([0, 0], 'Bi')
+        data = Data([0, 0], 'BI')
         sender_id, message_byte_size = self.get_message_metadata()
 
         if message_byte_size == data.byte_size:
