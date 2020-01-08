@@ -89,7 +89,7 @@ def plot_longest_trajectory(file_name: str) -> None:
 
 
 def main() -> None:
-    longest_trajectory = find_longest_trajectory()
+    longest_trajectory = "./broadcast_state.csv"
     plot_longest_trajectory(longest_trajectory)
 
 
