@@ -51,8 +51,8 @@ def count_neighbors(rows: list) -> int:
 def extract_points(rows: list) -> tuple:
     x, y, t = [], [], []
     for row in rows:
-        x.append(int(float(row[3])))
-        y.append(int(float(row[5])))
+        x.append(int(float(row[4])))
+        y.append(int(float(row[6])))
         t.append(float(row[1]))
 
     return x, y, t
