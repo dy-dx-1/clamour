@@ -127,8 +127,6 @@ class Task(TDMAState):
 
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
-        # elif len(self.anchors.available_tags) > 0:
-        #     return random.choice(self.anchors.available_tags)
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
@@ -136,7 +134,6 @@ class Task(TDMAState):
         If there aren't enough anchors, will use tags as well."""
 
         self.anchors.available_anchors.clear()
-        # self.anchors.available_tags.clear()
 
         with self.pozyx_lock:
             self.pozyx.clearDevices()
@@ -150,18 +147,8 @@ class Task(TDMAState):
             else:
                 new_tags.append(device)
 
-        print("Discovered anchors/tags:", new_anchors, new_tags)
         self.anchors.available_anchors = new_anchors
         self.update_neighborhood(new_tags)
-
-        # self.anchors.available_anchors = [device for device in self.anchors.available_anchors
-        #                                   if PozyxDiscoverer.is_anchor(device)]
-
-        # if len(anchors) >= 1:
-        #     self.anchors.available_anchors = anchors
-        # else:
-        #     self.anchors.available_tags = [device for device in self.anchors.available_anchors]
-        #     self.anchors.available_anchors.clear()
 
     def update_neighborhood(self, new_tags: list) -> None:
         if set(new_tags) != set(self.neighborhood.current_neighbors.keys()):
@@ -185,8 +172,6 @@ class Task(TDMAState):
             if anchor in self.anchors.anchors_dict:
                 with self.pozyx_lock:
                     self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
-            else:
-                print("Not an anchor:", anchor)
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:
