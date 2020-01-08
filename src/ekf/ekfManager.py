@@ -85,7 +85,8 @@ class EKFManager:
             except StructError as s:
                 print(str(s))
 
-            self.save_to_csv(self.ekf.last_measurement_time, message.update_type, update_info[0], update_info[1])
+            coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
+            self.save_to_csv(self.ekf.last_measurement_time, message.update_type, coordinates, yaw)
 
             if self.sound:
                 sound_message = SoundMessage(self.ekf.get_position())
