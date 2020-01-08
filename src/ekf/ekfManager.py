@@ -33,7 +33,7 @@ class EKFManager:
     def initialize_csv():
         filepath = 'broadcast_state.csv'
         is_new_file = os.path.exists(filepath)
-        fieldnames = ['pozyx_id', 'timestamp', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'raw_yaw',
+        fieldnames = ['pozyx_id', 'timestamp', 'update_type', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'raw_yaw',
                       'ekf_yaw', 'ekf_covariance_matrix', 'two_hop_neighbors']
 
         state_csv = open(filepath, 'w')
