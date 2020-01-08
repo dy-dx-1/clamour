@@ -26,9 +26,13 @@ class Messenger:
         self.received_messages = set()
         self.should_go_back_to_sync = 0
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
-                             neighbors: list = None, topology: dict = None) -> None:
+    def send_ekf_update(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
+                             neighbors: list=None, topology: dict=None) -> None:
         message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors, topology)
+        self.multiprocess_communication_queue.put(UpdateMessage.save(message))
+
+    def send_topology_update(self, topology: dict) -> None:
+        message = UpdateMessage(UpdateType.TOPOLOGY, time(), topology=topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:
@@ -104,8 +108,7 @@ class Messenger:
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
         if control_message.slot > len(self.slot_assignment.receive_list):
-            print("INVALID SLOT, SKIPPING MSG", control_message.slot, self.slot_assignment.receive_list)
-            return
+            return  # Invalid slot, skipping message
 
         if control_message.code == -1:
             self.handle_assignment_request(control_message)
