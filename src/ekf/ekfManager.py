@@ -154,10 +154,11 @@ class EKFManager:
                 'coords_pos_z': coordinates.z,
                 'ekf_pos_z': self.ekf.get_position().z,
                 'raw_yaw': yaw,
-                'ekf_yaw': self.ekf.get_yaw(), 
+                'ekf_yaw': self.ekf.get_yaw(),
                 'ekf_covariance_matrix': linalg.det(self.ekf.P),
                 'two_hop_neighbors': self.last_know_neighbors
             }
 
             self.writer.writerow(csv_data)
             self.state_csv.flush()
+            print("New coordinates:", self.ekf.get_position())
