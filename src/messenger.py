@@ -29,7 +29,8 @@ class Messenger:
     def send_ekf_update(self, update_type: UpdateType, clock: float, offset: float,
                         measured_position: Coordinates, yaw: float,
                         neighbors: list=None, topology: dict=None) -> None:
-        message = UpdateMessage(update_type, time(), clock, offset, yaw, measured_position, neighbors, topology)
+        message = UpdateMessage(update_type, time(), clock, offset, yaw, measured_position, 
+                                self.slot_assignment.send_list, neighbors, topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def send_topology_update(self, clock: float, offset: float, topology: dict) -> None:
