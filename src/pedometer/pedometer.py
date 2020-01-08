@@ -119,5 +119,5 @@ class Pedometer:
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
 
     def update_trajectory(self):
-        message = UpdateMessage(UpdateType.PEDOMETER, time(), self.steps[-1].z)
+        message = UpdateMessage(UpdateType.PEDOMETER, time(), measured_yaw=self.steps[-1].z)
         self.communication_queue.put(UpdateMessage.save(message))

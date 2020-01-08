@@ -33,8 +33,9 @@ class EKFManager:
     def initialize_csv():
         filepath = 'broadcast_state.csv'
         is_new_file = os.path.exists(filepath)
-        fieldnames = ['pozyx_id', 'timestamp', 'update_type', 'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 
-                      'ekf_pos_z', 'coords_pos_z', 'raw_yaw', 'ekf_yaw', 'ekf_covariance_matrix', 'two_hop_neighbors']
+        fieldnames = ['pozyx_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
+                      'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'ekf_pos_z', 'coords_pos_z', 'raw_yaw', 'ekf_yaw', 
+                      'ekf_covariance_matrix', 'slots', 'two_hop_neighbors']
 
         state_csv = open(filepath, 'w')
         writer = csv.DictWriter(state_csv, delimiter=',', fieldnames=fieldnames)
@@ -86,7 +87,7 @@ class EKFManager:
                 print(str(s))
 
             coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
-            self.save_to_csv(self.ekf.last_measurement_time, message.update_type, coordinates, yaw)
+            self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
 
             if self.sound:
                 sound_message = SoundMessage(self.ekf.get_position())
@@ -141,12 +142,14 @@ class EKFManager:
     def update_neighbors(self, neighbors: dict):
         self.last_know_neighbors = neighbors
 
-    def save_to_csv(self, timestamp: float, update_type: UpdateType, coordinates: Coordinates, yaw: float) -> None:
+    def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
         if coordinates is not None:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
-                'update_type': update_type,
+                'synchronized_clock': message.synchronized_clock,
+                'offset': message.offset,
+                'update_type': message.update_type,
                 'coords_pos_x': coordinates.x,
                 'ekf_pos_x': self.ekf.get_position().x,
                 'coords_pos_y': coordinates.y,
@@ -156,6 +159,7 @@ class EKFManager:
                 'raw_yaw': yaw,
                 'ekf_yaw': self.ekf.get_yaw(),
                 'ekf_covariance_matrix': linalg.det(self.ekf.P),
+                'slots': message.slots,
                 'two_hop_neighbors': self.last_know_neighbors
             }
 

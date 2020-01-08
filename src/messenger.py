@@ -26,13 +26,15 @@ class Messenger:
         self.received_messages = set()
         self.should_go_back_to_sync = 0
 
-    def send_ekf_update(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
-                             neighbors: list=None, topology: dict=None) -> None:
-        message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors, topology)
+    def send_ekf_update(self, update_type: UpdateType, clock: float, offset: float,
+                        measured_position: Coordinates, yaw: float,
+                        neighbors: list=None, topology: dict=None) -> None:
+        message = UpdateMessage(update_type, time(), clock, offset, yaw, measured_position, neighbors, topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
-    def send_topology_update(self, topology: dict) -> None:
-        message = UpdateMessage(UpdateType.TOPOLOGY, time(), topology=topology)
+    def send_topology_update(self, clock: float, offset: float, topology: dict) -> None:
+        message = UpdateMessage(UpdateType.TOPOLOGY, time(), clock, offset,
+                                slots=self.slot_assignment.send_list, topology=topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:

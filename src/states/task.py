@@ -46,7 +46,7 @@ class Task(TDMAState):
 
         if self.neighborhood.changed:
             self.messenger.broadcast_topology_message()  # Broadcast topology change to other devices
-            self.messenger.send_topology_update(self.neighborhood.current_neighbors)
+            self.messenger.send_topology_update(self.timing.logical_clock.clock, self.timing.logical_clock.offset, self.neighborhood.current_neighbors)
             self.neighborhood.changed = False
 
         return self.next()
@@ -78,8 +78,8 @@ class Task(TDMAState):
             self.handle_error("positioning (ranging)")
 
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
-            self.messenger.send_ekf_update(UpdateType.TRILATERATION, position, angles.heading,
-                                                topology=self.neighborhood.current_neighbors)
+            self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
+                                           position, angles.heading, topology=self.neighborhood.current_neighbors)
 
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
@@ -117,8 +117,8 @@ class Task(TDMAState):
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
-                self.messenger.send_ekf_update(UpdateType.RANGING, measured_position, angles.heading, 
-                                               neighbors=atleast_2d(neighbor_position),
+                self.messenger.send_ekf_update(UpdateType.RANGING, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
+                                               measured_position, angles.heading, neighbors=atleast_2d(neighbor_position),
                                                topology=self.neighborhood.current_neighbors)
 
     def select_ranging_target(self) -> int:
