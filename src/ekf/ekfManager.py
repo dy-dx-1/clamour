@@ -57,7 +57,7 @@ class EKFManager:
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
                     self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
-                    self.save_to_csv(message.timestamp, message.update_type, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.save_to_csv(message.timestamp, message, self.ekf.get_position(), self.ekf.get_yaw())
 
         print("EKF Initializing Done.")
 
