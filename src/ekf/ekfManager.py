@@ -9,21 +9,18 @@ from time import time
 
 from .ekf import CustomEKF, DT_THRESHOLD
 from contextManagedQueue import ContextManagedQueue
-from contextManagedSocket import ContextManagedSocket
 from messages import UpdateMessage, SoundMessage, UpdateType
 from rooms import Floorplan
 
 
 class EKFManager:
     def __init__(self, sound_queue: ContextManagedQueue, communication_queue: ContextManagedQueue,
-                 shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock,
-                 pozyx_id: int, debug: int):
+                 shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, pozyx_id: int, sound: bool):
         self.pozyx_id = pozyx_id
         self.ekf = None
-        self.debug = debug
-        self.start_time = 0  # Needed for live graph
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.last_know_neighbors = {}
+        self.sound = sound
         self.sound_queue = sound_queue
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
@@ -47,33 +44,22 @@ class EKFManager:
         return state_csv, writer
 
     def run(self) -> None:
-        remote_host = "192.168.4.120" if self.debug else None
-        print(remote_host)
+        while True:
+            self.process_latest_state_info()
 
-        with ContextManagedSocket(remote_host=remote_host, port=10555) as socket:
-            self.initialize_ekf(socket)
-
-            while True:
-                self.process_latest_state_info(socket)
-
-    def initialize_ekf(self, socket: ContextManagedSocket) -> None:
+    def initialize_ekf(self) -> None:
         while self.ekf is None:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
-                    self.start_time = message.timestamp  # This is the first timestamp to be received
                     self.yaw_offset = message.measured_yaw
                     self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
-                    self.ekf.trilateration_update(message.measured_xyz,
-                                                  self.correct_yaw(message.measured_yaw), message.timestamp)
-
-                    self.broadcast_state(socket, message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
+                    self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
                     self.save_to_csv(message.timestamp, self.ekf.get_position(), self.ekf.get_yaw())
-                else:
-                    print(message.update_type)
+
         print("EKF Initializing Done.")
 
-    def process_latest_state_info(self, socket: ContextManagedSocket) -> None:
+    def process_latest_state_info(self) -> None:
         update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
                             UpdateType.TRILATERATION: self.ekf.trilateration_update,
                             UpdateType.RANGING: self.ekf.ranging_update,
@@ -97,12 +83,11 @@ class EKFManager:
             except StructError as s:
                 print(str(s))
 
-            self.broadcast_state(socket, self.ekf.last_measurement_time, update_info[0], update_info[1])
             self.save_to_csv(self.ekf.last_measurement_time, update_info[0], update_info[1])
 
-            # Uncomment for sound
-            # sound_message = SoundMessage(self.ekf.get_position())
-            # self.sound_queue.put(SoundMessage.save(sound_message))
+            if self.sound:
+                sound_message = SoundMessage(self.ekf.get_position())
+                self.sound_queue.put(SoundMessage.save(sound_message))
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
@@ -148,14 +133,6 @@ class EKFManager:
     def generate_zero_update_info(self, timestamp: float) -> tuple:
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
-    def broadcast_state(self, socket: ContextManagedSocket, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
-        if self.debug and coordinates is not None:
-            socket.send([timestamp - self.start_time,
-                         self.ekf.get_position().x, coordinates.x,
-                         self.ekf.get_position().y, coordinates.y,
-                         self.ekf.get_yaw(), self.correct_yaw(yaw),
-                         linalg.det(self.ekf.P), self.pozyx_id])
-    
     def save_to_csv(self, timestamp: float, coordinates: Coordinates, yaw: float) -> None:
         if coordinates is not None:
             csv_data = {
