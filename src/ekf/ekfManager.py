@@ -44,6 +44,7 @@ class EKFManager:
         return state_csv, writer
 
     def run(self) -> None:
+        self.initialize_ekf()
         while True:
             self.process_latest_state_info()
 
