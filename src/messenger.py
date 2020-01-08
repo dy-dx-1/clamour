@@ -30,12 +30,12 @@ class Messenger:
                         measured_position: Coordinates, yaw: float,
                         neighbors: list=None, topology: dict=None) -> None:
         message = UpdateMessage(update_type, time(), clock, offset, yaw, measured_position, 
-                                self.slot_assignment.send_list, neighbors, topology)
+                                self.slot_assignment.pure_send_list, neighbors, topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def send_topology_update(self, clock: float, offset: float, topology: dict) -> None:
         message = UpdateMessage(UpdateType.TOPOLOGY, time(), clock, offset,
-                                slots=self.slot_assignment.send_list, topology=topology)
+                                slots=self.slot_assignment.pure_send_list, topology=topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:
