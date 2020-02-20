@@ -19,7 +19,6 @@ def find_longest_trajectory() -> str:
     for file_name in glob("**", recursive=True):
         if ".csv" in file_name:
             file_name, max_nb_lines, max_neighbors, max_neighbor_file, longest_trajectory = parse_file(file_name, max_nb_lines, max_neighbors, max_neighbor_file, longest_trajectory)
-            # print(file_name, max_nb_lines, max_neighbors, max_neighbor_file, longest_trajectory)
     
     print(f"Longest_trajectory: {longest_trajectory} with {max_nb_lines}")
     print(f"Max number of times neighbors were registered in a file ({max_neighbor_file}): {max_neighbors}")

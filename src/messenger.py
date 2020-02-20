@@ -51,25 +51,19 @@ class Messenger:
             # No priority message to broadcast (such as rejection). Proposal can be made.
             code = -1
             if self.should_chose_from_non_block():
-                broadcast_origin = 1
                 # Propose new slot by randomly choosing from non_block
                 slot = random.randint(0, len(self.slot_assignment.non_block) - 1)
                 self.slot_assignment.send_list[slot] = self.id
             elif self.should_chose_from_subpriority():
-                broadcast_origin = 2
                 # Propose new slot by randomly choosing from subpriority_slots
                 slot = random.choice(self.slot_assignment.subpriority_slots)
                 self.slot_assignment.send_list[slot] = self.id
             else:
-                broadcast_origin = 3
                 slot = random.choice(self.slot_assignment.pure_send_list)
         else:
-            broadcast_origin = 4
             message = self.message_box.popleft()
             slot, code = message.slot, message.code
 
-        if slot > len(self.slot_assignment.receive_list):
-            print("NEXT SCHEDULING MSG MIGHT BE WRONG. Origin:", broadcast_origin, "Slot:", slot, "Code:", code)
         self.broadcast(slot, code)
 
     def broadcast_topology_message(self):
