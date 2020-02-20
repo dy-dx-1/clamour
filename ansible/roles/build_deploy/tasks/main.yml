@@ -1,5 +1,0 @@
-- name: "Pulling latest code version"
-  git:
-    repo: "https://{{ 'samarseneault' | urlencode }}:{{ 'calypso2019' }}@github.com/MISTLab/clamour.git"
-    version: test-phase
-    dest: /home/pi/clamour

@@ -1,2 +1,0 @@
-- name: "Setting Pozyx tag ID"
-  command: ../files/change-id.py {{ id }}

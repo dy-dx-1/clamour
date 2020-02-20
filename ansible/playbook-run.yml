@@ -1,4 +1,0 @@
-- hosts: eggs
-  gather_facts: yes
-  roles:
-    - build_deploy
