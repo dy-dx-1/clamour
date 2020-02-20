@@ -89,8 +89,7 @@ class Pedometer:
         last_time = 0 if len(self.steps) == 0 else self.steps[-1].x
         delta_time = local_max.x - last_time
 
-        zero_cross = self.zero_crossing(self.buffer, local_max_index)
-        if local_max.y > min_acc and delta_time >= min_delay and zero_cross:
+        if local_max.y > min_acc and delta_time >= min_delay and self.zero_crossing(self.buffer, local_max_index):
             self.steps.append(local_max)
             self.update_trajectory()
 
@@ -120,5 +119,5 @@ class Pedometer:
         return (user_acceleration[2] * math.sin(holding_angle) + user_acceleration[1] * math.cos(holding_angle)) / 981
 
     def update_trajectory(self):
-        message = UpdateMessage(UpdateType.PEDOMETER, time(), self.steps[-1].z)
+        message = UpdateMessage(UpdateType.PEDOMETER, time(), measured_yaw=self.steps[-1].z)
         self.communication_queue.put(UpdateMessage.save(message))

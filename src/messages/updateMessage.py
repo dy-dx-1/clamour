@@ -7,12 +7,17 @@ from .types import UpdateType
 
 
 class UpdateMessage:
-    def __init__(self, update_type: UpdateType, timestamp: float, measured_yaw: float,
-                 measured_xyz: Coordinates = None, neighbors: list = None, topology: dict = None):
+    def __init__(self, update_type: UpdateType, timestamp: float,
+                 synchronized_clock: float=0.0, offset: float=0.0,
+                 measured_yaw: float=0.0, measured_xyz: Coordinates=None,
+                 slots: list=None, neighbors: list=None, topology: dict=None):
+        self.timestamp = timestamp
+        self.synchronized_clock = synchronized_clock
+        self.offset = offset
         self.update_type = update_type
         self.measured_xyz = measured_xyz
         self.measured_yaw = measured_yaw
-        self.timestamp = timestamp
+        self.slots = slots
         self.neighbors = neighbors if neighbors is not None else []
         self.topology = topology if topology is not None else {}
 

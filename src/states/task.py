@@ -1,6 +1,7 @@
 import random
 from multiprocessing import Lock
 from struct import error as StructError
+from time import perf_counter
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
@@ -44,7 +45,8 @@ class Task(TDMAState):
             self.localize()
 
         if self.neighborhood.changed:
-            self.messenger.broadcast_topology_message()
+            self.messenger.broadcast_topology_message()  # Broadcast topology change to other devices
+            self.messenger.send_topology_update(self.timing.logical_clock.clock, self.timing.logical_clock.offset, self.neighborhood.current_neighbors)
             self.neighborhood.changed = False
 
         return self.next()
@@ -76,8 +78,8 @@ class Task(TDMAState):
             self.handle_error("positioning (ranging)")
 
         if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
-            self.messenger.send_new_measurement(UpdateType.TRILATERATION, position, angles.heading,
-                                                topology=self.neighborhood.current_neighbors)
+            self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
+                                           position, angles.heading, topology=self.neighborhood.current_neighbors)
 
     @staticmethod
     def positioning_converges(coordinates: Coordinates) -> bool:
@@ -115,9 +117,9 @@ class Task(TDMAState):
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
             if status_pos == status_angle == POZYX_SUCCESS:
-                self.messenger.send_new_measurement(UpdateType.RANGING, measured_position,
-                                                    angles.heading, atleast_2d(neighbor_position),
-                                                    topology=self.neighborhood.current_neighbors)
+                self.messenger.send_ekf_update(UpdateType.RANGING, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
+                                               measured_position, angles.heading, neighbors=atleast_2d(neighbor_position),
+                                               topology=self.neighborhood.current_neighbors)
 
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
@@ -125,8 +127,6 @@ class Task(TDMAState):
 
         if len(self.anchors.available_anchors) > 0:
             return random.choice(self.anchors.available_anchors)
-        # elif len(self.anchors.available_tags) > 0:
-        #     return random.choice(self.anchors.available_tags)
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
@@ -134,22 +134,28 @@ class Task(TDMAState):
         If there aren't enough anchors, will use tags as well."""
 
         self.anchors.available_anchors.clear()
-        # self.anchors.available_tags.clear()
 
         with self.pozyx_lock:
             self.pozyx.clearDevices()
 
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
-        print("Discovered anchors/tags:", self.anchors.available_anchors)
 
-        self.anchors.available_anchors = [device for device in self.anchors.available_anchors
-                                          if PozyxDiscoverer.is_anchor(device)]
+        new_anchors, new_tags = [], []
+        for device in self.anchors.available_anchors:
+            if PozyxDiscoverer.is_anchor(device):
+                new_anchors.append(device)
+            else:
+                new_tags.append(device)
 
-        # if len(anchors) >= 1:
-        #     self.anchors.available_anchors = anchors
-        # else:
-        #     self.anchors.available_tags = [device for device in self.anchors.available_anchors]
-        #     self.anchors.available_anchors.clear()
+        self.anchors.available_anchors = new_anchors
+        self.update_neighborhood(new_tags)
+
+    def update_neighborhood(self, new_tags: list) -> None:
+        if set(new_tags) != set(self.neighborhood.current_neighbors.keys()):
+            self.neighborhood.current_neighbors.clear()
+            for tag in new_tags:
+                self.neighborhood.add_neighbor(tag, perf_counter(), State.TASK)
+                self.neighborhood.changed = True
 
     def discover(self, discovery_type: int) -> None:
         devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
@@ -166,8 +172,6 @@ class Task(TDMAState):
             if anchor in self.anchors.anchors_dict:
                 with self.pozyx_lock:
                     self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
-            else:
-                print("Not an anchor:", anchor)
 
         if len(self.anchors.available_anchors) > 4:
             with self.pozyx_lock:

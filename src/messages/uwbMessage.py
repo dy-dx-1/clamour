@@ -1,5 +1,5 @@
 from .types import MessageType
-from ctypes import c_int32 as int32
+from ctypes import c_uint32 as uint32
 
 
 class InvalidValueException(Exception):
@@ -39,7 +39,7 @@ class UWBSynchronizationMessage(UWBMessage):
         if self.synchronized_clock.value < 0:
             raise InvalidValueException("One of the attributes of the message could not be encoded, because it is negative")
 
-        self.data = int32((bool(self.message_type) << 31) | (self.synchronized << 30) | (self.synchronized_clock.value >> 2)).value
+        self.data = uint32((bool(self.message_type) << 31) | (self.synchronized << 30) | (self.synchronized_clock.value >> 2)).value
 
     def __hash__(self):
         return hash(str(self.sender_id) + str(self.data))
@@ -73,7 +73,7 @@ class UWBTDMAMessage(UWBMessage):
         if self.code < 0:
             self.code = 16384 - self.code
         
-        self.data = int32((self.message_type << 30) | (self.slot << 15) | self.code).value
+        self.data = uint32((self.message_type << 30) | (self.slot << 15) | self.code).value
 
     def __hash__(self):
         return hash(str(self.sender_id) + str(self.data))
@@ -86,7 +86,7 @@ class UWBTDMAMessage(UWBMessage):
 
 
 class UWBTopologyMessage(UWBMessage):
-    def __init__(self, sender_id: int, message_type: MessageType = MessageType.TDMA,
+    def __init__(self, sender_id: int, message_type: MessageType = MessageType.TOPOLOGY,
                  data: int = 0, topology: list = None):
         super(UWBTopologyMessage, self).__init__(sender_id, message_type, data)
         self.TAG_ID_MASK = 0xFF
@@ -101,7 +101,7 @@ class UWBTopologyMessage(UWBMessage):
 
     def encode(self):
         self.calculate_bitwise_neighbors()
-        self.data = int32((self.message_type << 30) | self.bitwise_neighbors).value
+        self.data = uint32((self.message_type << 30) | self.bitwise_neighbors).value
 
     def calculate_bitwise_neighbors(self) -> None:
         self.bitwise_neighbors = 0

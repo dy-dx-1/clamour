@@ -41,17 +41,15 @@ def keep_alive(process: RunnableProcess) -> None:
             print("A process that needs to be kept alive died and will be restarted. Error:", str(e))
 
 
-def main(debug: bool, sound: bool):
+def main(sound: bool):
     # The different levels of context managers are required to ensure everything starts and stops cleanly.
-    print("Starting everything, have a nice visit (", debug, ")")
-
     with ContextManagedQueue() as sound_queue:
         with ContextManagedQueue() as communication_queue:
             shared_pozyx = connect_pozyx()
             shared_pozyx_lock = Lock()
             pozyx_id = get_pozyx_id(shared_pozyx)
 
-            ekf_manager = EKFManager(sound_queue, communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, debug)
+            ekf_manager = EKFManager(sound_queue, communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, sound)
             pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
             tdma_node = TDMANode(communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
 
@@ -71,10 +69,8 @@ def main(debug: bool, sound: bool):
 
 if __name__ == "__main__":
     # An argument of anything else than 0 sets debug to True.
-    debug, sound = False, False
+    sound = False
     if len(sys.argv) > 1:
-        debug = bool(int(sys.argv[1]))
-        if len(sys.argv) > 2:
-            sound = bool(int(sys.argv[2]))
+        sound = bool(int(sys.argv[1]))
 
-    main(debug, sound)
+    main(sound)

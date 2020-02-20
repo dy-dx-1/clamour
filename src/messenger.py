@@ -26,9 +26,16 @@ class Messenger:
         self.received_messages = set()
         self.should_go_back_to_sync = 0
 
-    def send_new_measurement(self, update_type: UpdateType, measured_position: Coordinates, yaw: float,
-                             neighbors: list = None, topology: dict = None) -> None:
-        message = UpdateMessage(update_type, time(), yaw, measured_position, neighbors, topology)
+    def send_ekf_update(self, update_type: UpdateType, clock: float, offset: float,
+                        measured_position: Coordinates, yaw: float,
+                        neighbors: list=None, topology: dict=None) -> None:
+        message = UpdateMessage(update_type, time(), clock, offset, yaw, measured_position, 
+                                self.slot_assignment.pure_send_list, neighbors, topology)
+        self.multiprocess_communication_queue.put(UpdateMessage.save(message))
+
+    def send_topology_update(self, clock: float, offset: float, topology: dict) -> None:
+        message = UpdateMessage(UpdateType.TOPOLOGY, time(), clock, offset,
+                                slots=self.slot_assignment.pure_send_list, topology=topology)
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:
@@ -37,7 +44,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -70,7 +77,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'Bi'))
+            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -91,7 +98,7 @@ class Messenger:
         message.encode()
 
         with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([0xAA, message.data], 'Bi'))
+            self.pozyx.sendData(0, Data([0xAA, message.data], 'BI'))
 
     def receive_message(self, state: State) -> bool:
         is_new_message, should_go_to_sync = self.receive_new_message(state)
@@ -104,8 +111,7 @@ class Messenger:
 
     def handle_control_message(self, control_message: UWBTDMAMessage) -> None:
         if control_message.slot > len(self.slot_assignment.receive_list):
-            print("INVALID SLOT, SKIPPING MSG", control_message.slot, self.slot_assignment.receive_list)
-            return
+            return  # Invalid slot, skipping message
 
         if control_message.code == -1:
             self.handle_assignment_request(control_message)
@@ -172,7 +178,7 @@ class Messenger:
             received_message = MessageFactory.create(sender_id, data)
             if isinstance(received_message, UWBTopologyMessage):
                 received_message.decode()
-                self.update_topology(State.LISTEN, topology_info=received_message.neighbors)
+                self.update_topology(State.LISTEN, topology_info=received_message.neighborhood, sender_id=sender_id)
             elif received_message not in self.received_messages:
                 self.received_messages.add(received_message)
                 self.message_box.append(received_message)
@@ -185,7 +191,7 @@ class Messenger:
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
     def obtain_message_from_pozyx(self) -> (int, Data, int):
-        data = Data([0, 0], 'Bi')
+        data = Data([0, 0], 'BI')
         sender_id, message_byte_size = self.get_message_metadata()
 
         if message_byte_size == data.byte_size:
@@ -205,13 +211,12 @@ class Messenger:
 
         return info[0], info[1]
 
-    def update_topology(self, state: State, device_list: list = None, topology_info: dict = None) -> None:
+    def update_topology(self, state: State, device_list: list=None, topology_info: list=None, sender_id:int=None) -> None:
         if device_list is not None:
             for device in device_list:
                 self.neighborhood.add_neighbor(device, perf_counter(), state)
         elif topology_info is not None:
-            neighbor_id = next(iter(topology_info))  # Gets the first key (the dict contains only one neighbor.)
-            self.neighborhood.add_neighbor(neighbor_id, perf_counter(), state, topology_info[neighbor_id])
+            self.neighborhood.add_neighbor(sender_id, perf_counter(), state, topology_info)
         else:
             new_message = self.message_box.peek_last()
             new_message.decode()
