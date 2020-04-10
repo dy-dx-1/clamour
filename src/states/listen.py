@@ -17,7 +17,6 @@ class Listen(TDMAState):
 
     def execute(self) -> State:
         self.should_go_back_to_sync = self.messenger.receive_new_message(State.LISTEN)[1]
-
         return self.next()
 
     def next(self) -> State:

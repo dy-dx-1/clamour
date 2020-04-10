@@ -6,7 +6,7 @@ from time import perf_counter
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister)
+                     PozyxSerial, EulerAngles, SingleRegister, Data)
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
 from messages import UpdateMessage, UpdateType
@@ -42,7 +42,8 @@ class Task(TDMAState):
             self.set_manually_measured_anchors()
 
         if self.timing.enough_time_left():
-            self.localize()
+            #self.localize()
+            self.testTDMA()
 
         if self.neighborhood.changed:
             self.messenger.broadcast_topology_message()  # Broadcast topology change to other devices
@@ -51,10 +52,31 @@ class Task(TDMAState):
 
         return self.next()
 
+    def testTDMA(self):
+        tosend = [255] * 8
+        temp = self.slot_assignment.pure_send_list.copy()
+        for ele in temp:
+            if ele<0:
+                temp.remove(ele)
+        for i in range(min(len(temp), 8)):
+            tosend[i] = temp[i]
+        if self.timing.current_slot_id == 0:
+            tosend[-1] = (0 if tosend[-1]==255 else tosend[-1])
+            #print(self.id, " b2 at slot", 0)
+            with self.pozyx_lock:
+                self.pozyx.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+        else:
+            #print(self.id, " b2 at slot", self.timing.current_slot_id-1)
+            tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
+            print(tosend)
+            with self.pozyx_lock:
+                self.pozyx.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+
     def next(self) -> State:
         if self.timing.in_cycle():
             return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN
         else:
+            print("Go to sync")
             return State.SYNCHRONIZATION
 
     def select_localization_method(self) -> None:

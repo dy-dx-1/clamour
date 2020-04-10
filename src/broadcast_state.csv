@@ -1,1 +1,1 @@
-pozyx_id,timestamp,coords_pos_x,ekf_pos_x,coords_pos_y,ekf_pos_y,raw_yaw,ekf_yaw,ekf_covariance_matrix,two_hop_neighbors
+pozyx_id,timestamp,synchronized_clock,offset,update_type,coords_pos_x,ekf_pos_x,coords_pos_y,ekf_pos_y,ekf_pos_z,coords_pos_z,raw_yaw,ekf_yaw,ekf_covariance_matrix,slots,two_hop_neighbors
