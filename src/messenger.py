@@ -187,7 +187,7 @@ class Messenger:
                 self.should_go_back_to_sync += int(state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage))
 
             if self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10):
-                print("Received sync messages, going back to sync.")
+                print("Received sync messages, going back to sync.", self.should_go_back_to_sync, len(self.neighborhood.current_neighbors))
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 

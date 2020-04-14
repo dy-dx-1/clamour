@@ -71,6 +71,7 @@ class Task(TDMAState):
             print(tosend)
             with self.pozyx_lock:
                 self.pozyx.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+        print(self.timing.frame_id, self.timing.current_slot_id, self.timing.get_full_cycle_duration(),self.timing.current_time_in_cycle)
 
     def next(self) -> State:
         if self.timing.in_cycle():

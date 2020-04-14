@@ -21,6 +21,7 @@ class Listen(TDMAState):
 
     def next(self) -> State:
         if self.should_go_back_to_sync or not self.timing.in_cycle():
+            print("sgbts ",self.should_go_back_to_sync, " time ", self.timing.in_cycle())
             self.should_go_back_to_sync = False
             return State.SYNCHRONIZATION
         else:

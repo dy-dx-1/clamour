@@ -43,6 +43,10 @@ class Scheduling(TDMAState):
                 print("-------- Artificially adding slots -------")
                 self.slot_assignment.pure_send_list.extend({randint(0, NB_TASK_SLOTS) for _ in range(2)})
 
+            self.messenger.message_box.clear()
+            self.messenger.received_messages.clear()
+            self.messenger.should_go_back_to_sync = 0
+
             return State.LISTEN
         else:
             return State.SCHEDULING

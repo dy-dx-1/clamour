@@ -33,12 +33,26 @@ class TDMANode:
             State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
 
         self.current_state = self.states[State.INITIALIZATION]
+        self.last_state_id = State.INITIALIZATION
+        self.current_state_id = State.INITIALIZATION
+
 
     def run(self) -> None:
         while True:
             start_time = time()
             self.timing.update_current_time()
-            self.current_state = self.states[self.current_state.execute()]
+            self.current_state_id = self.current_state.execute()
+            self.current_state = self.states[self.current_state_id]
+
+            if(self.last_state_id == State.LISTEN and self.current_state_id == State.SYNCHRONIZATION):
+                self.current_state.first_exec_time = None
+                self.current_state.messenger.message_box.clear()
+                self.current_state.messenger.received_messages.clear()
+                self.current_state.messenger.should_go_back_to_sync = 0
+                print("Enter Synchronization, new Full Cycle starts")
+
+            self.last_state_id = self.current_state_id
+
             self.wait(start_time)
 
             # if int(1 / (time() - start_time)) < 59.0:

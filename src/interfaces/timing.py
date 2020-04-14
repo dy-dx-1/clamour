@@ -13,18 +13,18 @@ SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 15
 
 SYNCHRONIZATION_PERIOD = 10000
-NB_NODES = 35
+NB_NODES = 37 # The number should bigger than the maximum ID sequence (not the practical amount of nodes involved. eg. ID 8228 (10000000100100 & 0xFF) UWB tag send message on slot 36. So the number should bigger than 36.)
 SCHEDULING_SLOT_DURATION = 30
-
 NB_SCHEDULING_CYCLES = 200
+
 TASK_SLOT_DURATION = 25
 NB_TASK_SLOTS = 40
-NB_FULL_CYCLES = 5
+NB_FULL_CYCLES = 40
 
 # |<---------------------------------FULL_CYCLE_DURATION------------------------------------->|
 # |<----------TASK_START_TIME------>|  + |-------FRAME_DURATION * NB_FULL_CYCLES------------->|
 
-TASK_START_TIME = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES / 2
+TASK_START_TIME = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES
 FRAME_DURATION = TASK_SLOT_DURATION * NB_TASK_SLOTS
 FULL_CYCLE_DURATION = TASK_START_TIME + FRAME_DURATION * NB_FULL_CYCLES
 
@@ -40,18 +40,20 @@ class Timing:
         self.frame_id = 0
         self.cycle_start = self.logical_clock.clock
         self.hist_list = []
-        self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES / 2
+        self.task_start_time = TASK_START_TIME
+        self.task_process_time = FRAME_DURATION* NB_FULL_CYCLES
 
     def get_full_cycle_duration(self):
-        return self.task_start_time + FRAME_DURATION * NB_FULL_CYCLES
+        return FULL_CYCLE_DURATION
 
     def update_task_start_time(self, nb):
         if nb == 0: nb = 2
-        self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES / 2
+        self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES
+        pass
 
     def in_cycle(self) -> bool:
         self.update_current_time()
-        return (self.current_time_in_cycle < self.get_full_cycle_duration() - SLOT_FOR_RESET)
+        return (self.current_time_in_cycle < self.task_process_time - SLOT_FOR_RESET)
 
     def in_taskslot(self, assigned_list) -> bool:
         self.update_current_time()
