@@ -13,13 +13,13 @@ SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 15
 
 SYNCHRONIZATION_PERIOD = 10000
-NB_NODES = 37 # The number should bigger than the maximum ID sequence (not the practical amount of nodes involved. eg. ID 8228 (10000000100100 & 0xFF) UWB tag send message on slot 36. So the number should bigger than 36.)
+NB_NODES = 40 # The number should bigger than the maximum ID sequence (not the practical amount of nodes involved. eg. ID 8228 (10000000100100 & 0xFF) UWB tag send message on slot 36. So the number should bigger than 36.)
 SCHEDULING_SLOT_DURATION = 30
 NB_SCHEDULING_CYCLES = 200
 
 TASK_SLOT_DURATION = 25
 NB_TASK_SLOTS = 40
-NB_FULL_CYCLES = 40
+NB_FULL_CYCLES = 20
 
 # |<---------------------------------FULL_CYCLE_DURATION------------------------------------->|
 # |<----------TASK_START_TIME------>|  + |-------FRAME_DURATION * NB_FULL_CYCLES------------->|
@@ -34,13 +34,14 @@ class Timing:
         self.synchronization_offset_mean = 20
         self.clock_differential_stat = []
         self.logical_clock = LogicalClock()
-        self.current_time_in_cycle = 0
+        self.current_time_in_cycle = 0 # This is counted for task cycle. Updated by substute the timestampt(self.cycle_start) entering task phase
         self.synchronized = False
         self.current_slot_id = -1
         self.frame_id = 0
         self.cycle_start = self.logical_clock.clock
+        self.sync_timestamp = self.logical_clock.clock # This is the logical timestampt after sync, which means is the same clock value for all neighbors. Used to count the condition of scheduling.
         self.hist_list = []
-        self.task_start_time = TASK_START_TIME
+        self.task_start_time = TASK_START_TIME - SYNCHRONIZATION_PERIOD # Exclude the time used for sync, because 1) do not know exact time used for sync. 2 system is unite after sync.
         self.task_process_time = FRAME_DURATION* NB_FULL_CYCLES
 
     def get_full_cycle_duration(self):
@@ -48,7 +49,7 @@ class Timing:
 
     def update_task_start_time(self, nb):
         if nb == 0: nb = 2
-        self.task_start_time = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES
+        self.task_start_time = SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES
         pass
 
     def in_cycle(self) -> bool:
@@ -61,7 +62,7 @@ class Timing:
 
     def update_current_time(self):
         self.logical_clock.update_clock()
-        self.current_time_in_cycle = int(self.logical_clock.clock - self.cycle_start) % self.get_full_cycle_duration()
+        self.current_time_in_cycle = self.logical_clock.clock - self.cycle_start
         self.frame_id = floor(self.current_time_in_cycle / FRAME_DURATION)
         self.current_slot_id = floor((self.current_time_in_cycle % FRAME_DURATION) / TASK_SLOT_DURATION)
 

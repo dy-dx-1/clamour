@@ -34,7 +34,7 @@ class Scheduling(TDMAState):
             self.should_go_back_to_sync = False
             return State.SYNCHRONIZATION
 
-        if self.neighborhood.is_alone_in_state(-1) or self.timing.current_time_in_cycle > self.timing.task_start_time:
+        if self.neighborhood.is_alone_in_state(-1) or (self.timing.logical_clock.clock-self.timing.sync_timestamp) > self.timing.task_start_time:
             print("Receive List: ", self.slot_assignment.receive_list)
             print("Send list:", self.slot_assignment.pure_send_list)
             self.timing.cycle_start = self.timing.logical_clock.clock
@@ -65,7 +65,7 @@ class Scheduling(TDMAState):
         self.slot_assignment.pure_send_list = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
 
     def is_broadcast_slot(self) -> bool:
-        return int(((self.timing.current_time_in_cycle - SYNCHRONIZATION_PERIOD) % (NB_NODES * SCHEDULING_SLOT_DURATION))
+        return int(((self.timing.logical_clock.clock - self.timing.sync_timestamp) % (NB_NODES * SCHEDULING_SLOT_DURATION))
                 / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
 
     def update_pure_send_list(self):
