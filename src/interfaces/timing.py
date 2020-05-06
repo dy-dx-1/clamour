@@ -12,7 +12,7 @@ MAX_RANGING_DELAY = 15
 SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 15
 
-SYNCHRONIZATION_PERIOD = 10000
+SYNCHRONIZATION_PERIOD = 5000
 NB_NODES = 40 # The number should bigger than the maximum ID sequence (not the practical amount of nodes involved. eg. ID 8228 (10000000100100 & 0xFF) UWB tag send message on slot 36. So the number should bigger than 36.)
 SCHEDULING_SLOT_DURATION = 30
 NB_SCHEDULING_CYCLES = 200

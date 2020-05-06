@@ -14,7 +14,7 @@ from contextManagedQueue import ContextManagedQueue
 from contextManagedProcess import ContextManagedProcess
 from pedometer import Pedometer
 from runnableProcess import RunnableProcess
-from soundmanager import SoundManager
+#from soundmanager import SoundManager
 
 
 def connect_pozyx() -> PozyxSerial:

@@ -1,5 +1,6 @@
 from pypozyx import DeviceCoordinates, Coordinates
 import csv
+import sys
 
 
 class Anchors:
@@ -14,7 +15,7 @@ class Anchors:
         self.anchors_dict = {anchor.data[0]: anchor for (_, anchor) in enumerate(self.anchors_list)}
 
     def load_anchors_from_csv(self) -> list:
-        with open('interfaces/anchors.csv') as r:
+        with open(sys.path[0]+'/interfaces/anchors.csv') as r:
             reader = csv.reader(r, delimiter=';')
             next(reader)  # We don't want to read the header, so we skip it
             return [self.add_anchor(anc) for anc in reader]

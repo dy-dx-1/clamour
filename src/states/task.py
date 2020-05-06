@@ -32,9 +32,10 @@ class Task(TDMAState):
         self.messenger = messenger
         self.set_manually_measured_anchors()
         self.frame_id_done_discover = -1
+        self.neighborUpdateFrequency = 5 # every five frames, do discovery and update neighbor information
 
     def execute(self) -> State:
-        if self.frame_id_done_discover != self.timing.frame_id:
+        if self.frame_id_done_discover != self.timing.frame_id and not self.timing.frame_id % self.neighborUpdateFrequency: # do discovery at first slot of every $neighborUpdateFrequency frames
             self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
