@@ -41,7 +41,7 @@ class Timing:
         self.cycle_start = self.logical_clock.clock
         self.sync_timestamp = self.logical_clock.clock # This is the logical timestampt after sync, which means is the same clock value for all neighbors. Used to count the condition of scheduling.
         self.hist_list = []
-        self.task_start_time = TASK_START_TIME - SYNCHRONIZATION_PERIOD # Exclude the time used for sync, because 1) do not know exact time used for sync. 2 system is unite after sync.
+        self.task_start_time = TASK_START_TIME - SYNCHRONIZATION_PERIOD # Exclude the time used for sync, because 1) do not know exact time used for sync. 2) system is only unite after sync.
         self.task_process_time = FRAME_DURATION* NB_FULL_CYCLES
 
     def get_full_cycle_duration(self):
@@ -50,7 +50,6 @@ class Timing:
     def update_task_start_time(self, nb):
         if nb == 0: nb = 2
         self.task_start_time = SCHEDULING_SLOT_DURATION * nb * NB_SCHEDULING_CYCLES
-        pass
 
     def in_cycle(self) -> bool:
         self.update_current_time()

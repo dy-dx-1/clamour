@@ -6,7 +6,7 @@ from struct import error as StructError
 import time, sys
 
 
-class comm(object):
+class comm():
     """Continuously performs ranging between the Pozyx and a destination and sets their LEDs"""
 
     def __init__(self, pozyx, destination_id=0, range_step_mm=1000,

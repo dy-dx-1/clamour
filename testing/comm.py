@@ -42,10 +42,6 @@ class comm(object):
         self.count += 1;
         tosend = [255] * 8
         self.pozyx.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
-        #print("send ", self.count)
-        #status &= self.pozyx.setLed(3, True)
-        #time.sleep(0.5)
-        #status &= self.pozyx.setLed(3, False)
         time.sleep(0.003)
         if self.count%1000 == 0:
             curtime = time.time()

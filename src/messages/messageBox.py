@@ -2,7 +2,6 @@ from collections import deque
 from typing import Union
 
 from .uwbMessage import UWBMessage
-from .types import MessageType
 
 
 class MessageBox(deque):

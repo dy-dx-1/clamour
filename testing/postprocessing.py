@@ -12,25 +12,14 @@ TASK_START_TIME = (SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES 
 FRAME_DURATION = (TASK_SLOT_DURATION * NB_TASK_SLOTS)/1000
 FULL_CYCLE_DURATION = TASK_START_TIME + FRAME_DURATION * NB_FULL_CYCLES
 
-if __name__ == '__main__':
-    file = './data.txt'
+tagDic = {8193:1, 8200:2, 8201:3, 8214:4, 8225:5, 8197:6, 8228:7, 8212:8 , 8224:9, 8208:10}
+color = ['b','g','r','c','m','y','k', '#00FF00','#e76c36','#eeec36','#2ECC71' ]
+
+def extractData(fileName, time, tagLiveList, tagLiveSlot, planedSlotList):
     numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
     rx = re.compile(numeric_const_pattern, re.VERBOSE)
     with open(file) as f:
         content = f.readlines()
-
-    time = []
-    tagLiveList = []
-    tagLiveSlot = []
-
-
-    tagDic = {8193:1, 8200:2, 8201:3, 8214:4, 8225:5, 8197:6, 8228:7, 8212:8 , 8224:9, 8208:10}
-    keys = list(tagDic.keys())
-    dicValues = list(tagDic.values())
-    color = ['b','g','r','c','m','y','k', '#00FF00','#e76c36','#eeec36','#2ECC71' ]
-
-    planedSlotList = [[] for i in range(len(color))] # The scheduling of tags, [[],]
-
     content = [x.strip() for x in content]
     for ele in content:
         dis = rx.findall(ele)
@@ -47,31 +36,25 @@ if __name__ == '__main__':
             planedSlotList[idx].append(temp)
 
 
+def shiftTime(time, tagLiveSlot):
     startTime = time[0] - tagLiveSlot[0] * TASK_SLOT_DURATION / 1000
     for i in range(len(time)):
         time[i] -= startTime
 
-    circle = 0
-    refTime = []
-    diffTime = []
 
-    for i in range(len(time)):
-        if i>0 and tagLiveSlot[i]<tagLiveSlot[i - 1]:
-            circle+=1
-        refTime.append(circle * 1.2 + tagLiveSlot[i] * 0.03)
-        diffTime.append(refTime[i]-time[i])
-
-    xTime = [0+x*TASK_SLOT_DURATION/1000 for x in range(NB_TASK_SLOTS)]
-
+def draw(planedSlotList, tagLiveList, time ):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
 
     ax.set_xlabel("time/slot")
+    xTime = [0+x*TASK_SLOT_DURATION/1000 for x in range(NB_TASK_SLOTS)]
     ax.xaxis.set_ticks(xTime)
     ax.grid(linewidth=0.2)
     plt.xticks(rotation=75)
     plt.grid(True)
 
+    keys = list(tagDic.keys())
+    dicValues = list(tagDic.values())
 
     for i in range(1,len(planedSlotList)):
         temptime = []
@@ -87,6 +70,17 @@ if __name__ == '__main__':
         plt.scatter([tempx],[tempy],marker=9,c=color[tagLiveList[i]],s=20)
 
     ax.legend(loc='center left',prop={'size': 6})
-
     plt.ylabel("Time base (seconds)")
     plt.savefig("./testing/result.pdf")
+
+if __name__ == '__main__':
+
+    file = './data.txt'
+    time = []
+    tagLiveList = []
+    tagLiveSlot = []
+    planedSlotList = [[] for i in range(len(color))] # The scheduling of tags, [[],]
+
+    extractData(file,time,tagLiveList,tagLiveSlot,planedSlotList)
+    shiftTime(time,tagLiveSlot)
+    draw(planedSlotList, tagLiveList, time)
