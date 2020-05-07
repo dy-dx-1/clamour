@@ -33,16 +33,23 @@ class TDMANode:
             State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
 
         self.current_state = self.states[State.INITIALIZATION]
+        self.last_state_id = State.INITIALIZATION
+        self.current_state_id = State.INITIALIZATION
+
 
     def run(self) -> None:
         while True:
             start_time = time()
             self.timing.update_current_time()
-            self.current_state = self.states[self.current_state.execute()]
-            self.wait(start_time)
+            self.current_state_id = self.current_state.execute()
+            self.current_state = self.states[self.current_state_id]
 
-            # if int(1 / (time() - start_time)) < 59.0:
-            #     print("WARNING: ---:", int(1 / (time() - start_time)), "Hz ---")
+            if(self.last_state_id == State.LISTEN and self.current_state_id == State.SYNCHRONIZATION):
+                self.current_state.first_exec_time = None
+                print("Enter Synchronization, new Full Cycle starts")
+            self.last_state_id = self.current_state_id
+
+            self.wait(start_time)
 
     @staticmethod
     def wait(start_time: float):

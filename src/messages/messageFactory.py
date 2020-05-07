@@ -15,11 +15,10 @@ class MessageFactory:
         For  TDMA and topology, the 2 MSB are used for type. The difference in nb bits used for type
         explains the 2 message_type variables.
         """
-        message_type_a = (raw_data[1] & TYPE_A_BIT_MASK) >> 31
-        message_type_b = (raw_data[1] & TYPE_B_BIT_MASK) >> 30
-        message_data = raw_data[1]
-
-        if MessageFactory.is_custom_message(raw_data[0]):
+        if MessageFactory.is_custom_message(raw_data[0]): # check  is_custom_message first
+            message_type_a = (raw_data[1] & TYPE_A_BIT_MASK) >> 31
+            message_type_b = (raw_data[1] & TYPE_B_BIT_MASK) >> 30
+            message_data = raw_data[1]
             if message_type_a == MessageType.SYNC:
                 return UWBSynchronizationMessage(sender_id, message_type_a, message_data)
             else:
@@ -27,6 +26,8 @@ class MessageFactory:
                     return UWBTDMAMessage(sender_id, message_type_b, message_data)
                 elif message_type_b == MessageType.TOPOLOGY:
                     return UWBTopologyMessage(sender_id, message_type_b, message_data)
+        else:
+            return None
 
     @staticmethod
     def is_custom_message(data: int) -> bool:

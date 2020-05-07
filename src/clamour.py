@@ -14,7 +14,7 @@ from contextManagedQueue import ContextManagedQueue
 from contextManagedProcess import ContextManagedProcess
 from pedometer import Pedometer
 from runnableProcess import RunnableProcess
-from soundmanager import SoundManager
+#from soundmanager import SoundManager
 
 
 def connect_pozyx() -> PozyxSerial:
@@ -61,7 +61,7 @@ def main(sound: bool):
                 with ContextManagedProcess(target=tdma_node.run) as tdma_process:
                     tdma_process.start()
                     with ContextManagedProcess(target=pedometer.run) as pedometer_process:
-                        pedometer_process.start()
+                        #pedometer_process.start()
 
                         if sound:
                             keep_alive(sound_player)

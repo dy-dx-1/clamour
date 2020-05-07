@@ -17,12 +17,14 @@ class Listen(TDMAState):
 
     def execute(self) -> State:
         self.should_go_back_to_sync = self.messenger.receive_new_message(State.LISTEN)[1]
-
         return self.next()
 
     def next(self) -> State:
         if self.should_go_back_to_sync or not self.timing.in_cycle():
+            print("sgbts ",self.should_go_back_to_sync, " time ", self.timing.in_cycle())
             self.should_go_back_to_sync = False
+            self.messenger.message_box.clear()
+            self.messenger.received_messages.clear()
             return State.SYNCHRONIZATION
         else:
             return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN

@@ -10,6 +10,7 @@ from interfaces import Neighborhood, SlotAssignment, State
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UWBTopologyMessage, UpdateMessage, UpdateType)
+from messages.messageFactory import CUSTOM_MESSAGE_SIGNATURE
 
 
 class Messenger:
@@ -168,7 +169,7 @@ class Messenger:
         is_new_message = False
         sender_id, data = self.obtain_message_from_pozyx()
 
-        if sender_id != 0 and data[1] != 0:
+        if sender_id != 0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
             received_message = MessageFactory.create(sender_id, data)
             if isinstance(received_message, UWBTopologyMessage):
                 received_message.decode()
@@ -180,7 +181,7 @@ class Messenger:
                 self.should_go_back_to_sync += int(state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage))
 
             if self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10):
-                print("Received sync messages, going back to sync.")
+                print("Received sync messages, going back to sync.", self.should_go_back_to_sync, len(self.neighborhood.current_neighbors))
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 

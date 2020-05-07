@@ -56,7 +56,7 @@ class Synchronization(TDMAState):
                 self.broadcast_synchronization_message()
 
             self.prepare_next_state()
-            print("Entering scheduling at", self.timing.current_time_in_cycle, "in cycle with offset",
+            print("Entering scheduling at", self.timing.logical_clock.clock, "in cycle with offset",
                   self.timing.synchronization_offset_mean)
 
         return next_state
@@ -71,6 +71,9 @@ class Synchronization(TDMAState):
                 current_exec_time > SYNCHRONIZATION_PERIOD or \
                 ((self.timing.synchronized or self.is_left_behind()) and
                  self.neighborhood.are_neighbors_synced()):
+            print(self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION), current_exec_time > SYNCHRONIZATION_PERIOD, ((self.timing.synchronized or self.is_left_behind()) and
+                 self.neighborhood.are_neighbors_synced()) )
+            self.timing.sync_timestamp = self.timing.logical_clock.clock
             return State.SCHEDULING
         else:
             return State.SYNCHRONIZATION

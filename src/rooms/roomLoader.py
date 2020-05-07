@@ -1,12 +1,14 @@
 import csv
 import math
 from .room import Room
+import sys
 
 
 class RoomLoader:
     @staticmethod
     def load_rooms_from_csv() -> list:
-        with open('rooms/chambord_rooms.csv') as r:
+        print(sys.path)
+        with open(sys.path[0]+'/rooms/chambord_rooms.csv') as r:
             reader = csv.reader(r, delimiter=',')
             next(reader)  # We don't want to read the header, so we skip it
             return [RoomLoader.create_room(room) for room in reader]
