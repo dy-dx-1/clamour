@@ -1,0 +1,2 @@
+[WARNING] [2022-08-04 12:20:49,968]: Error opening the serial port (/dev/ttyS0): [Errno 13] could not open port /dev/ttyS0: [Errno 13] Permission denied: '/dev/ttyS0'
+[WARNING] [2022-08-04 12:20:50,469]: Serial port (/dev/ttyS0) not ready/available

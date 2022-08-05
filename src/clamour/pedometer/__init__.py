@@ -1,0 +1,1 @@
+from .pedometer import Pedometer

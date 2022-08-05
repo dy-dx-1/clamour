@@ -1,0 +1,174 @@
+import math
+import os.path
+import csv
+from multiprocessing import Lock
+from numpy import linalg
+from pypozyx import Coordinates, PozyxSerial
+from struct import error as StructError
+from time import time
+
+from .ekf import CustomEKF, DT_THRESHOLD
+from contextManagedQueue import ContextManagedQueue
+from messages import UpdateMessage, SoundMessage, UpdateType, PoseMessage
+from rooms import Floorplan
+
+
+class EKFManager:
+    def __init__(self, pose_callback, sound_queue: ContextManagedQueue, communication_queue: ContextManagedQueue,
+                 shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, pozyx_id: int, sound: bool):
+        self.pozyx_id = pozyx_id
+        self.ekf = None
+        self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
+        self.last_know_neighbors = {}
+        self.sound = sound
+        self.pose_callback = pose_callback
+        self.sound_queue = sound_queue
+        self.communication_queue = communication_queue
+        self.floorplan = Floorplan()
+        self.current_room = self.floorplan.rooms['24']
+        self.pozyx = shared_pozyx
+        self.pozyx_lock = shared_pozyx_lock
+        self.state_csv, self.writer = self.initialize_csv()
+
+    @staticmethod
+    def initialize_csv():
+        filepath = 'broadcast_state.csv'
+        is_new_file = os.path.exists(filepath)
+        fieldnames = ['pozyx_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
+                      'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'ekf_pos_z', 'coords_pos_z', 'raw_yaw', 'ekf_yaw', 
+                      'ekf_covariance_matrix', 'slots', 'two_hop_neighbors']
+
+        state_csv = open(filepath, 'w')
+        writer = csv.DictWriter(state_csv, delimiter=',', fieldnames=fieldnames)
+        if is_new_file:
+            writer.writeheader()
+
+        return state_csv, writer
+
+    def run(self) -> None:
+        self.initialize_ekf()
+        while True:
+            self.process_latest_state_info()
+
+    def initialize_ekf(self) -> None:
+        while self.ekf is None:
+            if not self.communication_queue.empty():
+                message = UpdateMessage.load(*self.communication_queue.get_nowait())
+                if message.update_type == UpdateType.TRILATERATION:
+                    self.yaw_offset = message.measured_yaw
+                    self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
+                    self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
+                    self.save_to_csv(message.timestamp, message, self.ekf.get_position(), self.ekf.get_yaw())
+                    poseMsg = PoseMessage(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, self.ekf.get_yaw())
+                    self.pose_callback(poseMsg)
+
+        print("EKF Initializing Done.")
+
+    def process_latest_state_info(self) -> None:
+        update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
+                            UpdateType.TRILATERATION: self.ekf.trilateration_update,
+                            UpdateType.RANGING: self.ekf.ranging_update,
+                            UpdateType.ZERO_MOVEMENT: self.ekf.zero_movement_update,
+                            UpdateType.TOPOLOGY: self.update_neighbors}
+
+        if not self.communication_queue.empty():
+            message = UpdateMessage.load(*self.communication_queue.get_nowait())
+            update_info = self.extract_update_info(message)
+
+            if message.update_type in [UpdateType.TRILATERATION, UpdateType.RANGING, UpdateType.TOPOLOGY]:
+                self.last_know_neighbors = message.topology
+
+            # if not self.validate_new_state(update_info[0]):
+            #     update_info = self.generate_zero_update_info(update_info[2])
+            #     message.update_type = UpdateType.ZERO_MOVEMENT
+            update_functions[message.update_type](*update_info)
+
+            try:
+                with self.pozyx_lock:
+                    self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
+            except StructError as s:
+                print(str(s))
+
+            coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
+            self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
+
+            poseMsg = PoseMessage(coordinates.x, coordinates.y, coordinates.z, yaw)
+            self.pose_callback(poseMsg)
+
+            if self.sound:
+                sound_message = SoundMessage(self.ekf.get_position())
+                self.sound_queue.put(SoundMessage.save(sound_message))
+
+        elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
+            update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
+
+    def extract_update_info(self, msg: UpdateMessage) -> tuple:
+        if msg.update_type == UpdateType.PEDOMETER:
+            return self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp
+        elif msg.update_type == UpdateType.TRILATERATION:
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp
+        elif msg.update_type == UpdateType.RANGING:
+            return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp, msg.neighbors
+        elif msg.update_type == UpdateType.TOPOLOGY:
+            return msg.topology,
+
+    def infer_coordinates(self, measured_yaw: float) -> Coordinates:
+        """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
+        Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
+
+        step_length = 750  # millimeters
+
+        delta_position_x = step_length * -math.cos(math.radians(self.correct_yaw(measured_yaw)))
+        delta_position_y = step_length * math.sin(math.radians(self.correct_yaw(measured_yaw)))
+
+        # The pedometer cannot measure height; we assumed it is constant.
+        return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
+
+    def correct_yaw(self, measured_yaw: float) -> float:
+        new_yaw = measured_yaw - self.yaw_offset
+        return new_yaw if new_yaw > 0 else 360 + new_yaw
+
+    def validate_new_state(self, new_coordinates: Coordinates) -> bool:
+        """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
+
+        if self.current_room.within_bounds(new_coordinates):
+            return True
+
+        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates, self.floorplan.rooms)
+        if new_neighbor is not None:
+            print("Changed room.")
+            self.current_room = self.floorplan.rooms[new_neighbor]
+            return True
+
+        return False
+
+    def generate_zero_update_info(self, timestamp: float) -> tuple:
+        return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
+
+    def update_neighbors(self, neighbors: dict):
+        self.last_know_neighbors = neighbors
+
+    def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
+        if coordinates is not None:
+            csv_data = {
+                'pozyx_id': self.pozyx_id,
+                'timestamp': timestamp,
+                'synchronized_clock': message.synchronized_clock,
+                'offset': message.offset,
+                'update_type': message.update_type,
+                'coords_pos_x': coordinates.x,
+                'ekf_pos_x': self.ekf.get_position().x,
+                'coords_pos_y': coordinates.y,
+                'ekf_pos_y': self.ekf.get_position().y,
+                'coords_pos_z': coordinates.z,
+                'ekf_pos_z': self.ekf.get_position().z,
+                'raw_yaw': yaw,
+                'ekf_yaw': self.ekf.get_yaw(),
+                'ekf_covariance_matrix': linalg.det(self.ekf.P),
+                'slots': message.slots,
+                'two_hop_neighbors': self.last_know_neighbors
+            }
+
+            self.writer.writerow(csv_data)
+            self.state_csv.flush()
+            #print("New coordinates:", self.ekf.get_position())

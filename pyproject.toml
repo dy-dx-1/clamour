@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling", "filterpy", "pypozyx"]
+build-backend = "hatchling.build"
+
+[project]
+name = "clamour"
+version = "0.0.1"
+authors = [
+    { name="Thinking-Dragon", email="clementgassmannprince@gmail.com" },
+]
+description = "Collaborative Localization Acheived with Modular Onboard UWB Rangers"
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/mistlab/clamour"
+"Bug Tracker" = "https://github.com/mistlab/clamour/issues"
