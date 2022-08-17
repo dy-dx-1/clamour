@@ -1,6 +1,8 @@
 from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, asarray, ndarray, dot, eye, linalg
 from pypozyx import Coordinates
+from ekf.customOdometry import CustomOdometry
+from messages import PoseMessage
 
 DT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
 
@@ -74,6 +76,9 @@ class CustomEKF(ExtendedKalmanFilter):
     def hx_zero_movement(self, x) -> ndarray:
         return dot(self.observation_matrix, x)
 
+    def hx_custom_odometry(self, x) -> ndarray:
+        return dot(self.observation_matrix, x)
+
     @staticmethod
     def hx_ranging(x, neighbor_positions: ndarray, yaw: float) -> ndarray:
         nb_neighbors = neighbor_positions.shape[0]
@@ -113,6 +118,17 @@ class CustomEKF(ExtendedKalmanFilter):
             print("Received message with bad timestamp.")
         self.predict()
 
+    def custom_odometry_update(self, position: Coordinates, yaw: float, R, timestamp: float) -> None:
+        print("Custom odometry update")
+        self.pre_update(timestamp)
+
+        super(CustomEKF, self).update(
+            asarray([position.x, position.y, position.z, yaw]),
+            lambda _: self.observation_matrix,
+            self.hx_custom_odometry,
+            R
+        )
+
     def pedometer_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)
 
@@ -145,3 +161,6 @@ class CustomEKF(ExtendedKalmanFilter):
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_zero_movement, self.R_zero_movement)
+
+    def add_custom_odometry(self, custom_odometry: CustomOdometry):
+        self.custom_R.append(array(custom_odometry.get_R()))
