@@ -6,6 +6,7 @@ from numpy import linalg
 from pypozyx import Coordinates, PozyxSerial
 from struct import error as StructError
 from time import time
+from pypozyx import Coordinates
 
 from .ekf import CustomEKF, DT_THRESHOLD
 from contextManagedQueue import ContextManagedQueue
@@ -56,8 +57,10 @@ class EKFManager:
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
                 if message.update_type == UpdateType.TRILATERATION:
                     self.yaw_offset = message.measured_yaw
+
                     self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
                     self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
+                    
                     self.save_to_csv(message.timestamp, message, self.ekf.get_position(), self.ekf.get_yaw())
                     poseMsg = PoseMessage(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, self.ekf.get_yaw())
                     self.pose_callback(poseMsg)
@@ -65,11 +68,14 @@ class EKFManager:
         print("EKF Initializing Done.")
 
     def process_latest_state_info(self) -> None:
-        update_functions = {UpdateType.PEDOMETER: self.ekf.pedometer_update,
-                            UpdateType.TRILATERATION: self.ekf.trilateration_update,
-                            UpdateType.RANGING: self.ekf.ranging_update,
-                            UpdateType.ZERO_MOVEMENT: self.ekf.zero_movement_update,
-                            UpdateType.TOPOLOGY: self.update_neighbors}
+        update_functions = {
+            UpdateType.PEDOMETER: self.ekf.pedometer_update,
+            UpdateType.TRILATERATION: self.ekf.trilateration_update,
+            UpdateType.RANGING: self.ekf.ranging_update,
+            UpdateType.ZERO_MOVEMENT: self.ekf.zero_movement_update,
+            UpdateType.TOPOLOGY: self.update_neighbors,
+            UpdateType.CUSTOM_POSE: self.ekf.custom_odometry_update,
+        }
 
         if not self.communication_queue.empty():
             message = UpdateMessage.load(*self.communication_queue.get_nowait())
@@ -111,6 +117,8 @@ class EKFManager:
             return msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp, msg.neighbors
         elif msg.update_type == UpdateType.TOPOLOGY:
             return msg.topology,
+        elif msg.update_type == UpdateType.CUSTOM_POSE:
+            return Coordinates(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp
 
     def infer_coordinates(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
@@ -149,7 +157,7 @@ class EKFManager:
         self.last_know_neighbors = neighbors
 
     def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
-        if coordinates is not None:
+        if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:
             csv_data = {
                 'pozyx_id': self.pozyx_id,
                 'timestamp': timestamp,
@@ -171,4 +179,3 @@ class EKFManager:
 
             self.writer.writerow(csv_data)
             self.state_csv.flush()
-            #print("New coordinates:", self.ekf.get_position())
