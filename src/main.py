@@ -1,4 +1,4 @@
-from clamour import Clamour, PoseMessage, ContextManagedQueue
+from clamour import Clamour, PoseMessage, CustomOdometry, ContextManagedQueue
 import sys
 import time
 
@@ -11,9 +11,17 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         sound = bool(int(sys.argv[1]))
 
-    clamour = Clamour()
+    imuOdometry = CustomOdometry(
+        [[20, 0, 0, 0],
+        [0, 20, 0, 0],
+        [0, 0, 20, 0],
+        [0, 0, 0, 0.5]],
+        "imu"
+    )
+
+    clamour = Clamour([imuOdometry])
     clamour.start_non_blocking(sound, onNewPoseEstimated)
 
     while True:
-        print("Doing other stuff")
+        imuOdometry.update_pose(PoseMessage(1.0, 2.0, 3.0, 4.0))
         time.sleep(1)
