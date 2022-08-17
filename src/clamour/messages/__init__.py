@@ -6,3 +6,4 @@ from .updateMessage import UpdateMessage
 from .uwbMessage import (UWBMessage, UWBSynchronizationMessage, UWBTDMAMessage, UWBTopologyMessage)
 from .soundMessage import SoundMessage
 from .poseMessage import PoseMessage
+from .customOdometryMessage import CustomOdometryMessage

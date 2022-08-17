@@ -13,3 +13,4 @@ class UpdateType(IntEnum):
     RANGING = 2
     ZERO_MOVEMENT = 3
     TOPOLOGY = 4
+    CUSTOM_POSE = 5
