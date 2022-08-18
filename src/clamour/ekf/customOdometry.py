@@ -2,9 +2,8 @@ import time
 from messages import PoseMessage
 
 class CustomOdometry:
-    def __init__(self, R, key):
+    def __init__(self, R):
         self._R = R
-        self._key = key
         self._pose_listener = None
 
     def update_pose(self, pose: PoseMessage):
@@ -16,6 +15,3 @@ class CustomOdometry:
     
     def get_R(self):
         return self._R
-
-    def get_key(self):
-        return self._key

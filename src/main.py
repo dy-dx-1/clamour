@@ -12,11 +12,10 @@ if __name__ == "__main__":
         sound = bool(int(sys.argv[1]))
 
     imuOdometry = CustomOdometry(
-        [[20, 0, 0, 0],
-        [0, 20, 0, 0],
-        [0, 0, 20, 0],
-        [0, 0, 0, 0.5]],
-        "imu"
+        [[20,  0,  0,   0],
+         [ 0, 20,  0,   0],
+         [ 0,  0, 20,   0],
+         [ 0,  0,  0, 0.5]]
     )
 
     clamour = Clamour([imuOdometry])

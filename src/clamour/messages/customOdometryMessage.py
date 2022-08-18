@@ -2,9 +2,8 @@ from messages import PoseMessage
 from .types import UpdateType
 
 class CustomOdometryMessage:
-    def __init__(self, pose: PoseMessage, odometry_key: str, R, timestamp: float):
+    def __init__(self, pose: PoseMessage, R, timestamp: float):
         self.pose = pose
-        self.odometry_key = odometry_key
         self.R = R
         self.timestamp = timestamp
         self.update_type = UpdateType.CUSTOM_POSE

@@ -79,6 +79,6 @@ class Clamour:
 
     def _on_custom_pose_update(self, custom_odometry: CustomOdometry, pose: PoseMessage, timestamp: float):
         if(self.communication_queue is not None):
-            message = CustomOdometryMessage(pose, custom_odometry.get_key(), custom_odometry.get_R(), timestamp)
+            message = CustomOdometryMessage(pose, custom_odometry.get_R(), timestamp)
             self.communication_queue.put(CustomOdometryMessage.save(message))
             
