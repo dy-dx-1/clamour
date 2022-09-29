@@ -10,6 +10,8 @@ if __name__ == "__main__":
     sound = False
     if len(sys.argv) > 1:
         sound = bool(int(sys.argv[1]))
+        
+    communication_queue = ContextManagedQueue()
 
     clamour = Clamour([])
-    clamour.start(sound, onNewPoseEstimated)
+    clamour.start(sound, onNewPoseEstimated, communication_queue)
