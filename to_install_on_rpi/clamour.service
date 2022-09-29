@@ -1,0 +1,14 @@
+Description=Start CLAMOUR project
+
+Wants=network.target
+After=syslog.target network-online.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /home/pi/update_and_start_clamour.sh
+Restart=on-failure
+RestartSec=10
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
