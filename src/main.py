@@ -11,16 +11,5 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         sound = bool(int(sys.argv[1]))
 
-    imuOdometry = CustomOdometry(
-        [[20,  0,  0,   0],
-         [ 0, 20,  0,   0],
-         [ 0,  0, 20,   0],
-         [ 0,  0,  0, 0.5]]
-    )
-
-    clamour = Clamour([imuOdometry])
-    clamour.start_non_blocking(sound, onNewPoseEstimated)
-
-    while True:
-        imuOdometry.update_pose(PoseMessage(1.0, 2.0, 3.0, 4.0))
-        time.sleep(1)
+    clamour = Clamour([])
+    clamour.start(sound, onNewPoseEstimated)
