@@ -28,8 +28,9 @@ class ClamourPoseEstimator(PoseEstimator):
         self.clamour = Clamour([self.fcOdometry])
         self.clamour.start_non_blocking(False, self._on_new_pose)
 
-    def get(self, x, y, z, dx, dy, dz, yaw, dyaw):
-        self._updateFlightControllerOdometry(x, y, z, yaw)
+    def get(self):
+        est_x, est_y, est_z, est_yaw, est_vx, est_vy, est_vz, est_w = self.get_fc_estimate()
+        self._updateFlightControllerOdometry(est_x, est_y, est_z, est_yaw)
         return self._get_last_calculated_output()
     
     def _updateFlightControllerOdometry(self, x, y, z, yaw):
@@ -63,6 +64,7 @@ class ClamourPoseEstimator(PoseEstimator):
         self.current_yaw = pose.yaw
         self.velocity_yaw = self.current_yaw - self.last_yaw
         self.last_yaw = self.current_yaw
+
 
 if __name__ == '__main__':
     estimator = ClamourPoseEstimator()
