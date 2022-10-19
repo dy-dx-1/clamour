@@ -91,6 +91,7 @@ class Task(TDMAState):
         try:
             with self.pozyx_lock:
                 print("USing anchors: ", self.anchors.anchors_dict)
+                print("USing anchors: ", self.anchors.anchors_list)
                 status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
         except StructError as s:
@@ -201,7 +202,7 @@ class Task(TDMAState):
                 with self.pozyx_lock:
                     self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
 
-        if len(self.anchors.available_anchors) > 4:
+        if len(self.anchors.available_anchors) > 3:
             with self.pozyx_lock:
                 self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
