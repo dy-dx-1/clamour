@@ -198,6 +198,9 @@ class Task(TDMAState):
             self.pozyx.clearDevices()
 
         for anchor in self.anchors.available_anchors:
+            print("Creating pozyx anchor list: ", anchor)
+            print("From loaded anchor: ",  self.anchors.anchors_dict)
+            print(self.anchors.anchors_list)
             if anchor in self.anchors.anchors_dict:
                 with self.pozyx_lock:
                     self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
