@@ -90,6 +90,7 @@ class Task(TDMAState):
 
         try:
             with self.pozyx_lock:
+                print("USing anchors: ", self.anchors.anchors_dict)
                 status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
                 status_angle = self.pozyx.getEulerAngles_deg(angles)
         except StructError as s:
@@ -166,9 +167,12 @@ class Task(TDMAState):
 
         new_anchors, new_tags = [], []
         for device in self.anchors.available_anchors:
+            print("Found device: ", device)
             if PozyxDiscoverer.is_anchor(device):
+                print("It's an anchor!")
                 new_anchors.append(device)
             else:
+                print("It's a tag!")
                 new_tags.append(device)
 
         self.anchors.available_anchors = new_anchors
