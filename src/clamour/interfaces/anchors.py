@@ -14,8 +14,9 @@ class Anchors:
         print("Loading anchros: ", sys.path[0]+'/interfaces/anchors.csv')
         with open(sys.path[0]+'/interfaces/anchors.csv') as r:
             reader = csv.reader(r, delimiter=';')
-            print(reader)
             next(reader)  # We don't want to read the header, so we skip it
+            anc_list = [anc for anc in reader]
+            print(anc_list)
             return [self.add_anchor(anc) for anc in reader]
 
     def add_anchor(self, anchor_data: list) -> DeviceCoordinates:
