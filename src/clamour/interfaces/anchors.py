@@ -11,13 +11,10 @@ class Anchors:
         self.anchors_dict = {anchor.data[0]: anchor for (_, anchor) in enumerate(self.anchors_list)}
 
     def load_anchors_from_csv(self) -> list:
-        print("Loading anchros: ", sys.path[0]+'/interfaces/anchors.csv')
         with open(sys.path[0]+'/interfaces/anchors.csv') as r:
             reader = csv.reader(r, delimiter=';')
             next(reader)  # We don't want to read the header, so we skip it
-            list = [self.add_anchor(anc) for anc in reader]
-            print(list)
-            return list
+            return [self.add_anchor(anc) for anc in reader]
 
     def add_anchor(self, anchor_data: list) -> DeviceCoordinates:
         label = int(anchor_data[0], base=16)
