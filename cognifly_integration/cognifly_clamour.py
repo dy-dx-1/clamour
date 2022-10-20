@@ -64,6 +64,7 @@ class ClamourPoseEstimator(PoseEstimator):
         self.current_yaw = pose.yaw
         self.velocity_yaw = self.current_yaw - self.last_yaw
         self.last_yaw = self.current_yaw
+        print("New pose coming in! X: ", pose.x, "Y: ", pose.y, "Z: ", pose.z, "Yaw: ", pose.yaw)
 
 
 if __name__ == '__main__':
