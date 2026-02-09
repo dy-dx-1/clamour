@@ -3,8 +3,8 @@
 import os
 import sys
 from multiprocessing import Lock, Manager
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
-from pypozyx.definitions.registers import POZYX_NETWORK_ID
+#from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
+#from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
@@ -18,20 +18,8 @@ from messages import PoseMessage, CustomOdometryMessage
 from runnableProcess import RunnableProcess
 #from soundmanager import SoundManager
 
-def connect_pozyx() -> PozyxSerial:
-    serial_port = get_first_pozyx_serial_port()
-
-    if serial_port is None:
-        raise Exception("No Pozyx connected. Check your USB cable or your driver.")
-
-    return PozyxSerial(serial_port)
-
-
-def get_pozyx_id(pozyx) -> int:
-    data = Data([0] * 2)
-    pozyx.getRead(POZYX_NETWORK_ID, data)
-
-    return data[1] * 256 + data[0]
+from interfaces import PozyxTag, BitcrazeTag
+TAG_TYPE = "BitCraze" # to be put in a config file later 
 
 
 def keep_alive(process: RunnableProcess) -> None:
@@ -48,26 +36,31 @@ class Clamour:
     def start(self, sound: bool, pose_callback, communication_queue):
         # The different levels of context managers are required to ensure everything starts and stops cleanly.
         with ContextManagedQueue() as sound_queue:
-            shared_pozyx = connect_pozyx()
-            shared_pozyx_lock = Lock()
-            pozyx_id = get_pozyx_id(shared_pozyx)
+            if TAG_TYPE == "BitCraze":
+                shared_tag = BitcrazeTag("/dev/ttyACM0", 123) # placeholder values, to be replaced with config file values
+            elif TAG_TYPE == "Pozyx":
+                shared_tag = PozyxTag()
+            else: 
+                raise Exception("Invalid TAG_TYPE, check your config file")
+            shared_tag_lock = Lock()
+            tag_id = shared_tag.get_tag_id
 
-            ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id, sound)
-            pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
-            tdma_node = TDMANode(communication_queue, shared_pozyx, shared_pozyx_lock, pozyx_id)
+            ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_tag, shared_tag_lock, tag_id, sound)
+            #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
+            tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
 
-            if sound:
-                sound_player = SoundManager(sound_queue)
+            #if sound:
+            #    sound_player = SoundManager(sound_queue)
 
             with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
                 ekf_manager_process.start()
                 with ContextManagedProcess(target=tdma_node.run) as tdma_process:
                     tdma_process.start()
-                    with ContextManagedProcess(target=pedometer.run) as pedometer_process:
+                    #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                         #pedometer_process.start()
 
-                        if sound:
-                            keep_alive(sound_player)
+                    #    if sound:
+                    #        keep_alive(sound_player)
 
     def start_non_blocking(self, sound: bool, pose_callback):
         self.communication_queue = Queue()
