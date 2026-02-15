@@ -4,3 +4,4 @@
 */__pycache__/
 ansible/*.retry
 VENV/
+clamour_workspace.code-workspace
