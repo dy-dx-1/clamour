@@ -29,7 +29,7 @@ def get_pozyx_id(pozyx) -> int:
 
 class PozyxTag(Tag):
     def __init__(self):
-        self.pozyx_serial = connect_pozyx()
+        self._pozyx_serial = connect_pozyx()
         self._id = get_pozyx_id(self.pozyx_serial)
         
     @property
@@ -46,10 +46,10 @@ class PozyxTag(Tag):
         where self.ekf is an instance of CustomEKF
         TODO: need to construct an alternative to Coordinates object from pozyx
         """
-        self.pozyx_serial.setCoordinates(coord_list)
+        self._pozyx_serial.setCoordinates(coord_list)
 
     def clearDevices(self):
         """
         Uses the PozyxSerial library to clear the devices
         """ 
-        self.pozyx_serial.clearDevices() 
+        self._pozyx_serial.clearDevices() 
