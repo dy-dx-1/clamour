@@ -1,34 +1,34 @@
 from multiprocessing import Lock
-from pypozyx import PozyxSerial
 from time import sleep, time
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
+from interfaces.tag import Tag
 from messenger import Messenger
 from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
 
 
 class TDMANode:
-    def __init__(self, multiprocess_communication_queue, shared_pozyx: PozyxSerial,
-                 shared_pozyx_lock: Lock, pozyx_id: int):
+    def __init__(self, multiprocess_communication_queue, shared_tag: Tag,
+                 shared_tag_lock: Lock, tag_id: int):
 
-        self.clear_devices(shared_pozyx, shared_pozyx_lock)
+        self.clear_devices(shared_tag, shared_tag_lock)
 
         neighborhood = Neighborhood()
         slot_assignment = SlotAssignment()
         anchors = Anchors()
-        messenger = Messenger(pozyx_id, shared_pozyx, neighborhood, slot_assignment,
-                              shared_pozyx_lock, multiprocess_communication_queue)
+        messenger = Messenger(tag_id, shared_tag, neighborhood, slot_assignment,
+                              shared_tag_lock, multiprocess_communication_queue)
 
         self.timing = Timing()
         self.loop_start_time = time()
 
         self.states = self.states = {
-            State.INITIALIZATION: Initialization(neighborhood, anchors, pozyx_id, shared_pozyx, messenger,
-                                                 multiprocess_communication_queue, shared_pozyx_lock),
+            State.INITIALIZATION: Initialization(neighborhood, anchors, tag_id, shared_tag, messenger,
+                                                 multiprocess_communication_queue, shared_tag_lock),
             State.SYNCHRONIZATION: Synchronization(neighborhood, slot_assignment, self.timing, messenger,
-                                                   pozyx_id, multiprocess_communication_queue),
-            State.SCHEDULING: Scheduling(neighborhood, slot_assignment, self.timing, pozyx_id, messenger),
-            State.TASK: Task(self.timing, anchors, neighborhood, pozyx_id, shared_pozyx, shared_pozyx_lock, messenger,
+                                                   tag_id, multiprocess_communication_queue),
+            State.SCHEDULING: Scheduling(neighborhood, slot_assignment, self.timing, tag_id, messenger),
+            State.TASK: Task(self.timing, anchors, neighborhood, tag_id, shared_tag, shared_tag_lock, messenger,
                              slot_assignment),
             State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
 
@@ -60,6 +60,6 @@ class TDMANode:
             sleep(0.00000001)
 
     @staticmethod
-    def clear_devices(pozyx: PozyxSerial, pozyx_lock: Lock()) -> None:
-        with pozyx_lock:
-            pozyx.clearDevices()
+    def clear_devices(tag: Tag, tag_lock: Lock()) -> None:
+        with tag_lock:
+            tag.clearDevices()

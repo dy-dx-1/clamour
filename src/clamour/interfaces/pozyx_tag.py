@@ -44,5 +44,12 @@ class PozyxTag(Tag):
 
         NOTE: this is passed in ekfManager.py as [int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)] 
         where self.ekf is an instance of CustomEKF
+        TODO: need to construct an alternative to Coordinates object from pozyx
         """
         self.pozyx_serial.setCoordinates(coord_list)
+
+    def clearDevices(self):
+        """
+        Uses the PozyxSerial library to clear the devices
+        """ 
+        self.pozyx_serial.clearDevices() 
