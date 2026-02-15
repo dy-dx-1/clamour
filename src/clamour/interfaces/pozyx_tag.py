@@ -53,3 +53,11 @@ class PozyxTag(Tag):
         Uses the PozyxSerial library to clear the devices
         """ 
         self._pozyx_serial.clearDevices() 
+
+    def sendData(self, destination:int, data): 
+        """  
+        Uses PozyxSerial lib to send a Data object from pypozyx to a destination
+        NOTE: will have to figure out how to adapt or replace Data object for general implementation
+        in states/initialization.py, this destination is a certain id and data=Data([0], 'i')
+        """
+        self._pozyx_serial.sendData(destination=destination, data=data)

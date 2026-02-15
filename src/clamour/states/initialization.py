@@ -1,6 +1,7 @@
 import random
 from multiprocessing import Lock
-from pypozyx import PozyxSerial, Data
+from interfaces.tag import Tag
+from pypozyx import PozyxSerial, Data    ### TODO REMOVE DATA DEPENDENCY OR ADAPT 
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
 from time import sleep
 
@@ -14,13 +15,13 @@ from .tdmaState import TDMAState
 
 class Initialization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, anchors: Anchors, 
-                 id: int, pozyx: PozyxSerial, messenger: Messenger,
-                 multiprocess_communication_queue, shared_pozyx_lock: Lock):
+                 id: int, tag: Tag, messenger: Messenger,
+                 multiprocess_communication_queue, shared_tag_lock: Lock):
         self.neighborhood = neighborhood
         self.anchors = anchors
         self.id = id
-        self.pozyx = pozyx
-        self.pozyx_lock = shared_pozyx_lock
+        self.tag = tag
+        self.tag_lock = shared_tag_lock
         self.messenger = messenger
         self.multiprocess_communication_queue = multiprocess_communication_queue
 
@@ -33,11 +34,11 @@ class Initialization(TDMAState):
         print("Entering synchronization...")
         return State.SYNCHRONIZATION
 
-    def clear_pozyx_buffer(self):
-        print(self.pozyx.sendData(destination=self.id, data=Data([0], 'i')))
+    def clear_tag_buffer(self):
+        print(self.tag.sendData(destination=self.id, data=Data([0], 'i')))
         sleep(0.25)
         for _ in range(50):
-            print(self.messenger.obtain_message_from_pozyx())
+            print(self.messenger.obtain_message_from_tag())
             sleep(0.05)
 
     def discover_neighbors(self):
@@ -49,8 +50,8 @@ class Initialization(TDMAState):
         self.messenger.update_topology(State.SYNCHRONIZATION, devices)  # Put state to Sync for next phase
 
     def clear_known_devices(self):
-        with self.pozyx_lock:
-            self.pozyx.clearDevices()
+        with self.tag_lock:
+            self.tag.clearDevices()
 
         self.neighborhood.neighbor_list = []
         self.anchors.available_anchors = []
