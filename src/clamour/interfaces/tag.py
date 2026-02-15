@@ -11,7 +11,7 @@ class Tag(ABC):
 
     @property
     @abstractmethod
-    def get_tag_id(self) -> int:
+    def tag_id(self) -> int:
         """
         Return the tag's unique identifier as an integer.
         """

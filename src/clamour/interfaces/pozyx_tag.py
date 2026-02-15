@@ -30,9 +30,19 @@ def get_pozyx_id(pozyx) -> int:
 class PozyxTag(Tag):
     def __init__(self):
         self.pozyx_serial = connect_pozyx()
-        self.id = get_pozyx_id(self.pozyx_serial)
+        self._id = get_pozyx_id(self.pozyx_serial)
         
     @property
-    def get_tag_id(self) -> int:
-        return self.id
+    def tag_id(self) -> int:
+        return self._id
+    
+    def setCoordinates(self, coord_list:list):
+        """
+        Takes in a list defining the position of the tag [x,y,z] 
+        and stores the coords in the object. 
+        Each coordinate is expected to be an int. 
 
+        NOTE: this is passed in ekfManager.py as [int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)] 
+        where self.ekf is an instance of CustomEKF
+        """
+        self.pozyx_serial.setCoordinates(coord_list)

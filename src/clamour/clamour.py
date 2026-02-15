@@ -43,7 +43,7 @@ class Clamour:
             else: 
                 raise Exception("Invalid TAG_TYPE, check your config file")
             shared_tag_lock = Lock()
-            tag_id = shared_tag.get_tag_id
+            tag_id = shared_tag.tag_id
 
             ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_tag, shared_tag_lock, tag_id, sound)
             #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)

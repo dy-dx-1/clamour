@@ -3,10 +3,10 @@ import os.path
 import csv
 from multiprocessing import Lock
 from numpy import linalg
-from pypozyx import Coordinates, PozyxSerial
+from interfaces.tag import Tag
+from pypozyx import Coordinates ###################### TODO: replace? 
 from struct import error as StructError
 from time import time
-from pypozyx import Coordinates
 
 from .ekf import CustomEKF, DT_THRESHOLD
 from contextManagedQueue import ContextManagedQueue
@@ -16,8 +16,8 @@ from rooms import Floorplan
 
 class EKFManager:
     def __init__(self, pose_callback, sound_queue: ContextManagedQueue, communication_queue: ContextManagedQueue,
-                 shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, pozyx_id: int, sound: bool):
-        self.pozyx_id = pozyx_id
+                 shared_tag: Tag, shared_tag_lock: Lock, tag_id: int, sound: bool):
+        self.tag_id = tag_id
         self.ekf = None
         self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
         self.last_know_neighbors = {}
@@ -27,15 +27,15 @@ class EKFManager:
         self.communication_queue = communication_queue
         self.floorplan = Floorplan()
         self.current_room = self.floorplan.rooms['24']
-        self.pozyx = shared_pozyx
-        self.pozyx_lock = shared_pozyx_lock
+        self.tag = shared_tag
+        self.tag_lock = shared_tag_lock
         self.state_csv, self.writer = self.initialize_csv()
 
     @staticmethod
     def initialize_csv():
         filepath = 'broadcast_state.csv'
         is_new_file = os.path.exists(filepath)
-        fieldnames = ['pozyx_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
+        fieldnames = ['tag_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
                       'coords_pos_x', 'ekf_pos_x', 'coords_pos_y', 'ekf_pos_y', 'ekf_pos_z', 'coords_pos_z', 'raw_yaw', 'ekf_yaw', 
                       'ekf_covariance_matrix', 'slots', 'two_hop_neighbors']
 
@@ -90,8 +90,8 @@ class EKFManager:
             update_functions[message.update_type](*update_info)
 
             try:
-                with self.pozyx_lock:
-                    self.pozyx.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
+                with self.tag_lock:
+                    self.tag.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
             except StructError as s:
                 print(str(s))
 
@@ -159,7 +159,7 @@ class EKFManager:
     def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
         if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:
             csv_data = {
-                'pozyx_id': self.pozyx_id,
+                'tag_id': self.tag_id_id,
                 'timestamp': timestamp,
                 'synchronized_clock': message.synchronized_clock,
                 'offset': message.offset,
