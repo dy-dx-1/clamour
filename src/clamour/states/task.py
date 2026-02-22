@@ -7,6 +7,7 @@ from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data)
+from interfaces.tag import Tag 
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
 from messages import UpdateMessage, UpdateType
@@ -19,14 +20,14 @@ from .tdmaState import TDMAState
 
 class Task(TDMAState):
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood,
-                 id: int, shared_pozyx: PozyxSerial, shared_pozyx_lock: Lock, messenger: Messenger,
+                 id: int, shared_tag: Tag, shared_tag_lock: Lock, messenger: Messenger,
                  slot_assignment: SlotAssignment):
         self.timing = timing
         self.anchors = anchors
         self.id = id
         self.localize = self.ranging
-        self.pozyx = shared_pozyx
-        self.pozyx_lock = shared_pozyx_lock
+        self.tag = shared_tag
+        self.tag_lock = shared_tag_lock
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
@@ -64,14 +65,14 @@ class Task(TDMAState):
         if self.timing.current_slot_id == 0:
             tosend[-1] = (0 if tosend[-1]==255 else tosend[-1])
             #print(self.id, " b2 at slot", 0)
-            with self.pozyx_lock:
-                self.pozyx.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+            with self.tag_lock:
+                self.tag.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
         else:
             #print(self.id, " b2 at slot", self.timing.current_slot_id-1)
             tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
             print(tosend)
-            with self.pozyx_lock:
-                self.pozyx.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+            with self.tag_lock:
+                self.tag.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
         print(self.timing.frame_id, self.timing.current_slot_id, self.timing.get_full_cycle_duration(),self.timing.current_time_in_cycle)
 
     def next(self) -> State:
@@ -89,11 +90,11 @@ class Task(TDMAState):
         angles = EulerAngles()
 
         try:
-            with self.pozyx_lock:
+            with self.tag_lock:
                 print("USing anchors: ", self.anchors.anchors_dict)
                 print("USing anchors: ", self.anchors.anchors_list)
-                status_pos = self.pozyx.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
-                status_angle = self.pozyx.getEulerAngles_deg(angles)
+                status_pos = self.tag.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
+                status_angle = self.tag.getEulerAngles_deg(angles)
         except StructError as s:
             status_pos, status_angle = 0, 0
             print(str(s))
@@ -119,8 +120,8 @@ class Task(TDMAState):
 
             if ranging_target_id not in self.anchors.anchors_dict:
                 try:
-                    with self.pozyx_lock:
-                        self.pozyx.getCoordinates(ref_coordinates)
+                    with self.tag_lock:
+                        self.tag.getCoordinates(ref_coordinates)
                 except StructError as s:
                     print(str(s))
             else:
@@ -130,9 +131,9 @@ class Task(TDMAState):
             angles = EulerAngles()
 
             try:
-                with self.pozyx_lock:
-                    status_pos = self.pozyx.doRanging(ranging_target_id, measured_position)
-                    status_angle = self.pozyx.getEulerAngles_deg(angles)
+                with self.tag_lock:
+                    status_pos = self.tag.doRanging(ranging_target_id, measured_position)
+                    status_angle = self.tag.getEulerAngles_deg(angles)
             except StructError as s:
                 status_angle, status_pos = 0, 0
                 print(s)
@@ -161,8 +162,8 @@ class Task(TDMAState):
 
         self.anchors.available_anchors.clear()
 
-        with self.pozyx_lock:
-            self.pozyx.clearDevices()
+        with self.tag_lock:
+            self.tag.clearDevices()
 
         self.discover(POZYX_DISCOVERY_ALL_DEVICES)
 
@@ -187,32 +188,32 @@ class Task(TDMAState):
                 self.neighborhood.changed = True
 
     def discover(self, discovery_type: int) -> None:
-        devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, discovery_type)
+        devices = PozyxDiscoverer.get_device_list(self.tag, self.tag_lock, discovery_type)
 
         for device_id in devices:
             if device_id not in self.anchors.available_anchors:
                 self.anchors.available_anchors.append(device_id)
 
     def set_manually_measured_anchors(self) -> None:
-        with self.pozyx_lock:
-            self.pozyx.clearDevices()
+        with self.tag_lock:
+            self.tag.clearDevices()
 
         for anchor in self.anchors.available_anchors:
             if anchor in self.anchors.anchors_dict:
-                with self.pozyx_lock:
-                    self.pozyx.addDevice(self.anchors.anchors_dict[anchor])
+                with self.tag_lock:
+                    self.tag.addDevice(self.anchors.anchors_dict[anchor])
 
         if len(self.anchors.available_anchors) > 3:
-            with self.pozyx_lock:
-                self.pozyx.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+            with self.tag_lock:
+                self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
     def handle_error(self, function_name: str) -> None:
         error_code = SingleRegister()
 
         try:
-            with self.pozyx_lock:
-                self.pozyx.getErrorCode(error_code)
-                message = self.pozyx.getErrorMessage(error_code)
+            with self.tag_lock:
+                self.tag.getErrorCode(error_code)
+                message = self.tag.getErrorMessage(error_code)
         except StructError as s:
             message = ""
             print(str(s))
