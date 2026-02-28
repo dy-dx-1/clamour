@@ -4,7 +4,7 @@ from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister, Data)
+                     PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
 
 def connect_pozyx() -> PozyxSerial:
     serial_port = get_first_pozyx_serial_port()
@@ -102,8 +102,24 @@ class PozyxTag(Tag):
         NOTE: will have to figure out how to adapt or replace Data object for general implementation
         in states/initialization.py, this destination is a certain id and data=Data([0], 'i')
         in states/task.py this is (destination=0, data=Data(tosend, 'BBBBBBBBB'))
+        in messenger.py this is (destination=0, data=Data([0xAA, message.data], 'BI'))
         """
         self._pozyx_serial.sendData(destination=destination, data=data)
+
+    def readRXBufferData(self, data:Data): 
+        """
+        Uses PozyxSerial to read the pozyx's buffer and put it in the data container 
+        NOTE: same implementation notes 
+        This seems only to be used in messenger.py? to check 
+        """
+        self._pozyx_serial.readRXBufferData(data) 
+
+    def getRxInfo(self, info:RXInfo): 
+        """
+        Gets metadata on information the Pozyx received over UWB and writes it to an Rx Info container
+        NOTE: Same implementation notes + this also only seems to be used in messenger.py? 
+        """
+        self._pozyx_serial.getRxInfo(info) 
 
     def doPositioning(self, position:Coordinates, dimension:int, algorithm_type:int):
         """

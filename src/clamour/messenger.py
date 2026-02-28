@@ -3,10 +3,11 @@ from multiprocessing import Lock
 from struct import error as StructError
 from time import perf_counter, time
 
-from pypozyx import Data, PozyxSerial, RXInfo, SingleRegister, Coordinates
+from pypozyx import Data, RXInfo, SingleRegister, Coordinates
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
+from interfaces.tag import Tag
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UWBTopologyMessage, UpdateMessage, UpdateType)
@@ -14,13 +15,13 @@ from messages.messageFactory import CUSTOM_MESSAGE_SIGNATURE
 
 
 class Messenger:
-    def __init__(self, id: int, shared_pozyx: PozyxSerial, neighborhood: Neighborhood,
-                 slot_assignment: SlotAssignment, shared_pozyx_lock: Lock,
+    def __init__(self, id: int, shared_tag: Tag, neighborhood: Neighborhood,
+                 slot_assignment: SlotAssignment, shared_tag_lock: Lock,
                  multiprocess_communication_queue: ContextManagedQueue):
         self.id = id
         self.message_box = MessageBox()
-        self.pozyx = shared_pozyx
-        self.pozyx_lock = shared_pozyx_lock
+        self.tag = shared_tag
+        self.tag_lock = shared_tag_lock
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
@@ -44,8 +45,8 @@ class Messenger:
         message.synchronized_clock = timestamp
         message.encode()
 
-        with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
+        with self.tag_lock:
+            self.tag.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -71,8 +72,8 @@ class Messenger:
         message = UWBTopologyMessage(sender_id=self.id, topology=self.neighborhood.current_neighbors.keys())
         message.encode()
 
-        with self.pozyx_lock:
-            self.pozyx.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
+        with self.tag_lock:
+            self.tag.sendData(destination=0, data=Data([0xAA, message.data], 'BI'))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -92,8 +93,8 @@ class Messenger:
         message = UWBTDMAMessage(sender_id=self.id, slot=slot, code=code)
         message.encode()
 
-        with self.pozyx_lock:
-            self.pozyx.sendData(0, Data([0xAA, message.data], 'BI'))
+        with self.tag_lock:
+            self.tag.sendData(0, Data([0xAA, message.data], 'BI'))
 
     def receive_message(self, state: State) -> bool:
         is_new_message, should_go_to_sync = self.receive_new_message(state)
@@ -162,12 +163,12 @@ class Messenger:
         self.slot_assignment.receive_list[message.slot] = -1
 
     def receive_new_message(self, state: State) -> (bool, bool):
-        """Attempts to get a message from the Pozyx tag.
+        """Attempts to get a message from the tag.
         If the attempt fails or if the same message was received before,
         returns False."""
 
         is_new_message = False
-        sender_id, data = self.obtain_message_from_pozyx()
+        sender_id, data = self.obtain_message_from_tag()
 
         if sender_id != 0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
             received_message = MessageFactory.create(sender_id, data)
@@ -185,13 +186,13 @@ class Messenger:
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
-    def obtain_message_from_pozyx(self) -> (int, Data, int):
+    def obtain_message_from_tag(self) -> (int, Data, int):
         data = Data([0, 0], 'BI')
         sender_id, message_byte_size = self.get_message_metadata()
 
         if message_byte_size == data.byte_size:
-            with self.pozyx_lock:
-                self.pozyx.readRXBufferData(data)
+            with self.tag_lock:
+                self.tag.readRXBufferData(data)
 
         return sender_id, data
 
@@ -199,8 +200,8 @@ class Messenger:
         info = RXInfo()
 
         try:
-            with self.pozyx_lock:
-                self.pozyx.getRxInfo(info)
+            with self.tag_lock:
+                self.tag.getRxInfo(info)
         except StructError as s:
             print("RxInfo crashes! ", str(s))
 
@@ -230,14 +231,14 @@ class Messenger:
         error_code = SingleRegister()
 
         try:
-            with self.pozyx_lock:
-                self.pozyx.getErrorCode(error_code)
-                message = self.pozyx.getErrorMessage(error_code)
+            with self.tag_lock:
+                self.tag.getErrorCode(error_code)
+                message = self.tag.getErrorMessage(error_code)
         except StructError as s:
             message = ""
             print(str(s))
 
         if error_code != 0x0:
             print("Error in", function_name, ":", message)
-            with self.pozyx_lock:
-                self.pozyx.resetSystem()
+            with self.tag_lock:
+                self.tag.resetSystem()
