@@ -79,6 +79,12 @@ class PozyxTag(Tag):
         """ 
         self._pozyx_serial.clearDevices() 
 
+    def resetSystem(self): 
+        """
+        Resets the Pozyx device 
+        """
+        self._pozyx_serial.resetSystem()
+
     def addDevice(self, device_coordinates): 
         """
         Adds an anchor or tag to the Pozyx device list
@@ -120,7 +126,7 @@ class PozyxTag(Tag):
         NOTE: Same implementation notes + this also only seems to be used in messenger.py? 
         """
         self._pozyx_serial.getRxInfo(info) 
-
+    
     def doPositioning(self, position:Coordinates, dimension:int, algorithm_type:int):
         """
         Uses pypozyx to position a UWB tag. This is very tightly coupled with pozyx. 
