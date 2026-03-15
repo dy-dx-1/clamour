@@ -1,6 +1,7 @@
 from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, asarray, ndarray, dot, eye, linalg
-from pypozyx import Coordinates
+#from pypozyx import Coordinates
+from interfaces import Coordinates
 from ekf.customOdometry import CustomOdometry
 from messages import PoseMessage
 

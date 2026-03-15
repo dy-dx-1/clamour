@@ -4,7 +4,8 @@ import csv
 from multiprocessing import Lock
 from numpy import linalg
 from interfaces.tag import Tag
-from pypozyx import Coordinates ###################### TODO: replace? 
+#from pypozyx import Coordinates 
+from interfaces import Coordinates
 from struct import error as StructError
 from time import time
 
