@@ -1,6 +1,6 @@
 import numpy as np
 from math import sqrt, sin, cos
-from pypozyx import Coordinates
+from interfaces import Coordinates
 from typing import Union
 
 

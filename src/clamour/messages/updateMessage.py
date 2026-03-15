@@ -2,7 +2,7 @@
 It is intended to be passed to a ContextManagedQueue as a pickled class + dictionary tuple.
 The state information passed within the message will be used to update the device's EKF."""
 
-from pypozyx import Coordinates
+from interfaces import Coordinates
 from .types import UpdateType
 
 

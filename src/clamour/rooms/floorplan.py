@@ -1,5 +1,5 @@
 from .roomLoader import RoomLoader
-from pypozyx import Coordinates
+from interfaces import Coordinates
 
 
 class NonexistentRoomException(Exception):

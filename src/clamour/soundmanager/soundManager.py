@@ -1,6 +1,6 @@
 import json
 import pygame
-from pypozyx import Coordinates
+from interfaces import Coordinates
 from random import randint
 from time import sleep
 import sys, os

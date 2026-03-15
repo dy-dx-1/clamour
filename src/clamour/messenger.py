@@ -3,7 +3,8 @@ from multiprocessing import Lock
 from struct import error as StructError
 from time import perf_counter, time
 
-from pypozyx import Data, RXInfo, SingleRegister, Coordinates
+from pypozyx import Data, RXInfo, SingleRegister
+from interfaces import Coordinates
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
