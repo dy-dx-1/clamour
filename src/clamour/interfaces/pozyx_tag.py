@@ -3,8 +3,10 @@ from pypozyx import PozyxSerial, get_first_pozyx_serial_port
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
+
+from .containers import Coordinates
 
 def connect_pozyx() -> PozyxSerial:
     serial_port = get_first_pozyx_serial_port()
@@ -35,11 +37,12 @@ class PozyxTag(Tag):
     def __init__(self):
         self._pozyx_serial = connect_pozyx()
         self._id = get_pozyx_id(self.pozyx_serial)
-        
+        self._coordinates = None # Initialised by setCoordinates, NOTE: implement as property in future? 
+
     @property
     def tag_id(self) -> int:
         return self._id
-    
+
     def getErrorCode(self, error_code:SingleRegister): 
         """
         Gets the error code for a pozyx device and writes it to a SingleRegister container
@@ -61,8 +64,8 @@ class PozyxTag(Tag):
 
         NOTE: this is passed in ekfManager.py as [int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)] 
         where self.ekf is an instance of CustomEKF
-        TODO: need to construct an alternative to Coordinates object from pozyx
         """
+        self._coordinates = Coordinates(*coord_list)
         self._pozyx_serial.setCoordinates(coord_list)
 
     def getCoordinates(self, ref_coordinates:Coordinates): 
@@ -71,7 +74,13 @@ class PozyxTag(Tag):
         NOTE: Returns a pozyx success or not. needs to be updates
         this is notably used in task.py similar situatin to doPositioning
         """
-        return self._pozyx_serial.getCoordinates(ref_coordinates)
+        # NOTE: This is only used in states/task.py
+        # I am not fully sure of my implementation. Currently ASSUMING the self._coordinates value is up-to-date when this function is called.
+        # Also not sure why pypozyx seems to only get the X position with this function. 
+        # If precision is way off in the future, look into this. 
+        status = self._pozyx_serial.getCoordinates(ref_coordinates) # success or not, this'll update the ref_coordinates value
+        assert ref_coordinates == self._coordinates # NOTE: this should confirm above assumption, remove after verifying. else can setCoords right after to enforce it?
+        return status # TODO: stop returning statuses 
 
     def clearDevices(self):
         """
@@ -130,14 +139,16 @@ class PozyxTag(Tag):
     def doPositioning(self, position:Coordinates, dimension:int, algorithm_type:int):
         """
         Uses pypozyx to position a UWB tag. This is very tightly coupled with pozyx. 
-        In task.py, this is used with:
+        Only used in task.py with:
          - 'position' container of type Coordinates
          - dimension is POZYX3D (which is int(3))
          - algorithm is POZYX_POS_ALG_UWB_ONLY 
 
         IMPORTANT NOTE!!! this returns POZYX_SUCCESS and it's variations and seemingly just writes the result to the pozyx hardware. Need to find a decoupled way to track this. 
         """
-        return self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
+        status = self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
+        self._coordinates = position 
+        return status # TODO: get rid of statuses 
     
     def getEulerAngles_deg(self, angles:EulerAngles): 
         """ 
