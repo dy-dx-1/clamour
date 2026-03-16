@@ -3,3 +3,4 @@ from .slotAssignment import SlotAssignment
 from .timing import Timing
 from .anchors import Anchors
 from .containers import Coordinates, DeviceCoordinates
+from .tag import Tag 

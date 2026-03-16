@@ -5,9 +5,9 @@ from time import perf_counter
 
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, Coordinates, DeviceRange,
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data)
-from interfaces.tag import Tag 
+from interfaces import Tag, Coordinates
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
 from messages import UpdateMessage, UpdateType
