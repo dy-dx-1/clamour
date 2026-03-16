@@ -1,5 +1,5 @@
 #from pypozyx import DeviceCoordinates, Coordinates
-from interfaces import Coordinates
+from interfaces import Coordinates, DeviceCoordinates
 import csv
 import sys
 
