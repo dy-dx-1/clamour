@@ -188,25 +188,20 @@ class Messenger:
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
     def obtain_message_from_tag(self) -> (int, Data, int):
-        data = Data([0, 0], 'BI')
-        sender_id, message_byte_size = self.get_message_metadata()
+        metadata = RXInfo() 
+        try: 
+            with self.tag_lock:
+                self.tag.getRxInfo(metadata) 
+        except StructError as s: 
+            print("RxInfo crashes! ", str(s))
+        sender_id, message_byte_size = metadata[0], metadata[1] 
 
+        data = Data([0, 0], 'BI')
         if message_byte_size == data.byte_size:
             with self.tag_lock:
                 self.tag.readRXBufferData(data)
 
         return sender_id, data
-
-    def get_message_metadata(self) -> (int, int):
-        info = RXInfo()
-
-        try:
-            with self.tag_lock:
-                self.tag.getRxInfo(info)
-        except StructError as s:
-            print("RxInfo crashes! ", str(s))
-
-        return info[0], info[1]
 
     def update_topology(self, state: State, device_list: list=None, topology_info: list=None, sender_id:int=None) -> None:
         if device_list is not None:
@@ -229,17 +224,7 @@ class Messenger:
             self.neighborhood.remove_synced_neighbor(message.sender_id)
 
     def handle_error(self, function_name: str) -> None:
-        error_code = SingleRegister()
-
-        try:
-            with self.tag_lock:
-                self.tag.getErrorCode(error_code)
-                message = self.tag.getErrorMessage(error_code)
-        except StructError as s:
-            message = ""
-            print(str(s))
-
-        if error_code != 0x0:
-            print("Error in", function_name, ":", message)
-            with self.tag_lock:
+        # 2026-03-07 NOTE: this doesn't seem to be called anywhere in src/clamour/* ?? why 
+        with self.tag_lock:
+            if self.tag.printCurrentError(function_name): 
                 self.tag.resetSystem()

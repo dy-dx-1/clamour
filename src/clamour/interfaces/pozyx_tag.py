@@ -5,8 +5,9 @@ from pypozyx.definitions.registers import POZYX_NETWORK_ID
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
+import struct 
 
-from .containers import Coordinates
+from .containers import Coordinates, DeviceCoordinates
 
 def get_pozyx_id(pozyx) -> int:
     """
@@ -33,25 +34,28 @@ class PozyxTag(Tag):
         self._pozyx_serial = PozyxSerial(serial_port)
         self._id = get_pozyx_id(self._pozyx_serial)
         self._coordinates = None # Initialised by setCoordinates, NOTE: implement as property in future? 
+        self._internal_device_list = [] # Used by addDevice, clearDevices
 
     @property
     def tag_id(self) -> int:
         return self._id
     
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
-    def addDevice(self, device_coordinates): 
+    def addDevice(self, device_coordinates:DeviceCoordinates): 
         """
         Adds an anchor or tag to the Pozyx device list
         see Pozyx lib for more detail on device_coordinates
         In task.py this is passed as self.anchors.anchors_dict[anchor]
         NOTE: same return problem as doPositioning
         """
-        return self._pozyx_serial.addDevice()
+        self._internal_device_list.append(device_coordinates) # Not needed for pozyx, putting it here to remind me general integration 
+        return self._pozyx_serial.addDevice(device_coordinates)
     
     def clearDevices(self):
         """
         Uses the PozyxSerial library to clear the devices
         """ 
+        self._internal_device_list = [] # Not needed for pozyx, putting it here for general integration 
         self._pozyx_serial.clearDevices() 
 
     def resetSystem(self): 
@@ -60,6 +64,23 @@ class PozyxTag(Tag):
         """
         self._pozyx_serial.resetSystem()
     
+    def printCurrentError(self, function_name:str) -> None: 
+        """
+        Gets the current error for a pozyx device and prints it out. 
+        function_name allows to specify where the error happened 
+        """
+        try: 
+            error_code = SingleRegister() 
+            self._pozyx_serial.getErrorCode(error_code) 
+            message = self._pozyx_serial.getErrorMessage(error_code) 
+        except struct.error as s: 
+            message = "" 
+            print(str(s))  
+        if error_code != 0x0: 
+            print(f"Error in {function_name} : {message}")
+            
+                
+
     def getErrorCode(self, error_code:SingleRegister): 
         """
         Gets the error code for a pozyx device and writes it to a SingleRegister container

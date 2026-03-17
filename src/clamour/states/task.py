@@ -207,16 +207,9 @@ class Task(TDMAState):
             with self.tag_lock:
                 self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
 
-    def handle_error(self, function_name: str) -> None:
-        error_code = SingleRegister()
-
-        try:
-            with self.tag_lock:
-                self.tag.getErrorCode(error_code)
-                message = self.tag.getErrorMessage(error_code)
-        except StructError as s:
-            message = ""
-            print(str(s))
-
-        if error_code != 0x0:
-            print("Error in", function_name, ":", message)
+    def handle_error(self, function_name: str) -> None: 
+        """
+        Prints the current error on the device with the function where it happened
+        """
+        with self.tag_lock: 
+            self.tag.printCurrentError(function_name) 
