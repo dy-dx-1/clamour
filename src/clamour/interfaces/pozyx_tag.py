@@ -8,15 +8,6 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICE
 
 from .containers import Coordinates
 
-def connect_pozyx() -> PozyxSerial:
-    serial_port = get_first_pozyx_serial_port()
-
-    if serial_port is None:
-        raise Exception("No Pozyx connected. Check your USB cable or your driver.")
-
-    return PozyxSerial(serial_port)
-
-
 def get_pozyx_id(pozyx) -> int:
     """
     Read and return the Pozyx device's network ID as an int.
@@ -35,14 +26,40 @@ def get_pozyx_id(pozyx) -> int:
 
 class PozyxTag(Tag):
     def __init__(self):
-        self._pozyx_serial = connect_pozyx()
-        self._id = get_pozyx_id(self.pozyx_serial)
+        serial_port = get_first_pozyx_serial_port()
+        if serial_port is None:
+            raise Exception("No Pozyx connected. Check your USB cable or your driver.")
+
+        self._pozyx_serial = PozyxSerial(serial_port)
+        self._id = get_pozyx_id(self._pozyx_serial)
         self._coordinates = None # Initialised by setCoordinates, NOTE: implement as property in future? 
 
     @property
     def tag_id(self) -> int:
         return self._id
+    
+    ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
+    def addDevice(self, device_coordinates): 
+        """
+        Adds an anchor or tag to the Pozyx device list
+        see Pozyx lib for more detail on device_coordinates
+        In task.py this is passed as self.anchors.anchors_dict[anchor]
+        NOTE: same return problem as doPositioning
+        """
+        return self._pozyx_serial.addDevice()
+    
+    def clearDevices(self):
+        """
+        Uses the PozyxSerial library to clear the devices
+        """ 
+        self._pozyx_serial.clearDevices() 
 
+    def resetSystem(self): 
+        """
+        Resets the Pozyx device 
+        """
+        self._pozyx_serial.resetSystem()
+    
     def getErrorCode(self, error_code:SingleRegister): 
         """
         Gets the error code for a pozyx device and writes it to a SingleRegister container
@@ -55,6 +72,57 @@ class PozyxTag(Tag):
         Returns the system error string for the given error code in the SingleRegister container
         """
         return self._pozyx_serial.getErrorMessage(error_code)
+    
+    ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
+
+    def sendData(self, destination:int, data:Data): 
+        """  
+        Uses PozyxSerial lib to send a Data object from pypozyx to a destination
+        NOTE: will have to figure out how to adapt or replace Data object for general implementation
+        in states/initialization.py, this destination is a certain id and data=Data([0], 'i')
+        in states/task.py this is (destination=0, data=Data(tosend, 'BBBBBBBBB'))
+        in messenger.py this is (destination=0, data=Data([0xAA, message.data], 'BI'))
+        """
+        self._pozyx_serial.sendData(destination=destination, data=data)
+
+    def readRXBufferData(self, data:Data): 
+        """
+        Uses PozyxSerial to read the pozyx's buffer and put it in the data container 
+        NOTE: same implementation notes 
+        This seems only to be used in messenger.py? to check 
+        """
+        self._pozyx_serial.readRXBufferData(data) 
+
+    def getRxInfo(self, info:RXInfo): 
+        """
+        Gets metadata on information the Pozyx received over UWB and writes it to an Rx Info container
+        NOTE: Same implementation notes + this also only seems to be used in messenger.py? 
+        """
+        self._pozyx_serial.getRxInfo(info) 
+
+    ### -------------------------------------------- LOCALIZATION --------------------------------------------
+    
+    def setSelectionOfAnchors(self, mode, number_of_anchors):
+        """
+        Sets the anchor positioning for the anchors. 
+        In task.py this is passed as self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+        NOTE: same return problem as doPositioning 
+        """
+        return self._pozyx_serial.setSelectionOfAnchors(mode, number_of_anchors)
+    
+    def doPositioning(self, position:Coordinates, dimension:int, algorithm_type:int):
+        """
+        Uses pypozyx to position a UWB tag. This is very tightly coupled with pozyx. 
+        Only used in task.py with:
+         - 'position' container of type Coordinates
+         - dimension is POZYX3D (which is int(3))
+         - algorithm is POZYX_POS_ALG_UWB_ONLY 
+
+        IMPORTANT NOTE!!! this returns POZYX_SUCCESS and it's variations and seemingly just writes the result to the pozyx hardware. Need to find a decoupled way to track this. 
+        """
+        status = self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
+        self._coordinates = position 
+        return status # TODO: get rid of statuses 
     
     def setCoordinates(self, coord_list:list):
         """
@@ -82,74 +150,6 @@ class PozyxTag(Tag):
         assert ref_coordinates == self._coordinates # NOTE: this should confirm above assumption, remove after verifying. else can setCoords right after to enforce it?
         return status # TODO: stop returning statuses 
 
-    def clearDevices(self):
-        """
-        Uses the PozyxSerial library to clear the devices
-        """ 
-        self._pozyx_serial.clearDevices() 
-
-    def resetSystem(self): 
-        """
-        Resets the Pozyx device 
-        """
-        self._pozyx_serial.resetSystem()
-
-    def addDevice(self, device_coordinates): 
-        """
-        Adds an anchor or tag to the Pozyx device list
-        see Pozyx lib for more detail on device_coordinates
-        In task.py this is passed as self.anchors.anchors_dict[anchor]
-        NOTE: same return problem as doPositioning
-        """
-        return self._pozyx_serial.addDevice()
-    
-    def setSelectionOfAnchors(self, mode, number_of_anchors):
-        """
-        Sets the anchor positioning for the anchors. 
-        In task.py this is passed as self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
-        NOTE: same return problem as doPositioning 
-        """
-        return self._pozyx_serial.setSelectionOfAnchors(mode, number_of_anchors)
-
-    def sendData(self, destination:int, data:Data): 
-        """  
-        Uses PozyxSerial lib to send a Data object from pypozyx to a destination
-        NOTE: will have to figure out how to adapt or replace Data object for general implementation
-        in states/initialization.py, this destination is a certain id and data=Data([0], 'i')
-        in states/task.py this is (destination=0, data=Data(tosend, 'BBBBBBBBB'))
-        in messenger.py this is (destination=0, data=Data([0xAA, message.data], 'BI'))
-        """
-        self._pozyx_serial.sendData(destination=destination, data=data)
-
-    def readRXBufferData(self, data:Data): 
-        """
-        Uses PozyxSerial to read the pozyx's buffer and put it in the data container 
-        NOTE: same implementation notes 
-        This seems only to be used in messenger.py? to check 
-        """
-        self._pozyx_serial.readRXBufferData(data) 
-
-    def getRxInfo(self, info:RXInfo): 
-        """
-        Gets metadata on information the Pozyx received over UWB and writes it to an Rx Info container
-        NOTE: Same implementation notes + this also only seems to be used in messenger.py? 
-        """
-        self._pozyx_serial.getRxInfo(info) 
-    
-    def doPositioning(self, position:Coordinates, dimension:int, algorithm_type:int):
-        """
-        Uses pypozyx to position a UWB tag. This is very tightly coupled with pozyx. 
-        Only used in task.py with:
-         - 'position' container of type Coordinates
-         - dimension is POZYX3D (which is int(3))
-         - algorithm is POZYX_POS_ALG_UWB_ONLY 
-
-        IMPORTANT NOTE!!! this returns POZYX_SUCCESS and it's variations and seemingly just writes the result to the pozyx hardware. Need to find a decoupled way to track this. 
-        """
-        status = self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
-        self._coordinates = position 
-        return status # TODO: get rid of statuses 
-    
     def getEulerAngles_deg(self, angles:EulerAngles): 
         """ 
         Uses pypozyx to read the angles of the tag and store them in a EulerAngles container
