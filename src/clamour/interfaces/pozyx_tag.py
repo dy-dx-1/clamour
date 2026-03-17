@@ -8,7 +8,7 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICE
 from pypozyx import Coordinates as pozyxCoordinates 
 import struct 
 
-from .containers import Coordinates, DeviceCoordinates
+from .containers import Coordinates, DeviceCoordinates # NOTE: check use of these 2 and coherence
 
 def get_pozyx_id(pozyx) -> int:
     """
@@ -161,17 +161,40 @@ class PozyxTag(Tag):
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
         return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
 
-    def getEulerAngles_deg(self, angles:EulerAngles): 
+    def doRanging(self, target_id:int): 
+        """
+        Calculates a range measurement between the tag and another device
+        Only used in task.py
+        NOTE: in task.py, after the Coordinates object is returned, it is fed into the ekf, should check that our general Coordinates object does work 
+        NOTE: check how to generalize target_id
+        """
+        range_measure = DeviceRange() 
+        try: 
+            status = self._pozyx_serial.doRanging(target_id, range_measure)
+        except struct.error as s: 
+            status = 0 
+            print(s) 
+
+        if status == POZYX_SUCCESS: 
+            return Coordinates(range_measure.data[1], 0, 0) # idk why only along X 
+        else: 
+            return None
+
+    def getEulerAngles_deg(self): 
         """ 
-        Uses pypozyx to read the angles of the tag and store them in a EulerAngles container
-        IMPORTANT NOTE!!! this returns POZYX_SUCCESS and it's variations and seemingly just writes the result to the pozyx hardware. Need to find a decoupled way to track this. 
+        Gets the device's current orientation in degrees (heading, roll, pitch) 
+        TODO: build general angles object and check coherence, CHANGE RETURN TO IT 
+        Only used in task.py
         """
-        return self._pozyx_serial.getEulerAngles_deg(angles)
-    
-    def doRanging(self, ranging_target_id:int, measured_position:DeviceRange): 
-        """
-        Gets a ranging measurement and stores it in the DeviceRange object 
-        NOTE: same situation for the return as doPositioning 
-        """
-        return self._pozyx_serial.doRanging(ranging_target_id, measured_position)
+        angles = EulerAngles() 
+        try:
+            status = self._pozyx_serial.getEulerAngles_deg(angles)
+        except struct.error as s: 
+            status = 0
+            print(s) 
+        
+        if status == POZYX_SUCCESS: 
+            return angles # TODO: CHANGE TO RETURNING GENERAL OBJECT + CHECK COHERENCE
+        else: 
+            return None
     

@@ -116,34 +116,22 @@ class Task(TDMAState):
         ranging_target_id = self.select_ranging_target()
 
         if ranging_target_id is not None:
-            ref_coordinates = Coordinates()
-
             if ranging_target_id not in self.anchors.anchors_dict:
                 try:
                     with self.tag_lock:
-                        self.tag.getCoordinates(ref_coordinates)
+                        ref_coordinates = self.tag.getCoordinates()
                 except StructError as s:
                     print(str(s))
             else:
                 ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
-            measured_position = DeviceRange()
-            angles = EulerAngles()
-
-            try:
-                with self.tag_lock:
-                    status_pos = self.tag.doRanging(ranging_target_id, measured_position)
-                    status_angle = self.tag.getEulerAngles_deg(angles)
-            except StructError as s:
-                status_angle, status_pos = 0, 0
-                print(s)
-
-            if status_pos == POZYX_SUCCESS:
-                measured_position = Coordinates(measured_position.data[1], 0, 0)
+            with self.tag_lock:
+                measured_position = self.tag.doRanging(ranging_target_id) 
+                angles = self.tag.getEulerAngles_deg() # TODO: return general angles object and check coherence for ranging and angles objects 
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
-            if status_pos == status_angle == POZYX_SUCCESS:
+            if not ((measured_position is None) or (angles is None)): # These will be None if there were errors when getting the ranging/angles 
                 self.messenger.send_ekf_update(UpdateType.RANGING, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
                                                measured_position, angles.heading, neighbors=atleast_2d(neighbor_position),
                                                topology=self.neighborhood.current_neighbors)
