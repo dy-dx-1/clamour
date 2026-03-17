@@ -226,5 +226,5 @@ class Messenger:
     def handle_error(self, function_name: str) -> None:
         # 2026-03-07 NOTE: this doesn't seem to be called anywhere in src/clamour/* ?? why 
         with self.tag_lock:
-            if self.tag.printCurrentError(function_name): 
+            if self.tag.printCurrentError(function_name): # prints the current error, and if there's indeed one resets the system
                 self.tag.resetSystem()
