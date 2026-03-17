@@ -5,6 +5,7 @@ from pypozyx.definitions.registers import POZYX_NETWORK_ID
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
+from pypozyx import Coordinates as pozyxCoordinates 
 import struct 
 
 from .containers import Coordinates, DeviceCoordinates
@@ -147,19 +148,18 @@ class PozyxTag(Tag):
         self._coordinates = Coordinates(*coord_list)
         self._pozyx_serial.setCoordinates(coord_list)
 
-    def getCoordinates(self, ref_coordinates:Coordinates): 
+    def getCoordinates(self)->Coordinates: 
         """
-        Stores the coordinates of the Pozyx in a Coordinates container
-        NOTE: Returns a pozyx success or not. needs to be updates
-        this is notably used in task.py similar situatin to doPositioning
+        Stores the coordinates of the Pozyx in a Coordinates container. 
+        Only used in task.py 
         """
-        # NOTE: This is only used in states/task.py
-        # I am not fully sure of my implementation. Currently ASSUMING the self._coordinates value is up-to-date when this function is called.
+        # NOTE: Figure out if/how to use self._coordinates here in general version 
         # Also not sure why pypozyx seems to only get the X position with this function. 
         # If precision is way off in the future, look into this. 
-        status = self._pozyx_serial.getCoordinates(ref_coordinates) # success or not, this'll update the ref_coordinates value
-        assert ref_coordinates == self._coordinates # NOTE: this should confirm above assumption, remove after verifying. else can setCoords right after to enforce it?
-        return status # TODO: stop returning statuses 
+        coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
+        status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
+        assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
+        return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
 
     def getEulerAngles_deg(self, angles:EulerAngles): 
         """ 
