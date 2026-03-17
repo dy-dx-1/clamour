@@ -64,11 +64,14 @@ class PozyxTag(Tag):
         """
         self._pozyx_serial.resetSystem()
     
-    def printCurrentError(self, function_name:str) -> None: 
+    def printCurrentError(self, function_name:str) -> bool: 
         """
         Gets the current error for a pozyx device and prints it out. 
         function_name allows to specify where the error happened 
+
+        Returns 1 if it indeed returned an error. Although note that this functionality is only used in messenger.py and I don't think the method in question is ever called 
         """
+        returned_error = False
         try: 
             error_code = SingleRegister() 
             self._pozyx_serial.getErrorCode(error_code) 
@@ -78,21 +81,8 @@ class PozyxTag(Tag):
             print(str(s))  
         if error_code != 0x0: 
             print(f"Error in {function_name} : {message}")
-            
-                
-
-    def getErrorCode(self, error_code:SingleRegister): 
-        """
-        Gets the error code for a pozyx device and writes it to a SingleRegister container
-        NOTE: returns POZYX_SUCESS, need to address this 
-        """
-        return self._pozyx_serial.getErrorCode(error_code) 
-    
-    def getErrorMessage(self, error_code:SingleRegister): 
-        """
-        Returns the system error string for the given error code in the SingleRegister container
-        """
-        return self._pozyx_serial.getErrorMessage(error_code)
+            returned_error = True 
+        return returned_error
     
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
 
