@@ -3,6 +3,7 @@ This file defines many objects that serve to transport info from the tag to Clam
 Originally, all of these directly came from the pypozyx lib. 
 In an effort to decouple the code from it, these are general versions that can be used in a platform agnostic manner. 
 """
+import struct 
 
 class XYZ: 
     """
@@ -65,6 +66,46 @@ class Coordinates(XYZ):
     byte_size = 12
     data_format = 'iii'
 
+class Angles():
+    """
+    Container for euler angles as heading(yaw), roll, and pitch (in degrees).
+    This is based on the EulerAngles object from pypozyx, and used inherit from ByteStructure and have the attributes physical_convet, byte_size and data_format
+    TODO: Check implementation and make sure pozyx stuff is only needed in PozyxTag
+    """
+
+    def __init__(self, heading=0, roll=0, pitch=0):
+        self.data = [heading, roll, pitch]
+
+    def load(self, data):
+        self.data = data
+
+    def __str__(self):
+        return f'Heading: {self.heading}, Roll: {self.roll}, Pitch: {self.pitch}'
+
+    @property
+    def heading(self):
+        return self.data[0] 
+
+    @heading.setter
+    def heading(self, value):
+        self.data[0] = value 
+
+    @property
+    def roll(self):
+        return self.data[1] 
+
+    @roll.setter
+    def roll(self, value):
+        self.data[1] = value 
+
+    @property
+    def pitch(self):
+        return self.data[2] 
+
+    @pitch.setter
+    def pitch(self, value):
+        self.data[2] = value 
+
 class DeviceCoordinates: 
     """
     NOTE: The original one inherits from ByteStructure
@@ -115,6 +156,7 @@ class DeviceCoordinates:
 
     @property
     def pos(self):
+        # NOTE: careful when modifying the object, this property (and im sure others) are used in the code, make sure object types coherent
         return Coordinates(self.data[2], self.data[3], self.data[4])
 
     @pos.setter
