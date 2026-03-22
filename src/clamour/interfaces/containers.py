@@ -3,21 +3,14 @@ This file defines many objects that serve to transport info from the tag to Clam
 Originally, all of these directly came from the pypozyx lib. 
 In an effort to decouple the code from it, these are general versions that can be used in a platform agnostic manner. 
 """
-import struct 
 
-class XYZ: 
+class Coordinates: 
     """
-    Generic XYZ data structure consisting of 3 integers x, y and z.
-    Is used to derive other data containers
-    NOTE: The original one inherits from ByteStructure
-    """
-    ### NOTE: These variables are from the original class, idk if they will be useful for us yet
-    byte_size = 12
-    data_format = 'iii'
-    physical_convert = 1 # This is used originally to derive other classes. Not sure if we need it. 
-
+    Container for x, y, z coordinates (in mm)
+    This is based on the Coordinates object from pypozyx that inherits from XYZ who inherits from ByteStructure
+    It used to have inherited attributes as well as byte_size and data_format 
+    """ 
     def __init__(self, x:int=0, y:int=0, z:int=0): 
-        """Initializes the XYZ object as a list"""
         self.data = [x,y,z] 
     
     def __str__(self):
@@ -29,27 +22,27 @@ class XYZ:
 
     @property
     def x(self):
-        return self.data[0] / self.physical_convert
+        return self.data[0] 
 
     @x.setter
     def x(self, value):
-        self.data[0] = value * self.physical_convert
+        self.data[0] = value 
 
     @property
     def y(self):
-        return self.data[1] / self.physical_convert
+        return self.data[1] 
 
     @y.setter
     def y(self, value):
-        self.data[1] = value * self.physical_convert
+        self.data[1] = value 
 
     @property
     def z(self):
-        return self.data[2] / self.physical_convert
+        return self.data[2] 
 
     @z.setter
     def z(self, value):
-        self.data[2] = value * self.physical_convert
+        self.data[2] = value 
 
     def to_dict(self):
         return {
@@ -58,19 +51,10 @@ class XYZ:
             "z": self.z,
         }
 
-class Coordinates(XYZ): 
-    """
-    Container for x, y, z coordinates (in mm)
-    This is effectively the same thing as XYZ, just with a different name that indicates they're coords
-    """ 
-    byte_size = 12
-    data_format = 'iii'
-
 class Angles:
     """
     Container for euler angles as heading(yaw), roll, and pitch (in degrees).
     This is based on the EulerAngles object from pypozyx, and used inherit from ByteStructure and have the attributes physical_convet, byte_size and data_format
-    TODO: Check implementation and make sure pozyx stuff is only needed in PozyxTag
     """
 
     def __init__(self, heading=0, roll=0, pitch=0):
