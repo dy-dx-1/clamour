@@ -87,24 +87,19 @@ class Task(TDMAState):
 
     def positioning(self) -> None:
         position = Coordinates()
-        angles = EulerAngles()
 
-        try:
-            with self.tag_lock:
-                print("USing anchors: ", self.anchors.anchors_dict)
-                print("USing anchors: ", self.anchors.anchors_list)
-                status_pos = self.tag.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
-                status_angle = self.tag.getEulerAngles_deg(angles)
-        except StructError as s:
-            status_pos, status_angle = 0, 0
-            print(str(s))
+        with self.tag_lock:
+            print("Using anchors: ", self.anchors.anchors_dict)
+            print("Using anchors: ", self.anchors.anchors_list)
+            status_pos = self.tag.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
+            angles = self.tag.getOrientation() 
 
-        if status_pos != POZYX_SUCCESS:
+        if status_pos != POZYX_SUCCESS: # TODO: implement doPositioning
             self.handle_error("positioning (pos)")
-        if status_angle != POZYX_SUCCESS:
+        if angles is None:
             self.handle_error("positioning (ranging)")
 
-        if status_pos == status_angle == POZYX_SUCCESS and self.positioning_converges(position):
+        if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
                                            position, angles.heading, topology=self.neighborhood.current_neighbors)
 
@@ -116,18 +111,14 @@ class Task(TDMAState):
         ranging_target_id = self.select_ranging_target()
 
         if ranging_target_id is not None:
-            if ranging_target_id not in self.anchors.anchors_dict:
-                try:
-                    with self.tag_lock:
-                        ref_coordinates = self.tag.getCoordinates()
-                except StructError as s:
-                    print(str(s))
-            else:
-                ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
+            with self.tag_lock: 
+                if ranging_target_id not in self.anchors.anchors_dict:
+                    ref_coordinates = self.tag.getCoordinates()
+                else:
+                    ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
 
-            with self.tag_lock:
                 measured_position = self.tag.doRanging(ranging_target_id) 
-                angles = self.tag.getEulerAngles_deg() # TODO: return general angles object and check coherence for ranging and angles objects 
+                angles = self.tag.getOrientation() 
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 

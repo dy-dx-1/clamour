@@ -8,7 +8,7 @@ from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICE
 from pypozyx import Coordinates as pozyxCoordinates 
 import struct 
 
-from .containers import Coordinates, DeviceCoordinates # NOTE: check use of these 2 and coherence
+from .containers import Coordinates, DeviceCoordinates, Angles # NOTE: check use of these 2 and coherence
 
 def get_pozyx_id(pozyx) -> int:
     """
@@ -132,7 +132,11 @@ class PozyxTag(Tag):
 
         IMPORTANT NOTE!!! this returns POZYX_SUCCESS and it's variations and seemingly just writes the result to the pozyx hardware. Need to find a decoupled way to track this. 
         """
-        status = self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
+        try: 
+            status = self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
+        except struct.error as s: 
+            status = 0
+            print(str(s))
         self._coordinates = position 
         return status # TODO: get rid of statuses 
     
@@ -157,11 +161,15 @@ class PozyxTag(Tag):
         # Also not sure why pypozyx seems to only get the X position with this function. 
         # If precision is way off in the future, look into this. 
         coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
-        status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
+        try:
+            status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
+        except struct.error as s: 
+            status = 0 
+            print(str(s)) 
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
         return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
 
-    def doRanging(self, target_id:int): 
+    def doRanging(self, target_id:int)->Coordinates: 
         """
         Calculates a range measurement between the tag and another device
         Only used in task.py
@@ -180,13 +188,12 @@ class PozyxTag(Tag):
         else: 
             return None
 
-    def getEulerAngles_deg(self): 
+    def getOrientation(self)->Angles: 
         """ 
         Gets the device's current orientation in degrees (heading, roll, pitch) 
-        TODO: build general angles object and check coherence, CHANGE RETURN TO IT 
-        Only used in task.py
+        Returns a general Angles object with the data
         """
-        angles = EulerAngles() 
+        angles = EulerAngles() # pozyx object 
         try:
             status = self._pozyx_serial.getEulerAngles_deg(angles)
         except struct.error as s: 
@@ -194,7 +201,7 @@ class PozyxTag(Tag):
             print(s) 
         
         if status == POZYX_SUCCESS: 
-            return angles # TODO: CHANGE TO RETURNING GENERAL OBJECT + CHECK COHERENCE
+            return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
         else: 
             return None
     

@@ -66,7 +66,7 @@ class Coordinates(XYZ):
     byte_size = 12
     data_format = 'iii'
 
-class Angles():
+class Angles:
     """
     Container for euler angles as heading(yaw), roll, and pitch (in degrees).
     This is based on the EulerAngles object from pypozyx, and used inherit from ByteStructure and have the attributes physical_convet, byte_size and data_format
