@@ -1,4 +1,3 @@
-#from pypozyx import DeviceCoordinates, Coordinates
 from interfaces import Coordinates, DeviceCoordinates
 import csv
 import sys
@@ -27,4 +26,4 @@ class Anchors:
         if lvl == 2:
             z += self.floor_height
 
-        return DeviceCoordinates(label, 1, Coordinates(x, y, z))
+        return DeviceCoordinates(network_id=label, flag=1, pos=Coordinates(x, y, z))

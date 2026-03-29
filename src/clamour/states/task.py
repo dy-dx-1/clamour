@@ -1,12 +1,9 @@
 import random
 from multiprocessing import Lock
-from struct import error as StructError
 from time import perf_counter
 
 from numpy import array, atleast_2d
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister, Data)
+from pypozyx import (POZYX_DISCOVERY_ALL_DEVICES, Data)
 from interfaces import Tag, Coordinates
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment

@@ -92,28 +92,16 @@ class Angles:
 
 class DeviceCoordinates: 
     """
-    NOTE: The original one inherits from ByteStructure
-    Container for both reading and writing device coordinates from and to the tag.
+    Container representing a tag or anchor. Holds it's ID, the type and it's coordinates. 
+    This is based on DeviceCoordinates from pypozyx, which inherits from ByteStructure
 
-    The keyword arguments are at once its properties.
-
-    Kwargs:
+    Kwargs (can be accessed as properties):
         network_id: Network ID of the device
         flag: Type of the device. Tag or anchor.
         pos: Coordinates of the device. Coordinates().
     """
-    byte_size = 15
-    data_format = 'HBiii'
 
     def __init__(self, network_id=0, flag=0, pos=Coordinates()):
-        """
-        Initializes the DeviceCoordinates object.
-
-        Kwargs:
-            network_id: Network ID of the device
-            flag: Type of the device. Tag or anchor.
-            pos: Coordinates of the device. Coordinates().
-        """
         self.data = [network_id, flag, int(pos.x), int(pos.y), int(pos.z)]
 
     def load(self, data):
@@ -140,7 +128,7 @@ class DeviceCoordinates:
 
     @property
     def pos(self):
-        # NOTE: careful when modifying the object, this property (and im sure others) are used in the code, make sure object types coherent
+        # NOTE: i checked this should be coherent with the rest of code 
         return Coordinates(self.data[2], self.data[3], self.data[4])
 
     @pos.setter
