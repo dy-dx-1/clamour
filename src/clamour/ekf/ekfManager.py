@@ -1,10 +1,9 @@
 import math
 import os.path
 import csv
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock
 from numpy import linalg
-from interfaces.tag import Tag
-#from pypozyx import Coordinates 
+from interfaces import Tag
 from interfaces import Coordinates
 from struct import error as StructError
 from time import time

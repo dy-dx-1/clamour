@@ -45,12 +45,10 @@ class PozyxTag(Tag):
     def addDevice(self, device_coordinates:DeviceCoordinates): 
         """
         Adds an anchor or tag to the Pozyx device list
-        see Pozyx lib for more detail on device_coordinates
-        In task.py this is passed as self.anchors.anchors_dict[anchor]
-        NOTE: same return problem as doPositioning
+        Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return
         """
         self._internal_device_list.append(device_coordinates) # Not needed for pozyx, putting it here to remind me general integration 
-        return self._pozyx_serial.addDevice(device_coordinates)
+        self._pozyx_serial.addDevice(device_coordinates)
     
     def clearDevices(self):
         """

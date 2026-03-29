@@ -1,4 +1,4 @@
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock
 from pypozyx import PozyxSerial, SingleRegister, DeviceList, POZYX_DISCOVERY_ALL_DEVICES, POZYX_DISCOVERY_TAGS_ONLY, POZYX_DISCOVERY_ANCHORS_ONLY
 from pypozyx.definitions.constants import POZYX_SUCCESS
 from struct import error as StructError

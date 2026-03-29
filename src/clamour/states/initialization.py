@@ -1,7 +1,7 @@
 import random
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock
 from interfaces.tag import Tag
-from pypozyx import PozyxSerial, Data    ### TODO REMOVE DATA DEPENDENCY OR ADAPT 
+from pypozyx import Data    ### TODO REMOVE DATA DEPENDENCY OR ADAPT 
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
 from time import sleep
 

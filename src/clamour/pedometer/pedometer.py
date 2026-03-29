@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles
 from time import sleep, time
 from struct import error as StructError
@@ -49,7 +49,7 @@ class Pedometer:
 
         return linear_acceleration
 
-    def get_filtered_yaw_measurement(self, previous_angles: np.ndarray, i: int) -> (np.ndarray, np.ndarray):
+    def get_filtered_yaw_measurement(self, previous_angles: np.ndarray, i: int) -> tuple[np.ndarray, np.ndarray]:
         angles = EulerAngles()
         try:
             with self.pozyx_lock:

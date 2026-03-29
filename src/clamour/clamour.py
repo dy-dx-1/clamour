@@ -3,8 +3,6 @@
 import os
 import sys
 from multiprocessing import Lock, Manager
-#from pypozyx import PozyxSerial, get_first_pozyx_serial_port, Data
-#from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 

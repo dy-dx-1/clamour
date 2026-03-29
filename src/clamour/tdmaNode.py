@@ -1,4 +1,4 @@
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock
 from time import sleep, time
 
 from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
@@ -60,6 +60,6 @@ class TDMANode:
             sleep(0.00000001)
 
     @staticmethod
-    def clear_devices(tag: Tag, tag_lock: Lock()) -> None:
+    def clear_devices(tag: Tag, tag_lock: Lock) -> None:
         with tag_lock:
             tag.clearDevices()

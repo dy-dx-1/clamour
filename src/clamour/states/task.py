@@ -1,5 +1,5 @@
 import random
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from time import perf_counter
 
 from numpy import array, atleast_2d

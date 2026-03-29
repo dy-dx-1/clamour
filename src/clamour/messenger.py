@@ -1,5 +1,5 @@
 import random
-from multiprocessing import Lock
+from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from struct import error as StructError
 from time import perf_counter, time
 
@@ -163,7 +163,7 @@ class Messenger:
 
         self.slot_assignment.receive_list[message.slot] = -1
 
-    def receive_new_message(self, state: State) -> (bool, bool):
+    def receive_new_message(self, state: State) -> tuple[bool, bool]:
         """Attempts to get a message from the tag.
         If the attempt fails or if the same message was received before,
         returns False."""
@@ -187,7 +187,7 @@ class Messenger:
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
-    def obtain_message_from_tag(self) -> (int, Data, int):
+    def obtain_message_from_tag(self) -> tuple[int, Data, int]:
         metadata = RXInfo() 
         try: 
             with self.tag_lock:
