@@ -86,15 +86,13 @@ class Task(TDMAState):
         self.localize = self.positioning if len(self.anchors.available_anchors) >= 3 else self.ranging
 
     def positioning(self) -> None:
-        position = Coordinates()
-
         with self.tag_lock:
             print("Using anchors: ", self.anchors.anchors_dict)
             print("Using anchors: ", self.anchors.anchors_list)
-            status_pos = self.tag.doPositioning(position, POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
+            position = self.tag.doPositioning()
             angles = self.tag.getOrientation() 
 
-        if status_pos != POZYX_SUCCESS: # TODO: implement doPositioning
+        if position is None: 
             self.handle_error("positioning (pos)")
         if angles is None:
             self.handle_error("positioning (ranging)")

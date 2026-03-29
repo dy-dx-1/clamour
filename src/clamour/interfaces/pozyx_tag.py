@@ -122,23 +122,27 @@ class PozyxTag(Tag):
         """
         return self._pozyx_serial.setSelectionOfAnchors(mode, number_of_anchors)
     
-    def doPositioning(self, position:Coordinates, dimension:int, algorithm_type:int):
+    def doPositioning(self):
         """
-        Uses pypozyx to position a UWB tag. This is very tightly coupled with pozyx. 
-        Only used in task.py with:
+        Positions the tag with respect to it's UWB anchors. 
+
+        To use the pypozyx library to do this, we need:
          - 'position' container of type Coordinates
          - dimension is POZYX3D (which is int(3))
          - algorithm is POZYX_POS_ALG_UWB_ONLY 
-
-        IMPORTANT NOTE!!! this returns POZYX_SUCCESS and it's variations and seemingly just writes the result to the pozyx hardware. Need to find a decoupled way to track this. 
         """
+        pos = pozyxCoordinates() 
         try: 
-            status = self._pozyx_serial.doPositioning(position, dimension, algorithm_type)
+            status = self._pozyx_serial.doPositioning(position=pos, dimension=POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
         except struct.error as s: 
             status = 0
             print(str(s))
-        self._coordinates = position 
-        return status # TODO: get rid of statuses 
+
+        if status == POZYX_SUCCESS: 
+            self._coordinates = Coordinates(pos.x, pos.y, pos.z) # TODO: still need to define if I need this internal attribute, maybe for other tags?
+            return Coordinates(pos.x, pos.y, pos.z)
+        else: 
+            return None 
     
     def setCoordinates(self, coord_list:list):
         """
