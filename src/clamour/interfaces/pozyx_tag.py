@@ -114,13 +114,18 @@ class PozyxTag(Tag):
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     
-    def setSelectionOfAnchors(self, mode, number_of_anchors):
+    def setSelectionOfAnchors(self, number_of_anchors:int):
         """
-        Sets the anchor positioning for the anchors. 
-        In task.py this is passed as self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
+        Configures how many anchors are used for positioning and how they are selected.
+
+        With pypozyx, we use automatic anchor selection 
+        For more details, see https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
+
+        Only used in task.py once if there's more than 3 available anchors, without needing a return value
+          this is passed as self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
         NOTE: same return problem as doPositioning 
         """
-        return self._pozyx_serial.setSelectionOfAnchors(mode, number_of_anchors)
+        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=number_of_anchors)
     
     def doPositioning(self):
         """
