@@ -5,6 +5,7 @@ from time import perf_counter
 from numpy import array, atleast_2d
 from pypozyx import (POZYX_DISCOVERY_ALL_DEVICES, Data)
 from interfaces import Tag, Coordinates
+import struct
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
 from messages import UpdateMessage, UpdateType
@@ -61,15 +62,13 @@ class Task(TDMAState):
             tosend[i] = temp[i]
         if self.timing.current_slot_id == 0:
             tosend[-1] = (0 if tosend[-1]==255 else tosend[-1])
-            #print(self.id, " b2 at slot", 0)
             with self.tag_lock:
-                self.tag.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+                self.tag.sendData(destination=0, payload=struct.pack('BBBBBBBBB', *tosend))
         else:
-            #print(self.id, " b2 at slot", self.timing.current_slot_id-1)
             tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
             print(tosend)
             with self.tag_lock:
-                self.tag.sendData(destination=0, data=Data(tosend, 'BBBBBBBBB'))
+                self.tag.sendData(destination=0, payload=struct.pack('BBBBBBBBB', *tosend))
         print(self.timing.frame_id, self.timing.current_slot_id, self.timing.get_full_cycle_duration(),self.timing.current_time_in_cycle)
 
     def next(self) -> State:

@@ -85,16 +85,16 @@ class PozyxTag(Tag):
     
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
 
-    def sendData(self, destination:int, data:Data): 
+    def sendData(self, destination:int, payload:bytes): 
         """  
-        Uses PozyxSerial lib to send a Data object from pypozyx to a destination
-        NOTE: will have to figure out how to adapt or replace Data object for general implementation
-        in states/initialization.py, this destination is a certain id and data=Data([0], 'i')
-        in states/task.py this is (destination=0, data=Data(tosend, 'BBBBBBBBB'))
-        in messenger.py this is (destination=0, data=Data([0xAA, message.data], 'BI'))
+        Transmits binary data from a tag to a destination.
+        Internally converts a bytestream into a pypozyx Data object
         """
-        self._pozyx_serial.sendData(destination=destination, data=data)
-
+        values = list(payload)
+        data_to_send = Data(values, 'B'*len(values))
+        status = self._pozyx_serial.sendData(destination=destination, data=data_to_send)
+        return status # return only used in initialization.py for a print
+    
     def readRXBufferData(self, data:Data): 
         """
         Uses PozyxSerial to read the pozyx's buffer and put it in the data container 
@@ -211,4 +211,3 @@ class PozyxTag(Tag):
             return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
         else: 
             return None
-    

@@ -2,6 +2,7 @@ import random
 from multiprocessing.synchronize import Lock
 from interfaces.tag import Tag
 from pypozyx import Data    ### TODO REMOVE DATA DEPENDENCY OR ADAPT 
+import struct
 from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
 from time import sleep
 
@@ -35,7 +36,7 @@ class Initialization(TDMAState):
         return State.SYNCHRONIZATION
 
     def clear_tag_buffer(self):
-        print(self.tag.sendData(destination=self.id, data=Data([0], 'i')))
+        print(self.tag.sendData(destination=self.id, payload= struct.pack('i', 0)))
         sleep(0.25)
         for _ in range(50):
             print(self.messenger.obtain_message_from_tag())
