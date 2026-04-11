@@ -2,7 +2,7 @@ from .tag import Tag
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO, POZYX_DISCOVERY_ALL_DEVICES,
+from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
 from pypozyx import Coordinates as pozyxCoordinates 
