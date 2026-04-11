@@ -95,20 +95,31 @@ class PozyxTag(Tag):
         status = self._pozyx_serial.sendData(destination=destination, data=data_to_send)
         return status # return only used in initialization.py for a print
     
-    def readRXBufferData(self, data:Data): 
+    def receiveData(self) -> tuple[int, bytes]: 
         """
-        Uses PozyxSerial to read the pozyx's buffer and put it in the data container 
-        NOTE: same implementation notes 
-        This seems only to be used in messenger.py? to check 
+        Reads data received by a tag. 
+        Returns: 
+        - The sender id (int)
+        - The data (in bytes)  
         """
-        self._pozyx_serial.readRXBufferData(data) 
+        metadata = RXInfo() 
+        try: 
+            self._pozyx_serial.getRxInfo(metadata) 
+        except struct.error as s: 
+            print("RxInfo crashes! ", str(s))
+            # NOTE: there wasn't any other error handling in the past 
+        sender_id, message_byte_size = metadata[0], metadata[1] 
 
-    def getRxInfo(self, info:RXInfo): 
-        """
-        Gets metadata on information the Pozyx received over UWB and writes it to an Rx Info container
-        NOTE: Same implementation notes + this also only seems to be used in messenger.py? 
-        """
-        self._pozyx_serial.getRxInfo(info) 
+        if message_byte_size == 0:
+            return sender_id, b''
+        
+        p_data = Data([0]*message_byte_size, 'B'*message_byte_size)
+        if message_byte_size == p_data.byte_size:
+            self._pozyx_serial.readRXBufferData(p_data)
+
+        data = bytes(p_data.data) # .data is a list of ints representing bytes values
+
+        return sender_id, data 
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     

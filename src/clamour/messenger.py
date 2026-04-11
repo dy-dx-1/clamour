@@ -188,21 +188,10 @@ class Messenger:
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 
-    def obtain_message_from_tag(self) -> tuple[int, Data, int]:
-        metadata = RXInfo() 
-        try: 
-            with self.tag_lock:
-                self.tag.getRxInfo(metadata) 
-        except StructError as s: 
-            print("RxInfo crashes! ", str(s))
-        sender_id, message_byte_size = metadata[0], metadata[1] 
-
-        data = Data([0, 0], 'BI')
-        if message_byte_size == data.byte_size:
-            with self.tag_lock:
-                self.tag.readRXBufferData(data)
-
-        return sender_id, data
+    def obtain_message_from_tag(self) -> tuple[int, bytes]:
+        with self.tag_lock: 
+            sender_id, data = self.tag.receiveData()
+        return sender_id, data 
 
     def update_topology(self, state: State, device_list: list=None, topology_info: list=None, sender_id:int=None) -> None:
         if device_list is not None:
