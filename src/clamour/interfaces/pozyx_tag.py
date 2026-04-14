@@ -5,7 +5,11 @@ from pypozyx.definitions.registers import POZYX_NETWORK_ID
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
                      PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
-from pypozyx import Coordinates as pozyxCoordinates 
+
+from pypozyx import PozyxSerial, SingleRegister, POZYX_DISCOVERY_ALL_DEVICES, POZYX_DISCOVERY_TAGS_ONLY, POZYX_DISCOVERY_ANCHORS_ONLY
+
+from pypozyx import Coordinates as pozyxCoordinates
+from pypozyx import DeviceList as pozyxDeviceList
 import struct 
 
 from .containers import Coordinates, DeviceCoordinates, Angles # NOTE: check use of these 2 and coherence
@@ -42,6 +46,13 @@ class PozyxTag(Tag):
         return self._id
     
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
+    @staticmethod
+    def is_anchor(device_id: int) -> bool:
+        """
+        Checks if the id of a specific Pozyx device corresponds to an anchor 
+        """
+        return device_id < 0x500
+    
     def addDevice(self, device_coordinates:DeviceCoordinates): 
         """
         Adds an anchor or tag to the Pozyx device list
@@ -68,7 +79,10 @@ class PozyxTag(Tag):
         Gets the current error for a pozyx device and prints it out. 
         function_name allows to specify where the error happened 
 
-        Returns 1 if it indeed returned an error. Although note that this functionality is only used in messenger.py and I don't think the method in question is ever called 
+        NOTE: make sure this is called with the tag locked. 
+        NOTE: TODO in the future, eval if changing locking approach? use the lock internally so it can be called by every function individually and maybe speed things up?
+
+        Returns True if it indeed returned an error. Although note that this functionality is only used in messenger.py and I don't think the method in question is ever called 
         """
         returned_error = False
         try: 
@@ -82,7 +96,52 @@ class PozyxTag(Tag):
             print(f"Error in {function_name} : {message}")
             returned_error = True 
         return returned_error
+
+    def discover(self, pozyx_lock: Lock, discovery_type: int) -> None:
+        with pozyx_lock:
+            status = self._pozyx_serial.doDiscovery(discovery_type=discovery_type)
+
+            if status != POZYX_SUCCESS:
+                self.printCurrentError("discover")
     
+    def get_nb_devices(self, pozyx_lock: Lock) -> tuple:
+        size = SingleRegister()
+
+        with pozyx_lock: 
+            try: 
+                status = self._pozyx_serial.getDeviceListSize(size)
+            except struct.error as s:
+                status = 0
+                print(str(s))
+
+            if status != POZYX_SUCCESS: # NOTE: if too slow, change lock positioning to minimize holding
+                self.printCurrentError(pozyx_lock, "get_nb_devices")
+
+        return status, size[0]
+
+    def get_device_list(self, pozyx_lock: Lock, discovery_type: int) -> list:
+        pozyx = self._pozyx_serial
+        PozyxTag.discover(pozyx_lock, POZYX_DISCOVERY_ALL_DEVICES)
+        status, size = self.get_nb_devices(pozyx_lock)
+        devices = pozyxDeviceList(list_size=size)
+
+        if (status == POZYX_SUCCESS) and (size > 0):
+            try:
+                with pozyx_lock:
+                    pozyx.getDeviceIds(devices)
+            except struct.error as s:
+                print(str(s))
+        elif status != POZYX_SUCCESS:
+            with pozyx_lock: 
+                self.printCurrentError("get_device_list")
+
+        if discovery_type == POZYX_DISCOVERY_TAGS_ONLY:
+            devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]
+        elif discovery_type == POZYX_DISCOVERY_ANCHORS_ONLY:
+            devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
+
+        return devices
+
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
 
     def sendData(self, destination:int, payload:bytes): 
