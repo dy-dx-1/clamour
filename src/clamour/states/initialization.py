@@ -1,14 +1,12 @@
 import random
 from multiprocessing.synchronize import Lock
 from interfaces.tag import Tag
-from pypozyx import Data    ### TODO REMOVE DATA DEPENDENCY OR ADAPT 
+
 import struct
-from pypozyx.definitions.constants import (POZYX_DISCOVERY_TAGS_ONLY)
 from time import sleep
 
 from interfaces import Anchors, Neighborhood
 from messenger import Messenger
-from pozyx_utils import PozyxDiscoverer
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -44,7 +42,7 @@ class Initialization(TDMAState):
 
     def discover_neighbors(self):
         self.clear_known_devices()
-        devices = PozyxDiscoverer.get_device_list(self.pozyx, self.pozyx_lock, POZYX_DISCOVERY_TAGS_ONLY)
+        devices = self.tag.get_device_list(self.pozyx_lock, "tag")
 
         print("Tags discovered: ", devices)
 

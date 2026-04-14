@@ -3,14 +3,12 @@ from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from time import perf_counter
 
 from numpy import array, atleast_2d
-from pypozyx import (POZYX_DISCOVERY_ALL_DEVICES, Data)
 from interfaces import Tag, Coordinates
 import struct
 
 from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
 from messages import UpdateMessage, UpdateType
 from messenger import Messenger
-from pozyx_utils import PozyxDiscoverer
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -138,12 +136,12 @@ class Task(TDMAState):
         with self.tag_lock:
             self.tag.clearDevices()
 
-        self.discover(POZYX_DISCOVERY_ALL_DEVICES)
+        self.discover(discovery_type='all')
 
         new_anchors, new_tags = [], []
         for device in self.anchors.available_anchors:
             print("Found device: ", device)
-            if PozyxDiscoverer.is_anchor(device):
+            if self.tag.is_anchor(device):
                 print("It's an anchor!")
                 new_anchors.append(device)
             else:
@@ -160,8 +158,8 @@ class Task(TDMAState):
                 self.neighborhood.add_neighbor(tag, perf_counter(), State.TASK)
                 self.neighborhood.changed = True
 
-    def discover(self, discovery_type: int) -> None:
-        devices = PozyxDiscoverer.get_device_list(self.tag, self.tag_lock, discovery_type)
+    def discover(self, discovery_type: str) -> None:
+        devices = self.tag.get_device_list(self.tag_lock, discovery_type)
 
         for device_id in devices:
             if device_id not in self.anchors.available_anchors:

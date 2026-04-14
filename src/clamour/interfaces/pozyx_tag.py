@@ -119,7 +119,7 @@ class PozyxTag(Tag):
 
         return status, size[0]
 
-    def get_device_list(self, pozyx_lock: Lock, discovery_type: int) -> list:
+    def get_device_list(self, pozyx_lock: Lock, discovery_type: str) -> list:
         pozyx = self._pozyx_serial
         PozyxTag.discover(pozyx_lock, POZYX_DISCOVERY_ALL_DEVICES)
         status, size = self.get_nb_devices(pozyx_lock)
@@ -135,10 +135,14 @@ class PozyxTag(Tag):
             with pozyx_lock: 
                 self.printCurrentError("get_device_list")
 
-        if discovery_type == POZYX_DISCOVERY_TAGS_ONLY:
+        if discovery_type == "tag":
             devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]
-        elif discovery_type == POZYX_DISCOVERY_ANCHORS_ONLY:
+        elif discovery_type == "anchor":
             devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
+        elif discovery_type == "all": 
+            devices = [device_id for device_id in devices] 
+        else: 
+            raise ValueError("discovery_type arg must be 'all' or 'tag' or 'anchor'")
 
         return devices
 
