@@ -1,16 +1,15 @@
 from .tag import Tag
+import struct 
+
 from pypozyx import PozyxSerial, get_first_pozyx_serial_port
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
 
 from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, DeviceRange,
-                     PozyxSerial, EulerAngles, SingleRegister, Data, RXInfo)
-
-from pypozyx import PozyxSerial, SingleRegister, POZYX_DISCOVERY_ALL_DEVICES, POZYX_DISCOVERY_TAGS_ONLY, POZYX_DISCOVERY_ANCHORS_ONLY
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_DISCOVERY_ALL_DEVICES, DeviceRange,
+                     EulerAngles, SingleRegister, Data, RXInfo)
 
 from pypozyx import Coordinates as pozyxCoordinates
 from pypozyx import DeviceList as pozyxDeviceList
-import struct 
 
 from .containers import Coordinates, DeviceCoordinates, Angles # NOTE: check use of these 2 and coherence
 
@@ -97,13 +96,6 @@ class PozyxTag(Tag):
             returned_error = True 
         return returned_error
 
-    def discover(self, pozyx_lock: Lock, discovery_type: int) -> None:
-        with pozyx_lock:
-            status = self._pozyx_serial.doDiscovery(discovery_type=discovery_type)
-
-            if status != POZYX_SUCCESS:
-                self.printCurrentError("discover")
-    
     def get_nb_devices(self, pozyx_lock: Lock) -> tuple:
         size = SingleRegister()
 
@@ -121,7 +113,12 @@ class PozyxTag(Tag):
 
     def get_device_list(self, pozyx_lock: Lock, discovery_type: str) -> list:
         pozyx = self._pozyx_serial
-        PozyxTag.discover(pozyx_lock, POZYX_DISCOVERY_ALL_DEVICES)
+    
+        with pozyx_lock: 
+            status = self._pozyx_serial.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES)
+            if status != POZYX_SUCCESS:
+                self.printCurrentError("discover")
+        
         status, size = self.get_nb_devices(pozyx_lock)
         devices = pozyxDeviceList(list_size=size)
 
