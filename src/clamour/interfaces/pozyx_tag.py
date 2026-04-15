@@ -49,6 +49,7 @@ class PozyxTag(Tag):
     def is_anchor(device_id: int) -> bool:
         """
         Checks if the id of a specific Pozyx device corresponds to an anchor 
+        Doesn't require the use of lock 
         """
         return device_id < 0x500
     
@@ -97,6 +98,9 @@ class PozyxTag(Tag):
         return returned_error
 
     def get_nb_devices(self, pozyx_lock: Lock) -> tuple:
+        """
+        Get's the size of the tag's internal list of added devices 
+        """
         size = SingleRegister()
 
         with pozyx_lock: 
@@ -112,6 +116,10 @@ class PozyxTag(Tag):
         return status, size[0]
 
     def get_device_list(self, pozyx_lock: Lock, discovery_type: str) -> list:
+        """
+        Gets the list of IDs of devices seen by the tag
+        discovery_type: can be "all", "anchor" or "tag" to specify the type of device 
+        """
         pozyx = self._pozyx_serial
     
         with pozyx_lock: 
