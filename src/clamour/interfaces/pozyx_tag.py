@@ -153,7 +153,7 @@ class PozyxTag(Tag):
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
 
-    def sendData(self, destination:int, payload:bytes): 
+    def sendData(self, destination:int, payload:bytes)->bool: 
         """  
         Transmits binary data from a tag to a destination.
         Internally converts a bytestream into a pypozyx Data object
@@ -162,7 +162,8 @@ class PozyxTag(Tag):
         data_to_send = Data(values, 'B'*len(values))
         status = self._pozyx_serial.sendData(destination=destination, data=data_to_send)
         return status # return only used in initialization.py for a print
-    
+        # TODO: remove status return 
+        
     def receiveData(self) -> tuple[int, bytes]: 
         """
         Reads data received by a tag. 
