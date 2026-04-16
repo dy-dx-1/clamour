@@ -162,7 +162,7 @@ class PozyxTag(Tag):
         data_to_send = Data(values, 'B'*len(values))
         status = self._pozyx_serial.sendData(destination=destination, data=data_to_send)
         return status # return only used in initialization.py for a print
-        # TODO: remove status return 
+        # TODO: remove pypozyx status return 
         
     def receiveData(self) -> tuple[int, bytes]: 
         """
@@ -192,7 +192,7 @@ class PozyxTag(Tag):
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     
-    def setSelectionOfAnchors(self, number_of_anchors:int):
+    def setSelectionOfAnchors(self, number_of_anchors:int)->None:
         """
         Configures how many anchors are used for positioning and how they are selected.
 
