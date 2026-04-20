@@ -1,4 +1,3 @@
-from pypozyx import DeviceCoordinates, Coordinates
 import csv, sys
 from anchors import Anchors
 

@@ -1,15 +1,13 @@
 import random
 from multiprocessing.synchronize import Lock # multiprocessing.Lock
-from struct import error as StructError
 from time import perf_counter, time
 
-from pypozyx import Data, RXInfo, SingleRegister
 import struct
+from interfaces import Tag
 from interfaces import Coordinates
 
 from contextManagedQueue import ContextManagedQueue
 from interfaces import Neighborhood, SlotAssignment, State
-from interfaces.tag import Tag
 from interfaces.timing import NB_TASK_SLOTS
 from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UWBTopologyMessage, UpdateMessage, UpdateType)
