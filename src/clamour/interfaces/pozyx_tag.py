@@ -1,17 +1,16 @@
 from .tag import Tag
+from .containers import Coordinates, DeviceCoordinates, Angles
 import struct 
 
-from pypozyx import PozyxSerial, get_first_pozyx_serial_port
+from pypozyx import PozyxSerial 
 from pypozyx.definitions.registers import POZYX_NETWORK_ID
-
-from pypozyx import (POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
-                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_DISCOVERY_ALL_DEVICES, DeviceRange,
-                     EulerAngles, SingleRegister, Data, RXInfo)
+from pypozyx import (get_first_pozyx_serial_port, POZYX_3D, POZYX_ANCHOR_SEL_AUTO,
+                     POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_DISCOVERY_ALL_DEVICES)
 
 from pypozyx import Coordinates as pozyxCoordinates
 from pypozyx import DeviceList as pozyxDeviceList
+from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
-from .containers import Coordinates, DeviceCoordinates, Angles # NOTE: check use of these 2 and coherence
 
 def get_pozyx_id(pozyx) -> int:
     """
@@ -37,8 +36,6 @@ class PozyxTag(Tag):
 
         self._pozyx_serial = PozyxSerial(serial_port)
         self._id = get_pozyx_id(self._pozyx_serial)
-        self._coordinates = None # Initialised by setCoordinates, NOTE: implement as property in future? 
-        self._internal_device_list = [] # Used by addDevice, clearDevices
 
     @property
     def tag_id(self) -> int:
@@ -58,7 +55,6 @@ class PozyxTag(Tag):
         Adds an anchor or tag to the Pozyx device list
         Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return
         """
-        self._internal_device_list.append(device_coordinates) # Not needed for pozyx, putting it here to remind me general integration 
         self._pozyx_serial.addDevice(device_coordinates)
     
     def clearDevices(self):
