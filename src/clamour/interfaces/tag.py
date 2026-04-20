@@ -5,10 +5,12 @@ All tag classes should follow this blueprint to work with the rest of the codeba
 """
 from abc import ABC, abstractmethod
 from .containers import Coordinates, DeviceCoordinates, Angles
+
 class Tag(ABC):
-    @abstractmethod
-    def __init__(self):
-        pass 
+    """
+    Reference class for interfacing with UWB Tags in Clamour. 
+    All tag classes need to follow this blueprint to work with the rest of the code.
+    """
 
     @property
     @abstractmethod
@@ -16,21 +18,28 @@ class Tag(ABC):
         """
         Return the tag's unique identifier as an integer.
         """
-        pass
 
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def is_anchor(device_id: int) -> bool:
         """
-        Return True if the device_id corresponds to an anchor
+        Evaluates if a particular device is a UWB anchor. 
+
+        Args: 
+            device_id: Int ID of the device to check 
+
+        Returns:
+            Bool of the result
         """
-        pass
 
     @abstractmethod
-    def addDevice(self, device) -> None:
+    def addDevice(self, device:object) -> None:
         """
-        Adds an anchor or tag to the tag's internal device list
+        Adds an anchor or tag to the tag's internal device list.
+
+        Args:
+            device: Any appropriate object that can be handled by the tag interface in it's internal device list.
         """
         pass
 
