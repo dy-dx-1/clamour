@@ -161,8 +161,10 @@ class PozyxTag(Tag):
         values = list(payload)
         data_to_send = Data(values, 'B'*len(values))
         status = self._pozyx_serial.sendData(destination=destination, data=data_to_send)
-        return status # return only used in initialization.py for a print
-        # TODO: remove pypozyx status return 
+        if status == POZYX_SUCCESS: 
+            return f"sendData to {destination=} was a success!"
+        else:
+            return f"sendData to {destination=} FAILED"
         
     def receiveData(self) -> tuple[int, bytes]: 
         """
