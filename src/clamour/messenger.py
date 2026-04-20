@@ -48,7 +48,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(destination=0, payload=struct.pack('BI', 0xAA, message.data))
+            self.tag.sendData(destination=0, payload=struct.pack('<BI', 0xAA, message.data))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -75,7 +75,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(destination=0, payload=struct.pack('BI', 0xAA, message.data))
+            self.tag.sendData(destination=0, payload=struct.pack('<BI', 0xAA, message.data))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -96,7 +96,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(0, struct.pack('BI', 0xAA, message.data))
+            self.tag.sendData(0, struct.pack('<BI', 0xAA, message.data))
 
     def receive_message(self, state: State) -> bool:
         is_new_message, should_go_to_sync = self.receive_new_message(state)
