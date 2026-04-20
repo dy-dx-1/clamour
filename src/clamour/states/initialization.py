@@ -42,7 +42,8 @@ class Initialization(TDMAState):
 
     def discover_neighbors(self):
         self.clear_known_devices()
-        devices = self.tag.get_device_list(self.pozyx_lock, "tag")
+        with self.tag_lock:
+            devices = self.tag.get_device_list(discovery_type = "tag")
 
         print("Tags discovered: ", devices)
 

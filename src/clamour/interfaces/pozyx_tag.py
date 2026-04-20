@@ -97,48 +97,44 @@ class PozyxTag(Tag):
             returned_error = True 
         return returned_error
 
-    def get_nb_devices(self, pozyx_lock: Lock) -> tuple:
+    def get_nb_devices(self) -> tuple:
         """
         Get's the size of the tag's internal list of added devices 
         """
         size = SingleRegister()
 
-        with pozyx_lock: 
-            try: 
-                status = self._pozyx_serial.getDeviceListSize(size)
-            except struct.error as s:
-                status = 0
-                print(str(s))
+        try: 
+            status = self._pozyx_serial.getDeviceListSize(size)
+        except struct.error as s:
+            status = 0
+            print(str(s))
 
-            if status != POZYX_SUCCESS: # NOTE: if too slow, change lock positioning to minimize holding
-                self.printCurrentError(pozyx_lock, "get_nb_devices")
+        if status != POZYX_SUCCESS: # NOTE: if too slow, change lock positioning to minimize holding
+            self.printCurrentError("get_nb_devices")
 
         return status, size[0]
 
-    def get_device_list(self, pozyx_lock: Lock, discovery_type: str) -> list:
+    def get_device_list(self, discovery_type: str) -> list:
         """
         Gets the list of IDs of devices seen by the tag
         discovery_type: can be "all", "anchor" or "tag" to specify the type of device 
         """
         pozyx = self._pozyx_serial
     
-        with pozyx_lock: 
-            status = self._pozyx_serial.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES)
-            if status != POZYX_SUCCESS:
-                self.printCurrentError("discover")
+        status = self._pozyx_serial.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES)
+        if status != POZYX_SUCCESS:
+            self.printCurrentError("discover")
         
-        status, size = self.get_nb_devices(pozyx_lock)
+        status, size = self.get_nb_devices()
         devices = pozyxDeviceList(list_size=size)
 
         if (status == POZYX_SUCCESS) and (size > 0):
             try:
-                with pozyx_lock:
-                    pozyx.getDeviceIds(devices)
+                pozyx.getDeviceIds(devices)
             except struct.error as s:
                 print(str(s))
         elif status != POZYX_SUCCESS:
-            with pozyx_lock: 
-                self.printCurrentError("get_device_list")
+            self.printCurrentError("get_device_list")
 
         if discovery_type == "tag":
             devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]

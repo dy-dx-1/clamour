@@ -159,7 +159,8 @@ class Task(TDMAState):
                 self.neighborhood.changed = True
 
     def discover(self, discovery_type: str) -> None:
-        devices = self.tag.get_device_list(self.tag_lock, discovery_type)
+        with self.tag_lock:
+            devices = self.tag.get_device_list(discovery_type)
 
         for device_id in devices:
             if device_id not in self.anchors.available_anchors:
