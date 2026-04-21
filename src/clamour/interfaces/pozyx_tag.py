@@ -12,7 +12,7 @@ from pypozyx import DeviceList as pozyxDeviceList
 from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
 
-def get_pozyx_id(pozyx) -> int:
+def get_pozyx_id(pozyx:PozyxSerial) -> int:
     """
     Read and return the Pozyx device's network ID as an int.
 
@@ -28,7 +28,27 @@ def get_pozyx_id(pozyx) -> int:
 
     return data[1] * 256 + data[0]
 
+def get_nb_devices(pozyx:PozyxSerial) -> tuple:
+    """
+    Get's the size of the pozyx internal list of added devices 
+    """
+    size = SingleRegister()
+
+    try: 
+        status = pozyx.getDeviceListSize(size)
+    except struct.error as s:
+        status = 0
+        print(str(s))
+
+    # returns status like POZYX_SUCCESS, this is handled by get_device_list
+    return status, size[0]
+
 class PozyxTag(Tag):
+    """
+    Defines the UWB tag interface for a PozyxDevice. 
+    Methods are adapted from abstractclass Tag. 
+    Refer to Tag class for typehints and docstrings, except when overwritten for more clarity. 
+    """
     def __init__(self):
         serial_port = get_first_pozyx_serial_port()
         if serial_port is None:
@@ -38,48 +58,25 @@ class PozyxTag(Tag):
         self._id = get_pozyx_id(self._pozyx_serial)
 
     @property
-    def tag_id(self) -> int:
+    def tag_id(self):
         return self._id
     
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
-    def is_anchor(device_id: int) -> bool:
-        """
-        Checks if the id of a specific Pozyx device corresponds to an anchor 
-        Doesn't require the use of lock 
-        """
+    def is_anchor(device_id: int):
         return device_id < 0x500
     
     def addDevice(self, device_coordinates:DeviceCoordinates): 
-        """
-        Adds an anchor or tag to the Pozyx device list
-        Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return
-        """
+        # Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return
         self._pozyx_serial.addDevice(device_coordinates)
     
     def clearDevices(self):
-        """
-        Uses the PozyxSerial library to clear the devices
-        """ 
-        self._internal_device_list = [] # Not needed for pozyx, putting it here for general integration 
         self._pozyx_serial.clearDevices() 
 
     def resetSystem(self): 
-        """
-        Resets the Pozyx device 
-        """
         self._pozyx_serial.resetSystem()
     
-    def printCurrentError(self, function_name:str) -> bool: 
-        """
-        Gets the current error for a pozyx device and prints it out. 
-        function_name allows to specify where the error happened 
-
-        NOTE: make sure this is called with the tag locked. 
-        NOTE: TODO in the future, eval if changing locking approach? use the lock internally so it can be called by every function individually and maybe speed things up?
-
-        Returns True if it indeed returned an error. Although note that this functionality is only used in messenger.py and I don't think the method in question is ever called 
-        """
+    def printCurrentError(self, function_name): 
         returned_error = False
         try: 
             error_code = SingleRegister() 
@@ -93,44 +90,22 @@ class PozyxTag(Tag):
             returned_error = True 
         return returned_error
 
-    def get_nb_devices(self) -> tuple:
-        """
-        Get's the size of the tag's internal list of added devices 
-        """
-        size = SingleRegister()
-
-        try: 
-            status = self._pozyx_serial.getDeviceListSize(size)
-        except struct.error as s:
-            status = 0
-            print(str(s))
-
-        if status != POZYX_SUCCESS: # NOTE: if too slow, change lock positioning to minimize holding
-            self.printCurrentError("get_nb_devices")
-
-        return status, size[0]
-
-    def get_device_list(self, discovery_type: str) -> list:
-        """
-        Gets the list of IDs of devices seen by the tag
-        discovery_type: can be "all", "anchor" or "tag" to specify the type of device 
-        """
-        pozyx = self._pozyx_serial
-    
+    def get_device_list(self, discovery_type):  
         status = self._pozyx_serial.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES)
         if status != POZYX_SUCCESS:
             self.printCurrentError("discover")
+            return [] # NOTE: there wasn't any return before, function would have just continued with an error
         
-        status, size = self.get_nb_devices()
+        status, size = get_nb_devices(self._pozyx_serial)
         devices = pozyxDeviceList(list_size=size)
 
         if (status == POZYX_SUCCESS) and (size > 0):
             try:
-                pozyx.getDeviceIds(devices)
+                self._pozyx_serial.getDeviceIds(devices)
             except struct.error as s:
                 print(str(s))
         elif status != POZYX_SUCCESS:
-            self.printCurrentError("get_device_list")
+            self.printCurrentError("get_nb_devices")
 
         if discovery_type == "tag":
             devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]
