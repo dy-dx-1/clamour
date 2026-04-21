@@ -5,11 +5,13 @@ All tag classes should follow this blueprint to work with the rest of the codeba
 """
 from abc import ABC, abstractmethod
 from .containers import Coordinates, DeviceCoordinates, Angles
+from typing import Literal
 
 class Tag(ABC):
     """
     Reference class for interfacing with UWB Tags in Clamour. 
     All tag classes need to follow this blueprint to work with the rest of the code.
+    NOTE: All of these methods, except is_anchor, need to be called with the appropriate lock context manager to ensure thread safety. 
     """
 
     @property
@@ -25,6 +27,7 @@ class Tag(ABC):
     def is_anchor(device_id: int) -> bool:
         """
         Evaluates if a particular device is a UWB anchor. 
+        Does not require the use of Lock. 
 
         Args: 
             device_id: Int ID of the device to check 
@@ -41,34 +44,44 @@ class Tag(ABC):
         Args:
             device: Any appropriate object that can be handled by the tag interface in it's internal device list.
         """
-        pass
 
     @abstractmethod
     def clearDevices(self) -> None:
         """
-        Clears the tag's internal device list
+        Clears the tag's internal device list.
         """
-        pass 
 
     @abstractmethod
     def resetSystem(self) -> None:
         """
-        Resets the tag
+        Resets the tag. 
         """
-        pass 
 
     @abstractmethod
     def printCurrentError(self, function_name:str) -> bool:
         """
-        Verifies if the tag has experienced an error and retrieves it. 
-        Then, prints the error to the terminal & the function name where it happened.
-        Returns True if there was indeed an error, and False if not.
+        Checks if the tag experienced an error and retrieves it. 
+        If there was an error, prints it to the terminal & the function name where it happened.
+        
+        Args:
+            function_name: String indicating the function name where this was checked
+        Returns: 
+            Bool on whether there was really an error or not 
         """
-        pass 
     
-    # TODO: pozyxdiscoverer stuff
+    @abstractmethod
+    def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:
+        """
+        Gets the list of IDs of devices seen by the tag. 
 
-    ### -------------------------------------------- COMMUNICATION --------------------------------------------
+        Args: 
+            discovery_type: String specifying what type of device to return
+        
+        Returns:
+            List of corresponding device IDs (ints) 
+        """
+
+    ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     @abstractmethod
     def sendData(self, destination:int, payload:bytes) -> bool: 
         """
