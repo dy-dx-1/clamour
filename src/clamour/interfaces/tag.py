@@ -86,23 +86,23 @@ class Tag(ABC):
     def sendData(self, destination:int, payload:bytes) -> bool: 
         """
         Transmits data from the tag to a destination. 
+
         Args:
-        - destination: destination id (int)
-        - payload: data to send (bytes)
+            destination: destination id (int)
+            payload: data to send (bytes)
+
         Returns:
-        - True if succeeded and False if not. 
+            Bool on whether it succeeded
         """
-        pass 
     
     @abstractmethod
     def receiveData(self) -> tuple[int, bytes]:
         """
         Reads data received by the tag. 
+
         Returns: 
-        - Sender id (int) 
-        - Received data (bytes) 
+            tuple[sender_id (int), data (bytes)]
         """
-        pass 
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
 

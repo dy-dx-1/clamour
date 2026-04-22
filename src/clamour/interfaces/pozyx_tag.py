@@ -129,13 +129,7 @@ class PozyxTag(Tag):
         else:
             return False
         
-    def receiveData(self) -> tuple[int, bytes]: 
-        """
-        Reads data received by a tag. 
-        Returns: 
-        - The sender id (int)
-        - The data (in bytes)  
-        """
+    def receiveData(self): 
         metadata = RXInfo() 
         try: 
             self._pozyx_serial.getRxInfo(metadata) 
