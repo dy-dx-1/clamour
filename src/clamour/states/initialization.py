@@ -34,7 +34,10 @@ class Initialization(TDMAState):
         return State.SYNCHRONIZATION
 
     def clear_tag_buffer(self):
-        print(self.tag.sendData(destination=self.id, payload= struct.pack('<i', 0)))
+        if self.tag.sendData(destination=self.id, payload= struct.pack('<i', 0)):
+            print(f"sendData to {self.id=} was a success!")
+        else:
+            print(f"sendData to {self.id=} FAILED")
         sleep(0.25)
         for _ in range(50):
             print(self.messenger.obtain_message_from_tag())
