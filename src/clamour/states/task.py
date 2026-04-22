@@ -177,7 +177,7 @@ class Task(TDMAState):
 
         if len(self.anchors.available_anchors) > 3:
             with self.tag_lock:
-                self.tag.setSelectionOfAnchors(number_of_anchors = len(self.anchors.available_anchors))
+                self.tag.configureAnchorSelection(number_of_anchors = len(self.anchors.available_anchors))
 
     def handle_error(self, function_name: str) -> None: 
         """

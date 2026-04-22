@@ -151,28 +151,40 @@ class PozyxTag(Tag):
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     
-    def setSelectionOfAnchors(self, number_of_anchors:int)->None:
-        """
-        Configures how many anchors are used for positioning and how they are selected.
-
-        With pypozyx, we use automatic anchor selection 
-        For more details, see https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
-
-        Only used in task.py once if there's more than 3 available anchors, without needing a return value
-          this is passed as self.tag.setSelectionOfAnchors(POZYX_ANCHOR_SEL_AUTO, len(self.anchors.available_anchors))
-        NOTE: same return problem as doPositioning 
-        """
+    def configureAnchorSelection(self, number_of_anchors):
+        # With pypozyx, we use automatic anchor selection: https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
+        # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
         self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=number_of_anchors)
     
-    def doPositioning(self):
-        """
-        Positions the tag with respect to it's UWB anchors. 
+    def setCoordinates(self, coord_list):
+        self._pozyx_serial.setCoordinates(coord_list)
 
-        To use the pypozyx library to do this, we need:
-         - 'position' container of type Coordinates
-         - dimension is POZYX3D (which is int(3))
-         - algorithm is POZYX_POS_ALG_UWB_ONLY 
-        """
+    def getCoordinates(self): 
+        # Not sure why pypozyx seems to only get the X position with this function. 
+        # If precision is way off in the future, look into this. 
+        coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
+        try:
+            status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
+        except struct.error as s: 
+            status = 0 
+            print(str(s)) 
+        assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
+        return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
+
+    def getOrientation(self): 
+        angles = EulerAngles() # pozyx object 
+        try:
+            status = self._pozyx_serial.getEulerAngles_deg(angles)
+        except struct.error as s: 
+            status = 0
+            print(s) 
+        
+        if status == POZYX_SUCCESS: 
+            return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
+        else: 
+            return None
+
+    def doPositioning(self):
         pos = pozyxCoordinates() 
         try: 
             status = self._pozyx_serial.doPositioning(position=pos, dimension=POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
@@ -185,35 +197,6 @@ class PozyxTag(Tag):
             return Coordinates(pos.x, pos.y, pos.z)
         else: 
             return None 
-    
-    def setCoordinates(self, coord_list:list):
-        """
-        Takes in a list defining the position of the tag [x,y,z] 
-        and stores the coords in the object. 
-        Each coordinate is expected to be an int. 
-
-        NOTE: this is passed in ekfManager.py as [int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)] 
-        where self.ekf is an instance of CustomEKF
-        """
-        self._coordinates = Coordinates(*coord_list)
-        self._pozyx_serial.setCoordinates(coord_list)
-
-    def getCoordinates(self)->Coordinates: 
-        """
-        Stores the coordinates of the Pozyx in a Coordinates container. 
-        Only used in task.py 
-        """
-        # NOTE: Figure out if/how to use self._coordinates here in general version 
-        # Also not sure why pypozyx seems to only get the X position with this function. 
-        # If precision is way off in the future, look into this. 
-        coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
-        try:
-            status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
-        except struct.error as s: 
-            status = 0 
-            print(str(s)) 
-        assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
-        return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
 
     def doRanging(self, target_id:int)->Coordinates: 
         """
@@ -231,22 +214,5 @@ class PozyxTag(Tag):
 
         if status == POZYX_SUCCESS: 
             return Coordinates(range_measure.data[1], 0, 0) # idk why only along X 
-        else: 
-            return None
-
-    def getOrientation(self)->Angles: 
-        """ 
-        Gets the device's current orientation in degrees (heading, roll, pitch) 
-        Returns a general Angles object with the data
-        """
-        angles = EulerAngles() # pozyx object 
-        try:
-            status = self._pozyx_serial.getEulerAngles_deg(angles)
-        except struct.error as s: 
-            status = 0
-            print(s) 
-        
-        if status == POZYX_SUCCESS: 
-            return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
         else: 
             return None

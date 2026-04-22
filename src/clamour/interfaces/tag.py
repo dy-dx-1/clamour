@@ -107,25 +107,49 @@ class Tag(ABC):
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
 
     @abstractmethod
-    def setSelectionOfAnchors(self, number_of_anchors:int)->None:
+    def configureAnchorSelection(self, number_of_anchors:int) -> None:
         """
-        TODO
+        Configures how many and which anchors are used for positioning the tag.
+        Should be called with the total number of anchors that are currently available. We can then use them all or a more efficient subset. 
+        Only used in task.py: it's updated if there's more than 3 available anchors
+
+        Args:
+            number_of_anchors: int specifying how many anchors are available for positioning
         """
     
+    @abstractmethod
+    def setCoordinates(self, coord_list:list[int]) -> None:
+        """
+        Manually sets the position of the tag. 
+
+        Args:
+            coord_list: List of ints [x, y, z] representing the position of the tag
+        """
+
+    @abstractmethod
+    def getCoordinates(self) -> Coordinates | None: 
+        """
+        Gets the coordinates of the device. 
+        Does not trigger positioning, only retrieves last known coordinates. 
+
+        Returns:
+            Coordinates object of the last known position 
+        """
+
+    @abstractmethod
+    def getOrientation(self) -> Angles | None: 
+        """ 
+        Gets the current orientation of the tag in degrees. 
+        
+        Returns:
+            Angles object of the current orientation (heading, roll, pitch)
+        """
+
     @abstractmethod
     def doPositioning(self)->Coordinates|None:
         """
         Gets the positioning of the tag. 
         Returns:
         - Coordinates object with the position or None
-        """
-        pass 
-
-    @abstractmethod
-    def setCoordinates(self, coord_list:list)->None:
-        """
-        Defines the position of the tag
-        Args:
-        - coord_list: List of ints defining the position of the tag [x,y,z]
         """
         pass 
