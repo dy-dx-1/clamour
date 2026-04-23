@@ -9,7 +9,7 @@ from typing import Literal
 
 class Tag(ABC):
     """
-    Reference class for interfacing with UWB Tags in Clamour. 
+    Reference class for interfacing with UWB tags in Clamour. 
     All tag classes need to follow this blueprint to work with the rest of the code.
     NOTE: All of these methods, except is_anchor, need to be called with the appropriate lock context manager to ensure thread safety. 
     """
@@ -146,10 +146,23 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def doPositioning(self)->Coordinates|None:
+    def doPositioning(self) -> Coordinates | None:
         """
-        Gets the positioning of the tag. 
+        Positions the tag in space with UWB ranging. 
+        This function computes and stores the position in the tag's memory. 
+
         Returns:
-        - Coordinates object with the position or None
+            Coordinates object with the position or None
         """
-        pass 
+
+    @abstractmethod
+    def doRanging(self, target_id:int) -> Coordinates | None: 
+        """
+        Calculates a UWB range measurement between the tag and another device. 
+        
+        Args:
+            target_id: ID of the target device (int) 
+        
+        Returns:
+            Coordinates object with the position or None
+        """
