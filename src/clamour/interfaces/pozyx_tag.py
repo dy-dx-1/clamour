@@ -11,7 +11,6 @@ from pypozyx import Coordinates as pozyxCoordinates
 from pypozyx import DeviceList as pozyxDeviceList
 from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
-
 def get_pozyx_id(pozyx:PozyxSerial) -> int:
     """
     Read and return the Pozyx device's network ID as an int.
@@ -47,7 +46,7 @@ class PozyxTag(Tag):
     """
     Defines the UWB tag interface for a PozyxDevice. 
     Methods are adapted from abstractclass Tag. 
-    Refer to Tag class for typehints and docstrings, except when overwritten for more clarity. 
+    Refer to Tag class for typehints and docstrings, except when overwritten for clarity. 
     """
     def __init__(self):
         serial_port = get_first_pozyx_serial_port()
@@ -63,7 +62,7 @@ class PozyxTag(Tag):
     
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
-    def is_anchor(device_id: int):
+    def is_anchor(device_id):
         return device_id < 0x500
     
     def addDevice(self, device_coordinates:DeviceCoordinates): 
@@ -119,7 +118,6 @@ class PozyxTag(Tag):
         return devices
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
-
     def sendData(self, destination, payload): 
         values = list(payload)
         data_to_send = Data(values, 'B'*len(values)) # converting the bytes into a pozyx Data object
@@ -150,7 +148,6 @@ class PozyxTag(Tag):
         return sender_id, data 
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
-    
     def configureAnchorSelection(self, number_of_anchors):
         # With pypozyx, we use automatic anchor selection: https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
         # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
@@ -198,13 +195,7 @@ class PozyxTag(Tag):
         else: 
             return None 
 
-    def doRanging(self, target_id:int)->Coordinates: 
-        """
-        Calculates a range measurement between the tag and another device
-        Only used in task.py
-        NOTE: in task.py, after the Coordinates object is returned, it is fed into the ekf, should check that our general Coordinates object does work 
-        NOTE: check how to generalize target_id
-        """
+    def doRanging(self, target_id): 
         range_measure = DeviceRange() 
         try: 
             status = self._pozyx_serial.doRanging(target_id, range_measure)
