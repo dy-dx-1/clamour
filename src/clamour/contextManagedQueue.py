@@ -15,3 +15,6 @@ class ContextManagedQueue:
         self.queue.join_thread()
         print(exc_type, exc_val)
         tb.print_tb(exc_tb, file=sys.stdout)
+
+    def empty(self):
+        return self.queue.empty() 
