@@ -17,7 +17,7 @@ from runnableProcess import RunnableProcess
 #from soundmanager import SoundManager
 
 from interfaces import PozyxTag, BitcrazeTag
-TAG_TYPE = "BitCraze" # TODO: to be put in a config file later 
+TAG_TYPE = "Pozyx" # TODO: to be put in a config file later 
 
 
 def keep_alive(process: RunnableProcess) -> None:

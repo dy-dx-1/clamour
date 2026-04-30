@@ -1,4 +1,4 @@
-from interfaces import Coordinates, DeviceCoordinates
+from .containers import Coordinates, DeviceCoordinates
 import csv
 import sys
 
