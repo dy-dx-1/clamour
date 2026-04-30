@@ -55,7 +55,7 @@ class PozyxTag(Tag):
 
         self._pozyx_serial = PozyxSerial(serial_port)
         self._id = get_pozyx_id(self._pozyx_serial)
-        print(f"Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
+        print(f"### Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
 
     @property
     def tag_id(self):
