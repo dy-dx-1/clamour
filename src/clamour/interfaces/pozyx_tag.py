@@ -8,6 +8,7 @@ from pypozyx import (get_first_pozyx_serial_port, POZYX_3D, POZYX_ANCHOR_SEL_AUT
                      POZYX_POS_ALG_UWB_ONLY, POZYX_SUCCESS, POZYX_DISCOVERY_ALL_DEVICES)
 
 from pypozyx import Coordinates as pozyxCoordinates
+from pypozyx import DeviceCoordinates as pozyxDeviceCoordinates 
 from pypozyx import DeviceList as pozyxDeviceList
 from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
@@ -68,7 +69,12 @@ class PozyxTag(Tag):
     
     def addDevice(self, device_coordinates:DeviceCoordinates): 
         # Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return
-        self._pozyx_serial.addDevice(device_coordinates)
+        # DeviceCoordinates is our general version, needs to be formatted to pypozyx version 
+        net_id = device_coordinates.network_id
+        fl = device_coordinates.flag
+        coords = device_coordinates.pos # General coordinates object, needs to be converted 
+        pozyx_obj = pozyxDeviceCoordinates(network_id=net_id, flag=fl, pos = pozyxCoordinates(coords.x, coords.y, coords.z) )
+        self._pozyx_serial.addDevice(pozyx_obj)
     
     def clearDevices(self):
         self._pozyx_serial.clearDevices() 
