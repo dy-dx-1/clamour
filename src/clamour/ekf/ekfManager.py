@@ -159,7 +159,7 @@ class EKFManager:
     def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
         if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:
             csv_data = {
-                'tag_id': self.tag_id_id,
+                'tag_id': self.tag_id,
                 'timestamp': timestamp,
                 'synchronized_clock': message.synchronized_clock,
                 'offset': message.offset,

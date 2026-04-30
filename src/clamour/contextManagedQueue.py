@@ -16,5 +16,11 @@ class ContextManagedQueue:
         print(exc_type, exc_val)
         tb.print_tb(exc_tb, file=sys.stdout)
 
+    def put(self, message): 
+        self.queue.put(message) 
+
     def empty(self):
         return self.queue.empty() 
+    
+    def get_nowait(self):
+        return self.queue.get_nowait()
