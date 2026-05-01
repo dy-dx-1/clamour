@@ -8,7 +8,7 @@ class Anchors:
         self.available_anchors = []
         self.floor_height = 18900 - 300
         self.anchors_list = self.load_anchors_from_csv()
-        self.anchors_dict = {anchor.data[0]: anchor for (_, anchor) in enumerate(self.anchors_list)}
+        self.anchors_dict = {anchor.network_id: anchor for (_, anchor) in enumerate(self.anchors_list)}
 
     def load_anchors_from_csv(self) -> list:
         with open(sys.path[0]+'/interfaces/anchors.csv') as r:
@@ -17,7 +17,8 @@ class Anchors:
             return [self.add_anchor(anc) for anc in reader]
 
     def add_anchor(self, anchor_data: list) -> DeviceCoordinates:
-        label = int(anchor_data[0], base=16)
+        #label = int(anchor_data[0], base=16)
+        label = int(anchor_data[0])
         lvl = int(anchor_data[1])
         x = int(anchor_data[2])
         y = int(anchor_data[3])
