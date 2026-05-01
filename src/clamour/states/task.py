@@ -82,14 +82,13 @@ class Task(TDMAState):
     def positioning(self) -> None:
         with self.tag_lock:
             print("Using anchors: ", self.anchors.anchors_dict)
-            print("Using anchors: ", self.anchors.anchors_list)
             position = self.tag.doPositioning()
             angles = self.tag.getOrientation() 
 
         if position is None: 
             self.handle_error("positioning (pos)")
         if angles is None:
-            self.handle_error("positioning (ranging)")
+            self.handle_error("positioning (angles)")
 
         if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
