@@ -65,6 +65,12 @@ class PozyxTag(Tag):
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
     def is_anchor(device_id):
+        # NOTE: noticed this check doesn't really work (see pers. notes from ~2026-04-30 & 2026-05-01)
+        # since moving away from pozyx, the following hardcoded ID checks are just to get through this and 
+        # allow me to check localization features 
+        testing_tags = [27182, 27199]
+        if device_id in testing_tags: 
+            return True 
         return device_id < 0x500
     
     def addDevice(self, device_coordinates:DeviceCoordinates): 
@@ -197,7 +203,6 @@ class PozyxTag(Tag):
             print(str(s))
 
         if status == POZYX_SUCCESS: 
-            self._coordinates = Coordinates(pos.x, pos.y, pos.z) # TODO: still need to define if I need this internal attribute, maybe for other tags?
             return Coordinates(pos.x, pos.y, pos.z)
         else: 
             return None 
