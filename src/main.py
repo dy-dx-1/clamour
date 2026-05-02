@@ -1,10 +1,9 @@
-from clamour import Clamour, PoseMessage, CustomOdometry, ContextManagedQueue
+from clamour import Clamour, PoseMessage, ContextManagedQueue
 import sys
-import time
 
 def onNewPoseEstimated(poseMsg: PoseMessage):
     ### PoseMessage is defined in ./clamour/messages/poseMessage.py and it's attributes describe the pose of an agent
-    print("New pose estimated: x:", poseMsg.x, ", y:", poseMsg.y, ", z:", poseMsg.z, ", yaw:", poseMsg.yaw)
+    print("[POSE INFO] New pose estimated: x:", poseMsg.x, ", y:", poseMsg.y, ", z:", poseMsg.z, ", yaw:", poseMsg.yaw)
 
 if __name__ == "__main__":
     # An argument of anything else than 0 sets debug to True.
