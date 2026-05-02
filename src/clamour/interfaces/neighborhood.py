@@ -28,7 +28,7 @@ class Neighborhood:
 
     def is_alone_in_state(self, state: State) -> bool:
         if len(self.current_neighbors) == 0:
-            print("No neighbors")
+            print("[INFO] No neighbors detected")
 
         if state == -1:
             return len(self.current_neighbors) == 0
@@ -57,4 +57,3 @@ class Neighborhood:
     def are_neighbors_synced(self) -> bool:
         return all([key in self.synced_neighbors for key in self.current_neighbors.keys()]) \
             and all([times_synced > 5 for times_synced in self.synced_neighbors.values()])
-

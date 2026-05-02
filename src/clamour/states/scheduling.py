@@ -35,12 +35,12 @@ class Scheduling(TDMAState):
             return State.SYNCHRONIZATION
 
         if self.neighborhood.is_alone_in_state(-1) or (self.timing.logical_clock.clock-self.timing.sync_timestamp) > self.timing.task_start_time:
-            print("Receive List: ", self.slot_assignment.receive_list)
-            print("Send list:", self.slot_assignment.pure_send_list)
+            print("[INFO] Slot assignement RECEIVE list: ", self.slot_assignment.receive_list)
+            print("[INFO] Slot assignement SEND list: ", self.slot_assignment.pure_send_list)
             self.timing.cycle_start = self.timing.logical_clock.clock
 
             if len(self.slot_assignment.pure_send_list) == 0:
-                print("-------- Artificially adding slots -------")
+                print("[INFO] Scheduling.next(): -------Artificially adding slots -------")
                 self.slot_assignment.pure_send_list.extend({randint(0, NB_TASK_SLOTS) for _ in range(2)})
 
             self.messenger.message_box.clear()

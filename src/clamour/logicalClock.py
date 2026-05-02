@@ -1,6 +1,5 @@
 from time import perf_counter
 
-
 class LogicalClock:
     def __init__(self, logical_rate=0, offset=0):
         self.offset = offset
@@ -13,7 +12,7 @@ class LogicalClock:
         self.last_hardware_time = perf_counter()
 
     def correct_logical_offset(self, correction: int) -> None:
-        print("Correction:", correction)
+        print("[INFO] LogicalClock.correct_logical_offset(): Correction:", correction)
         self.clock += -self.clock if self.clock + correction < 0 else correction
 
     def reset_logical_rate(self) -> None:

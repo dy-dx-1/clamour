@@ -38,7 +38,7 @@ def get_nb_devices(pozyx:PozyxSerial) -> tuple:
         status = pozyx.getDeviceListSize(size)
     except struct.error as s:
         status = 0
-        print(str(s))
+        print("[ERROR] in PozyxTag.get_nb_devices: ", str(s))
 
     # returns status like POZYX_SUCCESS, this is handled by get_device_list
     return status, size[0]
@@ -56,7 +56,7 @@ class PozyxTag(Tag):
 
         self._pozyx_serial = PozyxSerial(serial_port)
         self._id = get_pozyx_id(self._pozyx_serial)
-        print(f"### Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
+        print(f"[OK] Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
 
     @property
     def tag_id(self):
@@ -96,16 +96,17 @@ class PozyxTag(Tag):
             message = self._pozyx_serial.getErrorMessage(error_code) 
         except struct.error as s: 
             message = "" 
-            print(str(s))  
+            print("[ERROR] in PozyxTag.printCurrentError: ", str(s))  
+
         if error_code != 0x0: 
-            print(f"Error in {function_name} : {message}")
+            print(f"[ERROR] printCurrentError found an error in {function_name} : {message}")
             returned_error = True 
         return returned_error
 
     def get_device_list(self, discovery_type):  
         status = self._pozyx_serial.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES)
         if status != POZYX_SUCCESS:
-            self.printCurrentError("discover")
+            self.printCurrentError("PozyxSerial.doDiscovery")
             return [] # NOTE: there wasn't any return before, function would have just continued with an error
         
         status, size = get_nb_devices(self._pozyx_serial)
@@ -115,9 +116,9 @@ class PozyxTag(Tag):
             try:
                 self._pozyx_serial.getDeviceIds(devices)
             except struct.error as s:
-                print(str(s))
+                print("[ERROR] in PozyxTag.getDeviceIds: ", str(s))
         elif status != POZYX_SUCCESS:
-            self.printCurrentError("get_nb_devices")
+            self.printCurrentError("PozyxTag.get_nb_devices")
 
         if discovery_type == "tag":
             devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]
@@ -145,7 +146,7 @@ class PozyxTag(Tag):
         try: 
             self._pozyx_serial.getRxInfo(metadata) 
         except struct.error as s: 
-            print("RxInfo crashes! ", str(s))
+            print("[ERROR] in PozyxTag.receiveData, RxInfo crashes: ", str(s))
             # NOTE: there wasn't any other error handling in the past 
         sender_id, message_byte_size = metadata[0], metadata[1] 
 
@@ -177,7 +178,7 @@ class PozyxTag(Tag):
             status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
         except struct.error as s: 
             status = 0 
-            print(str(s)) 
+            print("[ERROR] in PozyxTag.getCoordinates: ", str(s)) 
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
         return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
 
@@ -187,7 +188,7 @@ class PozyxTag(Tag):
             status = self._pozyx_serial.getEulerAngles_deg(angles)
         except struct.error as s: 
             status = 0
-            print(s) 
+            print("[ERROR] in PozyxTag.getOrientation: ", str(s)) 
         
         if status == POZYX_SUCCESS: 
             return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
@@ -200,7 +201,7 @@ class PozyxTag(Tag):
             status = self._pozyx_serial.doPositioning(position=pos, dimension=POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
         except struct.error as s: 
             status = 0
-            print(str(s))
+            print("[ERROR] in PozyxTag.doPositioning: ", str(s))
 
         if status == POZYX_SUCCESS: 
             return Coordinates(pos.x, pos.y, pos.z)
@@ -213,7 +214,7 @@ class PozyxTag(Tag):
             status = self._pozyx_serial.doRanging(target_id, range_measure)
         except struct.error as s: 
             status = 0 
-            print(s) 
+            print("[ERROR] in PozyxTag.doRanging: ", str(s)) 
 
         if status == POZYX_SUCCESS: 
             return Coordinates(range_measure.data[1], 0, 0) # idk why only along X 

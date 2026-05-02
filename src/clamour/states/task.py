@@ -64,16 +64,16 @@ class Task(TDMAState):
                 self.tag.sendData(destination=0, payload=struct.pack('<BBBBBBBBB', *tosend))
         else:
             tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
-            print(tosend)
+            print("[INFO] Task.testTDMA(): tosend: ", tosend)
             with self.tag_lock:
                 self.tag.sendData(destination=0, payload=struct.pack('<BBBBBBBBB', *tosend))
-        print(self.timing.frame_id, self.timing.current_slot_id, self.timing.get_full_cycle_duration(),self.timing.current_time_in_cycle)
+        print("[INFO] Task.testTDMA(): ", self.timing.frame_id, self.timing.current_slot_id, self.timing.get_full_cycle_duration(),self.timing.current_time_in_cycle)
 
     def next(self) -> State:
         if self.timing.in_cycle():
             return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN
         else:
-            print("Go to sync")
+            print("[INFO] Task.next(): Moving to SYNC state")
             return State.SYNCHRONIZATION
 
     def select_localization_method(self) -> None:
@@ -81,14 +81,17 @@ class Task(TDMAState):
 
     def positioning(self) -> None:
         with self.tag_lock:
-            print("Using anchors: ", self.anchors.anchors_dict)
+            print("[INFO] Task.positioning(): Attempting positioning with anchors: ", self.anchors.anchors_dict)
             position = self.tag.doPositioning()
             angles = self.tag.getOrientation() 
 
-        if position is None: 
-            self.handle_error("positioning (pos)")
-        if angles is None:
-            self.handle_error("positioning (angles)")
+        if (position is not None) and (angles is not None): 
+            print("[OK] Task.positioning(): Successful positioning")
+        else: 
+            if position is None: 
+                self.handle_error("doPositioning()")
+            if angles is None:
+                self.handle_error("getOrientation()")
 
         if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
@@ -139,12 +142,12 @@ class Task(TDMAState):
 
         new_anchors, new_tags = [], []
         for device in self.anchors.available_anchors:
-            print("Found device: ", device)
+            print(f"[INFO] Task.discover_devices(): Found device: {device}", end=", ")
             if self.tag.is_anchor(device):
-                print("It's an anchor!")
+                print("it's an ANCHOR!")
                 new_anchors.append(device)
             else:
-                print("It's a tag!")
+                print("it's a TAG!")
                 new_tags.append(device)
 
         self.anchors.available_anchors = new_anchors

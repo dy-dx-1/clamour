@@ -11,10 +11,15 @@ class ContextManagedQueue:
         return self.queue
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            print(f"[ERROR] {exc_type.__name__}: {exc_val}")
+            tb.print_exception(exc_type, exc_val, exc_tb)
+
         self.queue.close()
         self.queue.join_thread()
-        print(exc_type, exc_val)
-        tb.print_tb(exc_tb, file=sys.stdout)
+
+        if not exc_type:
+            print("[OK] Queue context exited cleanly")
 
     def put(self, message): 
         self.queue.put(message) 

@@ -115,11 +115,11 @@ class CustomEKF(ExtendedKalmanFilter):
             self.last_measurement_time = timestamp
             self.set_qf()
         else:
-            print("Received message with bad timestamp.")
+            print("[ERROR] CustomEKF.pre_update(): Received message with bad timestamp")
         self.predict()
 
     def custom_odometry_update(self, position: Coordinates, yaw: float, R, timestamp: float) -> None:
-        print("Custom odometry update")
+        print("[ERROR] CustomEKF.custom_odometry_update(): Custom odometry update")
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(

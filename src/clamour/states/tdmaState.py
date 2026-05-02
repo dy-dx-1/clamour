@@ -13,6 +13,6 @@ class TDMAState(ABC):
 def print_progress(method):
     def progress(*args, **kwargs):
         full_name = str(method.__qualname__)
-        print("Executing " + full_name[:full_name.find(".")])
+        print("[INFO] print_progress: Executing " + full_name[:full_name.find(".")])
         return method(*args, **kwargs)
     return progress

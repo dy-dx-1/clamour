@@ -46,7 +46,7 @@ class TDMANode:
 
             if(self.last_state_id == State.LISTEN and self.current_state_id == State.SYNCHRONIZATION):
                 self.current_state.first_exec_time = None
-                print("Enter Synchronization, new Full Cycle starts")
+                print("[INFO] TDMANode.run(): Enter SYNC, new Full Cycle starts")
             self.last_state_id = self.current_state_id
 
             self.wait(start_time)

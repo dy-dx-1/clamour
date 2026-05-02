@@ -65,7 +65,7 @@ class EKFManager:
                     poseMsg = PoseMessage(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, self.ekf.get_yaw())
                     self.pose_callback(poseMsg)
 
-        print("EKF Initializing Done.")
+        print("[OK] EKF INITIALIZING DONE")
 
     def process_latest_state_info(self) -> None:
         update_functions = {
@@ -93,7 +93,7 @@ class EKFManager:
                 with self.tag_lock:
                     self.tag.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
             except StructError as s:
-                print(str(s))
+                print("[ERROR] in EKFManager.process_latest_state_info(): ", str(s))
 
             coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
             self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
@@ -144,7 +144,7 @@ class EKFManager:
 
         new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates, self.floorplan.rooms)
         if new_neighbor is not None:
-            print("Changed room.")
+            print("[INFO] Changed room.")
             self.current_room = self.floorplan.rooms[new_neighbor]
             return True
 

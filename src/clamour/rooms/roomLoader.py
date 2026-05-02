@@ -7,7 +7,7 @@ import sys
 class RoomLoader:
     @staticmethod
     def load_rooms_from_csv() -> list:
-        print(sys.path)
+        print("[INFO] RoomLoader.load_rooms_from_csv: loading rooms with sys.path: ", sys.path)
         with open(sys.path[0]+'/rooms/chambord_rooms.csv') as r:
             reader = csv.reader(r, delimiter=',')
             next(reader)  # We don't want to read the header, so we skip it

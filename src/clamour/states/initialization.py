@@ -30,14 +30,14 @@ class Initialization(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        print("Entering synchronization...")
+        print("[INFO] Initialization.next(): Entering synchronization...")
         return State.SYNCHRONIZATION
 
     def clear_tag_buffer(self):
         if self.tag.sendData(destination=self.id, payload= struct.pack('<i', 0)):
-            print(f"sendData to {self.id=} was a success!")
+            print(f"[INFO] Initialization.clear_tag_buffer(): sendData to {self.id=} was a success!")
         else:
-            print(f"sendData to {self.id=} FAILED")
+            print(f"[INFO] Initialization.clear_tag_buffer(): sendData to {self.id=} FAILED")
         sleep(0.25)
         for _ in range(50):
             print(self.messenger.obtain_message_from_tag())
@@ -48,7 +48,7 @@ class Initialization(TDMAState):
         with self.tag_lock:
             devices = self.tag.get_device_list(discovery_type = "tag")
 
-        print("Tags discovered: ", devices)
+        print("[INFO] Initialization.discover_neighbors(): Tags discovered: ", devices)
 
         self.messenger.update_topology(State.SYNCHRONIZATION, devices)  # Put state to Sync for next phase
 

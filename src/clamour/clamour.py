@@ -25,7 +25,7 @@ def keep_alive(process: RunnableProcess) -> None:
         try:
             process.run()
         except Exception as e:
-            print("A process that needs to be kept alive died and will be restarted. Error:", str(e))
+            print("[ERROR] Clamour.keep_alive(): A process that needs to be kept alive died and will be restarted. Error:", str(e))
 
 class Clamour:
     def __init__(self, custom_odometries):
