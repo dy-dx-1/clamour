@@ -6,7 +6,6 @@ CUSTOM_MESSAGE_SIGNATURE = 0xAA
 TYPE_A_BIT_MASK = 0x80000000
 TYPE_B_BIT_MASK = 0xC0000000
 
-
 class MessageFactory:
     @staticmethod
     def create(sender_id: int, raw_data: bytes) -> UWBMessage | None:
@@ -21,11 +20,11 @@ class MessageFactory:
             return None 
         
         header, message_data = struct.unpack('<BI', raw_data[:5])
-        message_type_a = (message_data & TYPE_A_BIT_MASK) >> 31
-        message_type_b = (message_data & TYPE_B_BIT_MASK) >> 30
+        message_type_a = (message_data & TYPE_A_BIT_MASK) >> 31  # 1 bit
+        message_type_b = (message_data & TYPE_B_BIT_MASK) >> 30  # 2 bits 
             
         if message_type_a == MessageType.SYNC:
-            return UWBSynchronizationMessage(sender_id, message_type_a, message_data)
+            return UWBSynchronizationMessage(sender_id, message_type_a, message_data) 
         elif message_type_b == MessageType.TDMA:
             return UWBTDMAMessage(sender_id, message_type_b, message_data)
         elif message_type_b == MessageType.TOPOLOGY:

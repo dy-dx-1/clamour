@@ -64,7 +64,8 @@ class Scheduling(TDMAState):
         random_slots = sample(range(NB_TASK_SLOTS), int(2 * NB_TASK_SLOTS / 3))  # We must leave some free slots
         self.slot_assignment.pure_send_list = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
 
-    def is_broadcast_slot(self) -> bool:
+    def is_broadcast_slot(self) -> bool: 
+        # NOTE: careful, NB_NODES must match highest ID to allow for slot proposal to be reached. See comment in definition of NB_NODES
         return int(((self.timing.logical_clock.clock - self.timing.sync_timestamp) % (NB_NODES * SCHEDULING_SLOT_DURATION))
                 / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
 

@@ -53,10 +53,10 @@ class PozyxTag(Tag):
         serial_port = get_first_pozyx_serial_port()
         if serial_port is None:
             raise Exception("No Pozyx connected. Check your USB cable or your driver.")
-
         self._pozyx_serial = PozyxSerial(serial_port)
         self._id = get_pozyx_id(self._pozyx_serial)
         print(f"[OK] Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
+        print(f"This ID means that the constant NB_NODES in timing.py must >{self._id & 0xFF} for the node to do slot proposals.")
 
     @property
     def tag_id(self):

@@ -46,7 +46,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(destination=0, payload=struct.pack('<BI', 0xAA, message.data))
+            self.tag.sendData(destination=0, payload=struct.pack('<BI', 0xAA, int(message.data)))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -73,7 +73,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(destination=0, payload=struct.pack('<BI', 0xAA, message.data))
+            self.tag.sendData(destination=0, payload=struct.pack('<BI', 0xAA, int(message.data)))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -94,7 +94,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(0, struct.pack('<BI', 0xAA, message.data))
+            self.tag.sendData(0, struct.pack('<BI', 0xAA, int(message.data)))
 
     def receive_message(self, state: State) -> bool:
         is_new_message, should_go_to_sync = self.receive_new_message(state)
@@ -170,8 +170,14 @@ class Messenger:
         is_new_message = False
         sender_id, data = self.obtain_message_from_tag()
 
-        if sender_id != 0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
+        if sender_id != 0 and data!=b"":
+            print(f"[DEBUG] Raw received: {data}")
+
+        if sender_id != 0 and len(data)>0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
             received_message = MessageFactory.create(sender_id, data)
+            if received_message is None:  # NOTE: from 2026-05-03 TDMA testing after decoupling, may not be right 
+                print(f"[WARNING] Dropped unknown message: {data}")
+                return False, False 
             if isinstance(received_message, UWBTopologyMessage):
                 received_message.decode()
                 self.update_topology(State.LISTEN, topology_info=received_message.neighborhood, sender_id=sender_id)
