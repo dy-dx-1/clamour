@@ -1,6 +1,61 @@
 from .tag import Tag
 from .containers import Coordinates, Angles
+
 from typing import Literal
+from pathlib import Path
+import os 
+import fcntl
+import time 
+import serial
+
+def find_first_bc_port() -> str | None:
+    """
+    Looks through ports and checks if one is for a Bitcraze device 
+    Uses by-id to give robust paths independent of ttyACMX indexing 
+    Returns the path to the port or None 
+    """
+    for path in Path("/dev/serial/by-id").iterdir():
+        if "Bitcraze" in path.name:
+            return str(path) 
+    return None 
+
+def tty_to_usb_device_path(tty_or_symlink_path:str) -> str:
+    """
+    Convert a tty device or symlink into the underlying USB device path. 
+    This is used to reset the device through usb. 
+
+    Examples:
+        /dev/ttyACM0
+        /dev/serial/by-id/usb-Bitcraze_...
+    ->
+        /dev/bus/usb/001/004
+    """
+
+    print(f"Input device: {tty_or_symlink_path}")
+    # Resolve the actual tty device if this is a symlink
+    tty_realpath = Path(tty_or_symlink_path).resolve()
+
+    print(f"Resolved tty device: {tty_realpath}")
+    tty_name = tty_realpath.name
+
+    # Build sysfs path from resolved tty name
+    sysfs_tty_path = Path(f"/sys/class/tty/{tty_name}")
+    # Follow sysfs symlink to actual device
+    device_path = sysfs_tty_path.resolve()
+
+    # Walk upward until we find USB metadata
+    current = device_path
+    while current != current.parent:
+        busnum = current / "busnum"
+        devnum = current / "devnum"
+        if busnum.exists() and devnum.exists():
+            bus = int(busnum.read_text().strip())
+            dev = int(devnum.read_text().strip())
+            usb_path = f"/dev/bus/usb/{bus:03d}/{dev:03d}"
+            print(f"USB device path: {usb_path}")
+            return usb_path
+        current = current.parent
+    return None 
 
 class BitcrazeTag(Tag):
     """
@@ -8,10 +63,17 @@ class BitcrazeTag(Tag):
     Methods are adapted from abstractclass Tag. 
     Refer to Tag class for typehints and docstrings, except when overwritten for clarity. 
     """
-    def __init__(self, serial_port: str, tag_id: int):
-        self.serial_port = serial_port
-        self.tag_id = tag_id
+    def __init__(self):
+        self.serial_port = find_first_bc_port() 
+        self.usb_path = tty_to_usb_device_path(self.serial_port) 
+        if self.serial_port is None:
+            raise Exception("No Bitcraze connected. Check your USB cable or your driver.")
+        if self.usb_path is None: 
+            raise Exception("Could not resolve Bitcraze serial port (tty or symlink to it) into a USB path.")
 
+        self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1) 
+        print(f"[OK] CONNECTED TO BC DEVICE ") # add id, port, info 
+    
     @property
     def tag_id(self): 
         return self._id 
@@ -47,6 +109,21 @@ class BitcrazeTag(Tag):
         """
         Resets the tag. 
         """
+        self.serial_con.close() 
+
+        USBDEVFS_RESET = ord('U') << 8 | 20
+        print(f"[INFO] RESETTING TAG #{self.tag_id} at port: {self.serial_port}")
+        fd = os.open(self.usb_path, os.O_WRONLY)
+        try:
+            fcntl.ioctl(fd, USBDEVFS_RESET, 0)
+        finally:
+            os.close(fd)
+        time.sleep(3) 
+
+        # Since we are using a symlink in find_first_lps_port, the port is still valid
+        # We only need to reopen the serial connection 
+        self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1)
+        print(f"[INFO] RESET COMPLETED") 
 
     def printCurrentError(self, function_name:str) -> bool:
         """
