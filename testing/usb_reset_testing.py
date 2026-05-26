@@ -69,7 +69,7 @@ dev = tty_to_usb_device_path(tty_device=find_first_lps_port())
 print("Found device")
 print(dev) 
 
-#reset_usb(dev)
+reset_usb(dev)
 
 print("Reset sent")
 #

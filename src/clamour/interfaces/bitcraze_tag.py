@@ -72,25 +72,60 @@ class BitcrazeTag(Tag):
             raise Exception("Could not resolve Bitcraze serial port (tty or symlink to it) into a USB path.")
 
         self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1) 
-        print(f"[OK] CONNECTED TO BC DEVICE ") # add id, port, info 
-    
-    @property
-    def tag_id(self): 
-        return self._id 
+
+        self.cpu_id, self.tag_id, mode_desc = self.get_tag_info() 
+        if mode_desc != "twr_tag": # NOTE: In the future can add automatic mode change if useful enough 
+            self.serial_con.close() 
+            raise Exception(f"Device is not in TWR Tag mode, but instead in : {mode_desc}. Change this.")
+        if BitcrazeTag.is_anchor(self.tag_id): 
+            raise Exception(f"Device ID {self.tag_id} is unexpected for a tag. Change this to be coherent with BitcrazeTag.is_anchor()")
+        
+        print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE IN TWR TAG MODE. PORT: {self.serial_port}, ID {self.tag_id}") 
+
+    def get_tag_info(self)->tuple[str, int, str]:   
+        """
+        Closes and opens the connection to get the startup info of the tag. 
+        """
+        max_attempts = 10 # Multiple attempts in case info can't be properly read at first 
+        for _ in range(max_attempts):
+            if self.serial_con.is_open: 
+                self.serial_con.close()
+                time.sleep(0.1) 
+
+            self.serial_con.open() 
+ 
+            cpu_id = None 
+            uwb_id = None 
+            mode_info = None 
+            
+            try:
+                for _ in range(50):
+                    line = self.serial_con.readline().decode(errors="ignore").strip()
+                    if not line:
+                        continue
+                    if "CPU-ID" in line: 
+                        cpu_id = line.split(" ")[2]
+                    elif "Address" in line: 
+                        uwb_id = line.split(" ")[3]
+                    elif "Mode is" in line: 
+                        mode_info = "_".join(line.split(" ")[3:]).lower().strip() 
+                    elif "Press 'h' for help" in line:
+                        break
+            except Exception as e:
+                self.serial_con.close()
+                raise(Exception(f"CONNECTION CLOSED. Error occurred during get_tag_info: {e}"))
+            
+            if cpu_id and uwb_id and mode_info: 
+                return cpu_id, int(uwb_id, base=16), mode_info 
+        
+        raise RuntimeError(f"Failed to retrieve tag info after {max_attempts} attempts.")
 
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
     def is_anchor(device_id: int) -> bool:
-        """
-        Evaluates if a particular device is a UWB anchor. 
-        Does not require the use of Lock. 
-
-        Args: 
-            device_id: Int ID of the device to check 
-
-        Returns:
-            Bool of the result
-        """
+        # NOTE: for BC as of 2026-05-26, I am defining anchors as devices with IDs <=10 
+        # Tags must have any other IDs. BC supports 0-255 in hexadecimal 
+        return device_id<=10 
 
     def addDevice(self, device:object) -> None:
         """
@@ -109,7 +144,8 @@ class BitcrazeTag(Tag):
         """
         Resets the tag. 
         """
-        self.serial_con.close() 
+        if self.serial_con.is_open: 
+            self.serial_con.close() 
 
         USBDEVFS_RESET = ord('U') << 8 | 20
         print(f"[INFO] RESETTING TAG #{self.tag_id} at port: {self.serial_port}")
