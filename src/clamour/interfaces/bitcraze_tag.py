@@ -82,6 +82,8 @@ class BitcrazeTag(Tag):
         
         print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE IN TWR TAG MODE. PORT: {self.serial_port}, ID {self.tag_id}") 
 
+        self.device_list = [] 
+
     def get_tag_info(self)->tuple[str, int, str]:   
         """
         Closes and opens the connection to get the startup info of the tag. 
@@ -139,6 +141,7 @@ class BitcrazeTag(Tag):
         """
         Clears the tag's internal device list.
         """
+        self.device_list = [] 
 
     def resetSystem(self) -> None:
         """
@@ -171,6 +174,7 @@ class BitcrazeTag(Tag):
         Returns: 
             Bool on whether there was really an error or not 
         """
+        # NOTE: check if this is used in clamour, else just implement a different way of using it. I don't think we can do it like pozyx
     
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:
         """
