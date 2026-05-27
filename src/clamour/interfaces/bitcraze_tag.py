@@ -86,7 +86,7 @@ class BitcrazeTag(Tag):
         
         print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE IN TWR TAG MODE.")
         print(f"[OK] PORT: {self.serial_port}") 
-        print(f"[OK] TAG ID {self._id}")
+        print(f"[OK] TAG ID: {self._id}")
 
         self.device_list = [] 
 
@@ -155,24 +155,23 @@ class BitcrazeTag(Tag):
 
     def resetSystem(self) -> None:
         """
-        Resets the tag. 
+        Closes and opens the serial connection. 
+        NOTE: This is not a proper reset of the tag. 
+        Changes to the tag's config won't be saved to EEPROM. This still requires pressing the reset button. 
+
+        I tried *multiple* ways of simulating a full reset and none worked. Firmware also doesn't support it through terminal. 
+        Therefore a manual button press is still required to change device settings. 
+        If truly needed in the future, best solution would be to solder a cable from the reset button to a GPIO and simulate the press. 
+
+        At the moment, I don't think it's needed. This function is only used in messenger.py/handle_error(), which itself is seemingly never called (?). 
         """
+        print(f"[INFO] RESTARTING SERIAL COMM OF TAG #{self.tag_id} at port: {self.serial_port}")
         if self.serial_con.is_open: 
             self.serial_con.close() 
-
-        USBDEVFS_RESET = ord('U') << 8 | 20
-        print(f"[INFO] RESETTING TAG #{self.tag_id} at port: {self.serial_port}")
-        fd = os.open(self.usb_path, os.O_WRONLY)
-        try:
-            fcntl.ioctl(fd, USBDEVFS_RESET, 0)
-        finally:
-            os.close(fd)
-        time.sleep(3) 
-
+        time.sleep(0.5) 
         # Since we are using a symlink in find_first_lps_port, the port is still valid
-        # We only need to reopen the serial connection 
         self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1)
-        print(f"[INFO] RESET COMPLETED") 
+        print(f"[INFO] RESTART OF COMM COMPLETED") 
 
     def printCurrentError(self, function_name:str) -> bool:
         """
