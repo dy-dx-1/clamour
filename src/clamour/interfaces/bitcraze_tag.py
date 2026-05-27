@@ -163,8 +163,7 @@ class BitcrazeTag(Tag):
         if self.serial_con.is_open: 
             self.serial_con.close() 
         time.sleep(0.5) 
-        # Since we are using a symlink in find_first_lps_port, the port is still valid
-        self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1)
+        self.serial_con.open() 
         print(f"[INFO] RESTART OF COMM COMPLETED") 
 
     def printCurrentError(self, function_name:str) -> bool:
