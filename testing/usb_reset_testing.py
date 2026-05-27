@@ -89,6 +89,7 @@ def unprivileged_usb_reset(usb_device_id):
 
 if __name__ == "__main__":
     # Replace with your node's specific USB port ID string" 
-    add = get_usb_hub_and_port("/dev/ttyACM0")
-
-    unprivileged_usb_reset(add.split(':')[0]) 
+    #add = get_usb_hub_and_port("/dev/ttyACM0")
+    #a = add.split(':')[0]
+    #print(a) 
+    unprivileged_usb_reset('1-1.1') 
