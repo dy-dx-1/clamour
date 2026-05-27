@@ -166,16 +166,14 @@ class BitcrazeTag(Tag):
         print(f"[INFO] RESTART OF COMM COMPLETED") 
 
     def printCurrentError(self, function_name:str) -> bool:
-        """
-        Checks if the tag experienced an error and retrieves it. 
-        If there was an error, prints it to the terminal & the function name where it happened.
-        
-        Args:
-            function_name: String indicating the function name where this was checked
-        Returns: 
-            Bool on whether there was really an error or not 
-        """
-        # NOTE: check if this is used in clamour, else just implement a different way of using it. I don't think we can do it like pozyx
+        # NOTE: This function cannot be used in the same way as originally intended with Pozyx
+        # as bitcraze does not allow for the same functionality in collecting errors through the firmware
+        # To avoid modifying the rest of the code and altering pozyx compatibility, I'm keeping 
+        # this function as a simple formatter that outputs the function name where the error occurred. 
+        # Since we can't check if there was really an error, I assume this function is only called when there is one 
+        # and so the function always returns True. 
+        print(f"[ERROR] There was an error in the function: {function_name}")
+        return True 
     
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:
         """

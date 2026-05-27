@@ -89,9 +89,9 @@ class Task(TDMAState):
             print("[OK] Task.positioning(): Successful positioning")
         else: 
             if position is None: 
-                self.handle_error("doPositioning()")
+                self.handle_error("Tag.doPositioning()")
             if angles is None:
-                self.handle_error("getOrientation()")
+                self.handle_error("Tag.getOrientation()")
 
         if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
