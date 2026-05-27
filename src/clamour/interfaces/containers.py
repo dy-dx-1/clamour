@@ -97,7 +97,7 @@ class DeviceCoordinates:
 
     Kwargs (can be accessed as properties):
         network_id: Network ID of the device
-        flag: Type of the device. Tag or anchor.
+        flag: Type of the device. 1 for anchor and 0 for tag. 
         pos: Coordinates of the device. Coordinates().
     """
 
