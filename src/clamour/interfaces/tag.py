@@ -37,12 +37,12 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def addDevice(self, device:object) -> None:
+    def addDevice(self, device:DeviceCoordinates) -> None:
         """
         Adds an anchor or tag to the tag's internal device list.
 
         Args:
-            device: Any appropriate object that can be handled by the tag interface in it's internal device list.
+            device: DeviceCoordinates object representing a UWB device. 
         """
 
     @abstractmethod
