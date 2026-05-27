@@ -30,12 +30,8 @@ def tty_to_usb_device_path(tty_or_symlink_path:str) -> str:
     ->
         /dev/bus/usb/001/004
     """
-
-    print(f"Input device: {tty_or_symlink_path}")
     # Resolve the actual tty device if this is a symlink
     tty_realpath = Path(tty_or_symlink_path).resolve()
-
-    print(f"Resolved tty device: {tty_realpath}")
     tty_name = tty_realpath.name
 
     # Build sysfs path from resolved tty name
@@ -52,7 +48,6 @@ def tty_to_usb_device_path(tty_or_symlink_path:str) -> str:
             bus = int(busnum.read_text().strip())
             dev = int(devnum.read_text().strip())
             usb_path = f"/dev/bus/usb/{bus:03d}/{dev:03d}"
-            print(f"USB device path: {usb_path}")
             return usb_path
         current = current.parent
     return None 
@@ -62,6 +57,14 @@ class BitcrazeTag(Tag):
     Defines the UWB tag interface for a Bitcraze Loco Positioning Node/Tag. 
     Methods are adapted from abstractclass Tag. 
     Refer to Tag class for typehints and docstrings, except when overwritten for clarity. 
+    
+    Attributes: 
+        serial_port: /dev/serial/by-id serial port to the device 
+        usb_path: path to the usb port of the device 
+        serial_con: serial.Serial instance of the serial connection 
+        cpu_id: unique CPU ID of the device 
+        tag_id: UWB address. Network identifier of the device. 
+        device_list: List of devices the tag can see 
     """
     def __init__(self):
         self.serial_port = find_first_bc_port() 
@@ -73,16 +76,23 @@ class BitcrazeTag(Tag):
 
         self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1) 
 
-        self.cpu_id, self.tag_id, mode_desc = self.get_tag_info() 
+        self.cpu_id, self._id, mode_desc = self.get_tag_info() 
         if mode_desc != "twr_tag": # NOTE: In the future can add automatic mode change if useful enough 
             self.serial_con.close() 
             raise Exception(f"Device is not in TWR Tag mode, but instead in : {mode_desc}. Change this.")
-        if BitcrazeTag.is_anchor(self.tag_id): 
-            raise Exception(f"Device ID {self.tag_id} is unexpected for a tag. Change this to be coherent with BitcrazeTag.is_anchor()")
+        if BitcrazeTag.is_anchor(self._id): 
+            self.serial_con.close() 
+            raise Exception(f"Device ID {self._id} is unexpected for a tag. Change this to be coherent with BitcrazeTag.is_anchor()")
         
-        print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE IN TWR TAG MODE. PORT: {self.serial_port}, ID {self.tag_id}") 
+        print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE IN TWR TAG MODE.")
+        print(f"[OK] PORT: {self.serial_port}") 
+        print(f"[OK] TAG ID {self._id}")
 
         self.device_list = [] 
+
+    @property
+    def tag_id(self)->int:
+        return self._id
 
     def get_tag_info(self)->tuple[str, int, str]:   
         """
