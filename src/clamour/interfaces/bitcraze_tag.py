@@ -14,12 +14,18 @@ def find_first_bc_port() -> str | None:
     Uses by-id to give robust paths independent of ttyACMX indexing 
     Returns the path to the port or None 
     """
-    for path in Path("/dev/serial/by-id").iterdir():
-        if "Bitcraze" in path.name:
-            return str(path) 
-    return None 
+    try: 
+        for path in Path("/dev/serial/by-id").iterdir():
+            if "Bitcraze" in path.name:
+                return str(path) 
+    except FileNotFoundError: 
+        pass 
+    raise Exception("No Bitcraze connected. Check your USB cable or your driver.")
 
 def tty_to_usb_device_path(tty_or_symlink_path:str) -> str:
+    # TODO: 2026-05-27, since resetSystem doesn't work with this as originally intended
+    # This function is not used at this time, nor is self.usb_port 
+    # in future eval if we did end up needing for smthing else, else, remove. 
     """
     Convert a tty device or symlink into the underlying USB device path. 
     This is used to reset the device through usb. 
@@ -50,7 +56,7 @@ def tty_to_usb_device_path(tty_or_symlink_path:str) -> str:
             usb_path = f"/dev/bus/usb/{bus:03d}/{dev:03d}"
             return usb_path
         current = current.parent
-    return None 
+    raise Exception("Could not resolve Bitcraze serial port (tty or symlink to it) into a USB path.") 
 
 class BitcrazeTag(Tag):
     """
@@ -68,11 +74,7 @@ class BitcrazeTag(Tag):
     """
     def __init__(self):
         self.serial_port = find_first_bc_port() 
-        self.usb_path = tty_to_usb_device_path(self.serial_port) 
-        if self.serial_port is None:
-            raise Exception("No Bitcraze connected. Check your USB cable or your driver.")
-        if self.usb_path is None: 
-            raise Exception("Could not resolve Bitcraze serial port (tty or symlink to it) into a USB path.")
+        self.usb_path = tty_to_usb_device_path(self.serial_port) # TODO: confirm if needed, check comment in function 
 
         self.serial_con = serial.Serial(port=self.serial_port, baudrate=9600, timeout=1) 
 
