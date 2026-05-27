@@ -1,5 +1,5 @@
 from .tag import Tag
-from .containers import Coordinates, Angles
+from .containers import Coordinates, Angles, DeviceCoordinates
 
 from typing import Literal
 from pathlib import Path
@@ -139,18 +139,10 @@ class BitcrazeTag(Tag):
         # Tags must have any other IDs. BC supports 0-255 in hexadecimal 
         return device_id<=10 
 
-    def addDevice(self, device:object) -> None:
-        """
-        Adds an anchor or tag to the tag's internal device list.
-
-        Args:
-            device: Any appropriate object that can be handled by the tag interface in it's internal device list.
-        """
+    def addDevice(self, device:DeviceCoordinates) -> None:
+        self.device_list.append(device)
 
     def clearDevices(self) -> None:
-        """
-        Clears the tag's internal device list.
-        """
         self.device_list = [] 
 
     def resetSystem(self) -> None:
