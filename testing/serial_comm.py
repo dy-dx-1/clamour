@@ -60,5 +60,13 @@ if __name__ == "__main__":
     ser = serial.Serial(port=find_first_lps_port(), baudrate=9600, timeout=1)  
     print("opened conn, waiting") 
     print(get_tag_info(ser))
-    ser.close() 
+    ser.write(b'reset')
+    try:
+        for _ in range(50):
+            line = ser.readline().decode(errors="ignore").strip()
+            if not line:
+                continue
+            print(line) 
+    finally:
+        ser.close() 
     
