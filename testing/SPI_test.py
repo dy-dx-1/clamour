@@ -9,6 +9,7 @@ if parent_dir not in sys.path:
 from src.clamour.interfaces.dw_1000 import DW1000 
 
 with DW1000(bus=0, cs=0) as dw:
+    d_id = dw.read_register(0x00, 4) 
     eui = dw.read_register(0x01, 8)
-    print(eui) 
-
+    print(f"{d_id}")
+    print(f"{eui=}")

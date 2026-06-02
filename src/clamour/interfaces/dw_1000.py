@@ -10,7 +10,7 @@ class DW1000:
         self.spi = spidev.SpiDev() 
         self.spi.open(bus, cs) 
         
-        self.spi.max_speed_hz = 3000000 # On init, should not exceed 3MHz  
+        self.spi.max_speed_hz = 3_000_000 # On init, should not exceed 3MHz  
         self.spi.mode = 0b00            # GPIO 5 and 6 dictate the mode, should be untouched 
         
         ## Checking device ID is expected for DW1000 
@@ -20,8 +20,19 @@ class DW1000:
             print(f"Expected ID: ['0xde', '0xca', '0x1', '0x30'], got {d_id}")
             self.spi.close() 
             quit() 
-        else: 
-            print("Successfully connected DW1000 device. ")
+        
+        ## Checking CLK PLL locked and device completed INIT mode 
+        cfg = self.read_register(0x0F, 5) 
+        cplock = self.hex_to_octet(cfg[0])[6] # 2nd bit of 0th octet
+        slp2init = self.hex_to_octet(cfg[2])[0] # last bit of 2nd octet
+        if not (cplock and slp2init): 
+            print("[ERROR] DW1000 did not lock CLK PLL and/or did not reach INIT successfully. Try replugging it?")
+            self.spi.close() 
+            quit() 
+        
+        ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
+        self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
+        print("[OK] Successfully connected DW1000 device.")
 
     def __enter__(self):
         return self 
@@ -35,6 +46,14 @@ class DW1000:
             self.spi.close() 
         except: 
             pass 
+
+    @staticmethod
+    def hex_to_octet(hex_str:str)->str: 
+        """ 
+        Converts a hex string into the equivalent octet binary string 
+        """
+        # TODO: add <0xFF checks 
+        return f"{int(hex_str, base=16):08b}"
     
     def read_register(self, header:bytes, length:int, reverse:bool=False)->list[str]: 
         """
