@@ -33,7 +33,7 @@ class DW1000:
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
         print("[OK] Successfully connected DW1000 device.")
-
+    
     def __enter__(self):
         return self 
 
