@@ -58,6 +58,14 @@ class PozyxTag(Tag):
         print(f"[OK] Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
         print(f"This ID means that the constant NB_NODES in timing.py must >{self._id & 0xFF} for the node to do slot proposals.")
 
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.clearDevices() 
+        self.resetSystem()
+        print("PozyxTag.__exit__() completed.")
+
     @property
     def tag_id(self):
         return self._id

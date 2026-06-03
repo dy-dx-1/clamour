@@ -14,6 +14,18 @@ class Tag(ABC):
     NOTE: All of these methods, except is_anchor, need to be called with the appropriate lock context manager to ensure thread safety. 
     """
 
+    @abstractmethod
+    def __enter__(self): 
+        """
+        Tags must be used with context managers to ensure proper disconnection.
+        """
+    
+    @abstractmethod
+    def __exit__(self, exc_type, exc_val, exc_tb): 
+        """
+        Tags must be used with context managers to ensure proper disconnection.
+        """
+
     @property
     @abstractmethod
     def tag_id(self) -> int:

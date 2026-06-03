@@ -15,23 +15,29 @@ class BitcrazeTag(Tag):
     The LPD is effectively a DW1000 on a board, so this class is based on the DW1000 class. 
     However, it's designed to communicate with Loco Positioning Nodes from the BC ecosystem as anchors. 
 
-    Methods are adapted from abstractclass Tag. 
+    Methods are adapted from abstractclass Tag. Always instantiate with a context manager for graceful closing of DW1000 connection. 
     Refer to Tag class for typehints and docstrings, except when overwritten for clarity. 
     
     Attributes: 
         TODO 
     """
-    def __init__(self, tag_id:int, dw1000:DW1000):
+    def __init__(self, tag_id:int, dw1000_bus:int, dw1000_cs:int):
         if not tag_id>10: 
             raise Exception("Invalid tag_id for BitcrazeTag. Tag ID must > 10. Check your config file.")
         
-        self.dw = dw1000   # NOTE: DW1000 MUST have been instanciated with a context manager 
         self._id = tag_id 
-        # TODO: check dw will stay in context manager 
+        self._dw = DW1000(dw1000_bus, dw1000_cs)
+        self.device_list = [] 
+
         print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE") 
         print(f"[OK] TAG ID: {self._id}")
 
-        self.device_list = [] 
+    def __enter__(self): 
+        return self 
+    
+    def __exit__(self, exc_type, exc_val, exc_tb): 
+        self._dw.close() 
+        print("DW1000 closed with BitcrazeTag.__exit__()")
 
     @property
     def tag_id(self)->int:

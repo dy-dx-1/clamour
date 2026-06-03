@@ -16,18 +16,23 @@ from .runnableProcess import RunnableProcess
 
 from .interfaces import PozyxTag, BitcrazeTag
 
-### Loading config file 
+#################################################### Loading config file 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-print(f"{PROJECT_ROOT=}")
 CONFIG_PATH = os.path.join(PROJECT_ROOT, 'configuration', 'clamour_config.yaml')
 
 with open(CONFIG_PATH, 'r') as f: # NOTE: maybe interesting to add error handling/checks in future. For now assuming easy enough to read and debug. 
     cfg = yaml.safe_load(f) 
 
-TAG_TYPE = cfg['tag_type'] 
-TAG_ID = cfg['tag_id']
-# NOTE: when coming back, add context managers to properly define how to load IDs
-# NOTE: then add more to the config file. 
+match cfg['tag_type']:
+    case "Bitcraze": 
+        TAG_FACTORY = lambda: BitcrazeTag(tag_id = cfg['tag_id'], dw1000_bus = cfg['dw1000_bus'], dw1000_cs = cfg['dw1000_cs'])
+    case "Pozyx": 
+        # TODO NOTE: pozyx doesn't currently support setting IDs through config file. 
+        TAG_FACTORY = lambda: PozyxTag() 
+    case _: 
+        raise ValueError(f"Invalid tag type: {cfg['tag_type']}. Check your config file.")
+
+#################################################### Clamour class 
 def keep_alive(process: RunnableProcess) -> None:
     while True:
         try:
@@ -41,32 +46,24 @@ class Clamour:
 
     def start(self, sound: bool, pose_callback, communication_queue):
         # The different levels of context managers are required to ensure everything starts and stops cleanly.
-        with ContextManagedQueue() as sound_queue:
-            if TAG_TYPE == "BitCraze":
-                shared_tag = BitcrazeTag("/dev/ttyACM0", 123) # placeholder values, to be replaced with config file values
-            elif TAG_TYPE == "Pozyx":
-                shared_tag = PozyxTag()
-            else: 
-                raise Exception("Invalid TAG_TYPE, check your config file")
+        with TAG_FACTORY() as shared_tag: # Type of tag defined in config file 
             shared_tag_lock = Lock()
             tag_id = shared_tag.tag_id
+            with ContextManagedQueue() as sound_queue:
+                ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_tag, shared_tag_lock, tag_id, sound)
+                #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
+                tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
+                #if sound:
+                #    sound_player = SoundManager(sound_queue)
+                with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
+                    ekf_manager_process.start()
+                    with ContextManagedProcess(target=tdma_node.run) as tdma_process:
+                        tdma_process.start()
+                        #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
+                            #pedometer_process.start()
 
-            ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_tag, shared_tag_lock, tag_id, sound)
-            #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
-            tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
-
-            #if sound:
-            #    sound_player = SoundManager(sound_queue)
-
-            with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
-                ekf_manager_process.start()
-                with ContextManagedProcess(target=tdma_node.run) as tdma_process:
-                    tdma_process.start()
-                    #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
-                        #pedometer_process.start()
-
-                    #    if sound:
-                    #        keep_alive(sound_player)
+                        #    if sound:
+                        #        keep_alive(sound_player)
 
     def start_non_blocking(self, sound: bool, pose_callback):
         self.communication_queue = Queue()
