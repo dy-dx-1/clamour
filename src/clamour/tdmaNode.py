@@ -1,10 +1,10 @@
 from multiprocessing.synchronize import Lock
 from time import sleep, time
 
-from interfaces import Anchors, Neighborhood, SlotAssignment, Timing
-from interfaces.tag import Tag
-from messenger import Messenger
-from states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
+from .interfaces import Anchors, Neighborhood, SlotAssignment, Timing
+from .interfaces.tag import Tag
+from .messenger import Messenger
+from .states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
 
 
 class TDMANode:

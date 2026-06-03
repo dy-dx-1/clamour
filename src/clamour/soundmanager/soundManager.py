@@ -1,15 +1,13 @@
 import json
 import pygame
-from interfaces import Coordinates
+from ..interfaces import Coordinates
 from random import randint
 from time import sleep
 import sys, os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-
-from contextManagedQueue import ContextManagedQueue
-from contextManagedProcess import ContextManagedProcess
-from messages import SoundMessage
+from ..contextManagedQueue import ContextManagedQueue
+from ..contextManagedProcess import ContextManagedProcess
+from ..messages import SoundMessage
 
 # variable needed to find the right sphere and to play them accordingly to the user position
 PLACEHOLDER = "xxx_yyy_zzz"  # file name template example: xxx_yyy_zzz_HH_FF_TTTTT

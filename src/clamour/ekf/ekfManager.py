@@ -3,15 +3,15 @@ import os.path
 import csv
 from multiprocessing.synchronize import Lock
 from numpy import linalg
-from interfaces import Tag
-from interfaces import Coordinates
+from ..interfaces import Tag
+from ..interfaces import Coordinates
 from struct import error as StructError
 from time import time
 
 from .ekf import CustomEKF, DT_THRESHOLD
-from contextManagedQueue import ContextManagedQueue
-from messages import UpdateMessage, SoundMessage, UpdateType, PoseMessage
-from rooms import Floorplan
+from ..contextManagedQueue import ContextManagedQueue
+from ..messages import UpdateMessage, SoundMessage, UpdateType, PoseMessage
+from ..rooms import Floorplan
 
 
 class EKFManager:

@@ -1,6 +1,6 @@
 from .tag import Tag
 from .containers import Coordinates, Angles, DeviceCoordinates
-from dw_1000 import DW1000
+from .dw_1000 import DW1000
 
 from typing import Literal
 from pathlib import Path
@@ -21,10 +21,13 @@ class BitcrazeTag(Tag):
     Attributes: 
         TODO 
     """
-    def __init__(self, dw1000:DW1000):
-        self.dw = dw1000 # NOTE: DW1000 MUST have been instanciated with a context manager 
+    def __init__(self, tag_id:int, dw1000:DW1000):
+        if not tag_id>10: 
+            raise Exception("Invalid tag_id for BitcrazeTag. Tag ID must > 10. Check your config file.")
+        
+        self.dw = dw1000   # NOTE: DW1000 MUST have been instanciated with a context manager 
+        self._id = tag_id 
         # TODO: check dw will stay in context manager 
-        # TODO: add ID def and anchor check 
         print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE") 
         print(f"[OK] TAG ID: {self._id}")
 

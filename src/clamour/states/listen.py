@@ -1,6 +1,6 @@
-from interfaces import SlotAssignment, Timing, Neighborhood
-from interfaces.timing import Timing
-from messenger import Messenger
+from ..interfaces import SlotAssignment, Timing, Neighborhood
+from ..interfaces.timing import Timing
+from ..messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState

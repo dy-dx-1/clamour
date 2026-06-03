@@ -3,12 +3,12 @@ from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from time import perf_counter
 
 from numpy import array, atleast_2d
-from interfaces import Tag, Coordinates
+from ..interfaces import Tag, Coordinates
 import struct
 
-from interfaces import Anchors, Neighborhood, Timing, SlotAssignment
-from messages import UpdateMessage, UpdateType
-from messenger import Messenger
+from ..interfaces import Anchors, Neighborhood, Timing, SlotAssignment
+from ..messages import UpdateMessage, UpdateType
+from ..messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState

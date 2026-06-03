@@ -3,15 +3,15 @@ from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from time import perf_counter, time
 
 import struct
-from interfaces import Tag
-from interfaces import Coordinates
+from .interfaces import Tag
+from .interfaces import Coordinates
 
-from contextManagedQueue import ContextManagedQueue
-from interfaces import Neighborhood, SlotAssignment, State
-from interfaces.timing import NB_TASK_SLOTS
-from messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
+from .contextManagedQueue import ContextManagedQueue
+from .interfaces import Neighborhood, SlotAssignment, State
+from .interfaces.timing import NB_TASK_SLOTS
+from .messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UWBTopologyMessage, UpdateMessage, UpdateType)
-from messages.messageFactory import CUSTOM_MESSAGE_SIGNATURE
+from .messages.messageFactory import CUSTOM_MESSAGE_SIGNATURE
 
 
 class Messenger:

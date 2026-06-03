@@ -1,6 +1,6 @@
-from interfaces import Neighborhood, SlotAssignment, Timing
-from interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS)
-from messenger import Messenger
+from ..interfaces import Neighborhood, SlotAssignment, Timing
+from ..interfaces.timing import (NB_NODES, SYNCHRONIZATION_PERIOD, SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS)
+from ..messenger import Messenger
 from random import sample, randint
 
 from .constants import State, TAG_ID_MASK

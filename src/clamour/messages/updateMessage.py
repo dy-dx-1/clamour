@@ -2,9 +2,8 @@
 It is intended to be passed to a ContextManagedQueue as a pickled class + dictionary tuple.
 The state information passed within the message will be used to update the device's EKF."""
 
-from interfaces import Coordinates
+from ..interfaces import Coordinates
 from .types import UpdateType
-
 
 class UpdateMessage:
     def __init__(self, update_type: UpdateType, timestamp: float,

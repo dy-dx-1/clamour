@@ -1,12 +1,11 @@
 import random
 from multiprocessing.synchronize import Lock
-from interfaces.tag import Tag
 
 import struct
 from time import sleep
 
-from interfaces import Anchors, Neighborhood
-from messenger import Messenger
+from ..interfaces import Tag, Anchors, Neighborhood
+from ..messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState

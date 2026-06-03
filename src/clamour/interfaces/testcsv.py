@@ -1,5 +1,5 @@
 import csv, sys
-from anchors import Anchors
+from .anchors import Anchors
 
 def main(argv):
     # The different levels of context managers are required to ensure everything starts and stops cleanly.

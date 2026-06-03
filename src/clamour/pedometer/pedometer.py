@@ -6,7 +6,7 @@ from multiprocessing.synchronize import Lock
 from pypozyx import PozyxSerial, LinearAcceleration, EulerAngles
 from time import sleep, time
 from struct import error as StructError
-from messages import UpdateMessage, UpdateType
+from ..messages import UpdateMessage, UpdateType
 from .pedometerMeasurement import PedometerMeasurement
 
 
