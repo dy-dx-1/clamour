@@ -34,7 +34,7 @@ class DW1000:
         
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
-        print("[OK] Successfully connected DW1000 device.")
+        print("[OK] DW1000 DEVICE READY")
     
     def close(self): 
         self.spi.close() 
@@ -45,10 +45,12 @@ class DW1000:
 
     def __exit__(self, exc_type, exc_val, exc_tb): 
         self.close() 
+        print("DW1000 exited context manager successfully")
 
     def __del__(self):
         try:
             self.close() 
+            print("[INFO] __del__ called on dw1000 obj")
         except: 
             pass 
 
