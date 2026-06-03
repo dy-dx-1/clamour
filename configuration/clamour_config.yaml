@@ -1,0 +1,2 @@
+tag_type: Bitcraze # Manufacturer of the tag. Bitcraze or Pozyx
+tag_id: 11 # Tag IDs must be >10. This value will override any hardware-level ID definition if it exists. Set this to 999 to use the hardware-level definition. 

@@ -2,24 +2,32 @@
 
 import os
 import sys
-from multiprocessing import Lock, Manager
+import yaml 
+from multiprocessing import Lock, Queue
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+from .ekf import EKFManager, CustomOdometry
+from .tdmaNode import TDMANode
+from .contextManagedQueue import ContextManagedQueue
+from .contextManagedProcess import ContextManagedProcess
+from .pedometer import Pedometer
+from .messages import PoseMessage, CustomOdometryMessage
+from .runnableProcess import RunnableProcess
+#from .soundmanager import SoundManager
 
-from ekf import EKFManager, CustomOdometry
-from tdmaNode import TDMANode
-from multiprocessing import Queue
-from contextManagedQueue import ContextManagedQueue
-from contextManagedProcess import ContextManagedProcess
-from pedometer import Pedometer
-from messages import PoseMessage, CustomOdometryMessage
-from runnableProcess import RunnableProcess
-#from soundmanager import SoundManager
+from .interfaces import PozyxTag, BitcrazeTag
 
-from interfaces import PozyxTag, BitcrazeTag
-TAG_TYPE = "Pozyx" # TODO: to be put in a config file later 
+### Loading config file 
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+print(f"{PROJECT_ROOT=}")
+CONFIG_PATH = os.path.join(PROJECT_ROOT, 'configuration', 'clamour_config.yaml')
 
+with open(CONFIG_PATH, 'r') as f: # NOTE: maybe interesting to add error handling/checks in future. For now assuming easy enough to read and debug. 
+    cfg = yaml.safe_load(f) 
 
+TAG_TYPE = cfg['tag_type'] 
+TAG_ID = cfg['tag_id']
+# NOTE: when coming back, add context managers to properly define how to load IDs
+# NOTE: then add more to the config file. 
 def keep_alive(process: RunnableProcess) -> None:
     while True:
         try:
