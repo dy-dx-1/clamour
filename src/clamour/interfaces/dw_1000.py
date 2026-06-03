@@ -4,7 +4,9 @@ import time
 class DW1000: 
     """
     Class defining interactions with the Decawave DW1000 UWB chip through SPI.
-    Always instanciate with a context manager to ensure that the connection is properly closed. 
+    Communicates in SPI mode 0. 
+    
+    IMPORTANT: Use a context manager to ensure that the connection is properly closed. 
     """
     def __init__(self, bus:int, cs:int): 
         self.spi = spidev.SpiDev() 
@@ -18,7 +20,7 @@ class DW1000:
         if d_id != ['0xde', '0xca', '0x1', '0x30']:
             print("[ERROR] DW1000 did not return the correct ID. Is it plugged in correctly?")
             print(f"Expected ID: ['0xde', '0xca', '0x1', '0x30'], got {d_id}")
-            self.spi.close() 
+            self.close() 
             quit() 
         
         ## Checking CLK PLL locked and device completed INIT mode 
@@ -27,23 +29,26 @@ class DW1000:
         slp2init = self.hex_to_octet(cfg[2])[0] # last bit of 2nd octet
         if not (cplock and slp2init): 
             print("[ERROR] DW1000 did not lock CLK PLL and/or did not reach INIT successfully. Try replugging it?")
-            self.spi.close() 
+            self.close() 
             quit() 
         
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
         print("[OK] Successfully connected DW1000 device.")
     
+    def close(self): 
+        self.spi.close() 
+        print("[INFO] DW1000 connection closed")
+
     def __enter__(self):
         return self 
 
     def __exit__(self, exc_type, exc_val, exc_tb): 
-        self.spi.close() 
-        print("DW1000 context manager exited. Connection closed successfully.")
+        self.close() 
 
     def __del__(self):
         try:
-            self.spi.close() 
+            self.close() 
         except: 
             pass 
 
