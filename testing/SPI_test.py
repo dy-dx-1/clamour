@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from rich import print
 
 # Add parent directory to sys.path
 parent_dir = str(Path(__file__).resolve().parent.parent)
@@ -9,7 +10,9 @@ if parent_dir not in sys.path:
 from src.clamour.interfaces.dw_1000 import DW1000 
 
 with DW1000(bus=0, cs=0) as dw:
-    d_id = dw.read_register(0x00, 4) 
-    eui = dw.read_register(0x01, 8)
-    print(f"{d_id}")
+    d_id = dw.read_register([0x00], 4) 
+    eui = dw.read_register([0x01], 8)
+    print(f"{d_id=}")
     print(f"{eui=}")
+    pmsc = dw.read_register([0x76, 0x00], 4) 
+    print(f"{pmsc=}")

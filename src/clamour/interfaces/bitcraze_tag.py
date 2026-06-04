@@ -57,11 +57,6 @@ class BitcrazeTag(Tag):
         self.device_list = [] 
 
     def resetSystem(self) -> None:
-        """
-        Closes and opens the serial connection. 
-
-        At the moment, I don't think it's needed. This function is only used in messenger.py/handle_error(), which itself is seemingly never called (?). 
-        """
         pass 
 
     def printCurrentError(self, function_name:str) -> bool:

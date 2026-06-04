@@ -16,7 +16,7 @@ class DW1000:
         self.spi.mode = 0b00            # GPIO 5 and 6 dictate the mode, should be untouched 
         
         ## Checking device ID is expected for DW1000 
-        d_id = self.read_register(0x00, 4, reverse=True) 
+        d_id = self.read_register([0x00], 4, reverse=True) 
         if d_id != ['0xde', '0xca', '0x1', '0x30']:
             print("[ERROR] DW1000 did not return the correct ID. Is it plugged in correctly?")
             print(f"Expected ID: ['0xde', '0xca', '0x1', '0x30'], got {d_id}")
@@ -24,7 +24,7 @@ class DW1000:
             quit() 
         
         ## Checking CLK PLL locked and device completed INIT mode 
-        cfg = self.read_register(0x0F, 5) 
+        cfg = self.read_register([0x0F], 5) 
         cplock = self.hex_to_octet(cfg[0])[6] # 2nd bit of 0th octet
         slp2init = self.hex_to_octet(cfg[2])[0] # last bit of 2nd octet
         if not (cplock and slp2init): 
@@ -62,20 +62,20 @@ class DW1000:
         # TODO: add <0xFF checks 
         return f"{int(hex_str, base=16):08b}"
     
-    def read_register(self, header:bytes, length:int, reverse:bool=False)->list[str]: 
+    def read_register(self, header:list, length:int, reverse:bool=False)->list[str]: 
         """
         Reads the value of a register. 
         Args: 
-            Header: Header of the transaction. Points to register and any subaddressings.
+            Header: 1 to 3 octet header of the transaction in list format
             Length: Size of register in octets
             Reverse: Reverse output. By default, read is done LSB first as specified in DW1000 user manual.  
         Returns: 
             List of hex values read from the register. 
         """
-        if type(header) != int or type(length) != int or type(reverse) != bool: 
+        if type(header) != list or type(length) != int or type(reverse) != bool: 
             print("[ERROR] Unexpected type. Check your args.")
             return None 
-        response = self.spi.xfer2([header] + [0]*length) # xfer2 is supposed to keep CS pressed for the entire transaction, although some sources differ, I use it to be safe. At worst its equivalent to xfer 
-        response = [hex(octet) for octet in response][1:] # throwing away the header
+        response = self.spi.xfer2(header + [0]*length) # xfer2 is supposed to keep CS pressed for the entire transaction, although some sources differ, I use it to be safe. At worst its equivalent to xfer 
+        response = [hex(octet) for octet in response][len(header):] # throwing away the header
         if reverse: response.reverse() 
         return response
