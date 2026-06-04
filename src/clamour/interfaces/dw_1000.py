@@ -16,7 +16,7 @@ class DW1000:
         self.spi.mode = 0b00            # GPIO 5 and 6 dictate the mode, should be untouched 
         
         ## Checking device ID is expected for DW1000 
-        d_id = self.read_register([0x00], 4, reverse=True) 
+        d_id = self.read_register([0x00], 4, reverse=True)
         if d_id != ['0xde', '0xca', '0x1', '0x30']:
             print("[ERROR] DW1000 did not return the correct ID. Is it plugged in correctly?")
             print(f"Expected ID: ['0xde', '0xca', '0x1', '0x30'], got {d_id}")
@@ -33,7 +33,7 @@ class DW1000:
             quit() 
         
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
-        self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
+        #self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
         print("[OK] DW1000 DEVICE READY")
     
     def close(self): 
@@ -62,20 +62,64 @@ class DW1000:
         # TODO: add <0xFF checks 
         return f"{int(hex_str, base=16):08b}"
     
-    def read_register(self, header:list, length:int, reverse:bool=False)->list[str]: 
+    def read_register(self, header:list, length:int, reverse:bool=False, return_ints:bool=False)->list[str]: 
         """
         Reads the value of a register. 
         Args: 
-            Header: 1 to 3 octet header of the transaction in list format
-            Length: Size of register in octets
-            Reverse: Reverse output. By default, read is done LSB first as specified in DW1000 user manual.  
+            header: 1 to 3 octet header of the transaction in list format
+            length: Size of register in octets
+            reverse: Reverse output. By default, read is done LSB first as specified in DW1000 user manual.  
+            return_ints: Return int values instead of strings 
         Returns: 
-            List of hex values read from the register. 
+            List of values read from the register. 
         """
         if type(header) != list or type(length) != int or type(reverse) != bool: 
-            print("[ERROR] Unexpected type. Check your args.")
+            print("[ERROR] Unexpected type in read_register. Check your args.")
             return None 
         response = self.spi.xfer2(header + [0]*length) # xfer2 is supposed to keep CS pressed for the entire transaction, although some sources differ, I use it to be safe. At worst its equivalent to xfer 
         response = [hex(octet) for octet in response][len(header):] # throwing away the header
         if reverse: response.reverse() 
+        if return_ints: response = [int(h, base=16) for h in response]
         return response
+    
+    def write_register(self, header:list, data:list)->None: 
+        """
+        Writes values to a register. 
+        Args: 
+            header: 1 to 3 octet header of the transaction in list format
+            data: list of octets to write to the register 
+        """
+        if type(header) != list or type(data) != list:
+            print("[ERROR] Unexpected type in write_register. Check your args.")
+            return None 
+        self.spi.xfer2(header + data) 
+        return 
+
+    def soft_reset(self, rx_only:bool=False): 
+        """
+        Performs a soft reset of the IC with the SOFTRESET register, as specified by the user manual. 
+        Will reset the IC TX, RX, Host Interface and the PMSC. 
+        Args: 
+            rx_only: Whether to only reset the rx components 
+        """   
+        # First we get the initial configuration to ensure we don't overwrite bits 
+        pmsc = self.read_register([0x76, 0x00], 4, return_ints=True) 
+        # should be smthing like: [0, 2, 48, 240]
+        print(f"Initial pmsc: {pmsc}")
+        # Setting SYSCLKS to 01 
+        pmsc[0] = (pmsc[0] & 0b11111100) | 0x01 # turning first 2 bits to 0 and then 01 
+        self.write_register([0xF6, 0x00], pmsc) 
+        # Clearing SOFTRESET to all zeros 
+        pmsc[3] = (pmsc[3] & 0x0F) | 0x00
+        self.write_register([0xF6, 0x00], pmsc)
+        # Waiting a bit 
+        time.sleep(0.01) 
+        # Setting SOFTRESET to all ones 
+        pmsc[3] = (pmsc[3] & 0x0F) | 0xF0
+        self.write_register([0xF6, 0x00], pmsc) 
+        # Setting SYSCLKS back to 00, else comm is ruined 
+        pmsc[0] = (pmsc[0] & 0b11111100) | 0x00
+        self.write_register([0xF6, 0x00], pmsc) 
+        
+        # TODO: add init checks here too 
+        print("[INFO] Soft reset of DW1000 completed.")
