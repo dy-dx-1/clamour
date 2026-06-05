@@ -13,9 +13,4 @@ with DW1000(bus=0, cs=0) as dw:
     d_id = dw.read_register([0x00], 4) 
     eui = dw.read_register([0x01], 8)
     print(f"{d_id=}")
-    print(f"{eui=}")
-    dw.soft_reset() 
-    d_id = dw.read_register([0x00], 4)
-    pmsc = dw.read_register([0x76, 0x00], 4, return_ints=True) 
-    print(f"{d_id=}")
-    print(f"{pmsc=}")
+ 
