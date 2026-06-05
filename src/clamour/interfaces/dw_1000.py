@@ -43,9 +43,10 @@ class DW1000:
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
 
-    def close(self): 
+    def close(self, verbose=True): 
         self.spi.close() 
-        print("[INFO] DW1000 connection closed")
+        if verbose: 
+            print("[INFO] DW1000 connection closed")
 
     def __enter__(self):
         return self 
@@ -56,7 +57,7 @@ class DW1000:
 
     def __del__(self):
         try:
-            self.close() 
+            self.close(verbose=False) 
             print("[INFO] __del__ called on dw1000 obj")
         except: 
             pass 
@@ -99,7 +100,6 @@ class DW1000:
             print("[ERROR] Unexpected type in write_register. Check your args.")
             return None 
         self.spi.xfer2(header + data) 
-        return 
 
     def soft_reset(self, rx_only:bool=False): 
         """
