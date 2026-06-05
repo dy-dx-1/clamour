@@ -1,8 +1,5 @@
 #!/usr/bin/python3
 
-import os
-import sys
-import yaml 
 from multiprocessing import Lock, Queue
 
 from .ekf import EKFManager, CustomOdometry
@@ -13,26 +10,21 @@ from .pedometer import Pedometer
 from .messages import PoseMessage, CustomOdometryMessage
 from .runnableProcess import RunnableProcess
 #from .soundmanager import SoundManager
-
 from .interfaces import PozyxTag, BitcrazeTag
 
-#################################################### Loading config file 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-CONFIG_PATH = os.path.join(PROJECT_ROOT, 'configuration', 'clamour_config.yaml')
+#################################################### CONFIG PARAMETERS
+from .config import TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS
 
-with open(CONFIG_PATH, 'r') as f: # NOTE: maybe interesting to add error handling/checks in future. For now assuming easy enough to read and debug. 
-    cfg = yaml.safe_load(f) 
-
-match cfg['tag_type']:
+match TAG_TYPE:
     case "Bitcraze": 
-        TAG_FACTORY = lambda: BitcrazeTag(tag_id = cfg['tag_id'], dw1000_bus = cfg['dw1000_bus'], dw1000_cs = cfg['dw1000_cs'])
+        TAG_FACTORY = lambda: BitcrazeTag(tag_id = TAG_ID, dw1000_bus = DW1000_BUS, dw1000_cs = DW1000_CS)
     case "Pozyx": 
         # TODO NOTE: pozyx doesn't currently support setting IDs through config file. 
         TAG_FACTORY = lambda: PozyxTag() 
     case _: 
-        raise ValueError(f"Invalid tag type: {cfg['tag_type']}. Check your config file.")
+        raise ValueError(f"Invalid tag type: {TAG_TYPE}. Check your config file.")
 
-#################################################### Clamour class 
+#################################################### CLAMOUR
 def keep_alive(process: RunnableProcess) -> None:
     while True:
         try:

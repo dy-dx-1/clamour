@@ -2,17 +2,8 @@
 This file defines the printing function to use in Clamour. 
 It uses the rich module for clearer printing and allows for clearer terminal output. 
 """
-import os 
-import yaml 
 from typing import Literal
-
-
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-CONFIG_PATH = os.path.join(PROJECT_ROOT, 'configuration', 'clamour_config.yaml') 
-
-# TODO check if can move elsewhere to avoid multiple opens 
-with open(CONFIG_PATH, 'r') as f: # NOTE: maybe interesting to add error handling/checks in future. For now assuming easy enough to read and debug. 
-    cfg = yaml.safe_load(f) 
+from .config import SUPPRESS_ALL_MSGS, DEVICE_MSGS, TDMA_MSGS, LOC_MSGS
 
 def print(text:str, status:Literal["ok", "info", "error"], type:Literal["device_mgt", "tdma", "localization"]): 
     """ 
@@ -22,7 +13,7 @@ def print(text:str, status:Literal["ok", "info", "error"], type:Literal["device_
         status: Defines the type of update 
         type:   Specifies the affected functionality 
     """
-    if cfg['suppress_all_msgs']: 
+    if SUPPRESS_ALL_MSGS: 
         return 
     
     if status == "ok": 
