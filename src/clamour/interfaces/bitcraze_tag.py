@@ -3,10 +3,6 @@ from .containers import Coordinates, Angles, DeviceCoordinates
 from .dw_1000 import DW1000
 
 from typing import Literal
-from pathlib import Path
-
-import time 
-import serial
 
 
 class BitcrazeTag(Tag):
@@ -57,7 +53,8 @@ class BitcrazeTag(Tag):
         self.device_list = [] 
 
     def resetSystem(self) -> None:
-        pass 
+        self._dw.soft_reset() 
+        print("[INFO] BitcrazeTag was reset")
 
     def printCurrentError(self, function_name:str) -> bool:
         # NOTE: This function cannot be used in the same way as originally intended with Pozyx
