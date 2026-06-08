@@ -42,7 +42,7 @@ class DW1000:
 
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
-
+    
     def close(self, verbose=True): 
         self.spi.close() 
         if verbose: 
@@ -137,3 +137,67 @@ class DW1000:
         # Reset done, run our init checks and set speed back to 20MHz
         self.check_device_ready() 
         print("[INFO] Soft reset of DW1000 completed.")
+
+    @staticmethod
+    def check_valid_uwb_config(channel:int, PRF:int, preamble_code:int)->bool: 
+        """ 
+        Checks if a specific UWB configuration is valid based on the DW1000 user manual. 
+        """
+        if type(channel)!=int or type(PRF)!=int or type(preamble_code)!=int: 
+            return False 
+        if channel not in [1,2,3,4,5,7]: 
+            return False 
+        if not (PRF==64 or PRF==16):
+            return False 
+        ## Checking preambles (p.202)
+        if PRF==64 and channel!=4 and channel!=7: 
+            allowed_preambles = [9,10,11,12] 
+        elif PRF==64 and (channel==4 or channel==7):
+            allowed_preambles = [17,18,19,20] 
+        elif PRF==16 and channel==1: 
+            allowed_preambles = [1, 2] 
+        elif PRF==16 and (channel==2 or channel==5): 
+            allowed_preambles = [3, 4] 
+        elif PRF==16 and channel==3: 
+            allowed_preambles = [5, 6] 
+        elif PRF==16 and (channel==4 or channel==7): 
+            allowed_preambles = [7, 8] 
+        if not preamble_code in allowed_preambles:
+            return False 
+        ## If all passed, everything ok 
+        return True 
+
+    def config_uwb_settings(self, channel:int, PRF:int, preamble_code:int)->None: 
+        """
+        Configures the DW1000's UWB settings.
+        """
+        if not self.check_valid_uwb_config(channel, PRF, preamble_code):
+            print("[ERROR] Unsupported UWB config for DW1000, check DW1000.config_uwb_settings()")
+            return 
+        og_cfg = self.read_register([0x1F], 4, return_ints=True) 
+        new_cfg = 0x00_00_00_00
+
+        ## First byte is the channel for RX and TX 
+        byte1 = int(f"0x{channel}{channel}", base=16) 
+        new_cfg |= byte1
+        ## Second byte is entirely reserved, we don't change it 
+        byte2 = og_cfg[1] 
+        new_cfg |= byte2 << 8 # shifting left by 8 to match register layout 
+        ## Now we look at bits 19-16 
+        # RXPRF (bit 19-18) will set the PRF 
+        # DWSFD (bit 17) left at 0 to use std DW SFD. Also leaving RNSSFD and TNSSFD at 0 for this. 
+        # Reserved bit 16 is left unchanged. 
+            # To get the value of bit16, we'll have to modify whole octet (23-16)
+            # but it's ok, we'll just write over it next step, since TX_PCODE is part of it
+        if PRF==16: # 16MHz: RXPRF at 0b01
+            prf_cfg = (og_cfg[2] & 0x01) | 0x04 
+        elif PRF==64: # 64MHz: RXPRF at 0b10
+            prf_cfg = (og_cfg[2] & 0x01) | 0x08
+        new_cfg |= prf_cfg << 16  
+        ## Now writing TX_PCODE and RX_PCODE (bits 31-22) 
+        new_cfg |= preamble_code << 22 
+        new_cfg |= preamble_code << 27 
+
+        ## Finally splitting this into bytes and sending 
+        chan_cfg = [new_cfg & 0xFF, (new_cfg>>8) & 0xFF, (new_cfg>>16) & 0xFF, (new_cfg>>24) & 0xFF]
+        self.write_register([0x9F], chan_cfg) 
