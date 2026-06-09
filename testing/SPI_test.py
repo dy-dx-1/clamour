@@ -12,9 +12,8 @@ from src.clamour.interfaces.dw_1000 import DW1000
 with DW1000(bus=0, cs=0) as dw:
     #d_id = dw.read_register([0x00], 4) 
     #print(f"{d_id=}")
-    cc = dw.read_register([0x1F], 4) 
-    print(cc) 
-    #dw.config_uwb_settings(2, 64, 9)
+    dw.config_uwb_settings(2, 64, 9, 6.8, 128)
+    print(dw.read_register([0x08], 5, return_ints=False))
     #cc = dw.read_register([0x1F], 4)
     #print(cc) 
  

@@ -1,5 +1,6 @@
 import spidev 
 import time 
+from typing import Literal
 
 class DW1000: 
     """
@@ -70,7 +71,7 @@ class DW1000:
         # TODO: add <0xFF checks 
         return f"{int(hex_str, base=16):08b}"
     
-    def read_register(self, header:list, length:int, reverse:bool=False, return_ints:bool=False)->list[str]: 
+    def read_register(self, header:list, length:int, reverse:bool=False, return_ints:bool=False)->list[str|int]: 
         """
         Reads the value of a register. 
         Args: 
@@ -139,7 +140,7 @@ class DW1000:
         print("[INFO] Soft reset of DW1000 completed.")
 
     @staticmethod
-    def check_valid_uwb_config(channel:int, PRF:int, preamble_code:int)->bool: 
+    def check_valid_uwb_config(channel:int, PRF:int, preamble_code:int, bitrate:float, preamble_length:int)->bool: 
         """ 
         Checks if a specific UWB configuration is valid based on the DW1000 user manual. 
         """
@@ -164,19 +165,41 @@ class DW1000:
             allowed_preambles = [7, 8] 
         if not preamble_code in allowed_preambles:
             return False 
+        ## Checking bitrate
+        if bitrate not in [110, 850, 6.8, 6, 7]: 
+            return False 
+        ## Preamble length 
+        if preamble_length not in [64,128,256,512,1024,1536,2048,4096]: 
+            return False 
         ## If all passed, everything ok 
         return True 
 
-    def config_uwb_settings(self, channel:int, PRF:int, preamble_code:int)->None: 
+    def config_uwb_settings(self, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], preamble_code:int, bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096])->None: 
         """
-        Configures the DW1000's UWB settings.
+        Configures the DW1000's UWB settings. Modifies the following registers:
+            - 0x1F    - Channel Control
+            - 0x08    - Transmit Frame Control 
+            - 0x28:0B - RF_RXCTRLH
+            - 0x28:0C - RF_TXCTRL 
+            - 0x2A:0B - TC_PGDELAY
+            - 0x2B:07 - FS_PLLCFG
+        
+        Args: 
+            - channel: Communication channel 
+            - PRF: Pulse repetition frequency (16 or 64MHz) 
+            - preamble_code: Code associated to PRF, see user manual. 
+            - bitrate: Bitrate, 110kps, 850kps or 6.8Mbps (latter can be passed as 6, 7 or 6.8, all correspond to 6.8)
+            - preamble_length: in symbols 
         """
-        if not self.check_valid_uwb_config(channel, PRF, preamble_code):
+        if not self.check_valid_uwb_config(channel, PRF, preamble_code, bitrate, preamble_length):
+            # This ensures that the combination of values is valid 
+            # and simplifies following if/elses 
             print("[ERROR] Unsupported UWB config for DW1000, check DW1000.config_uwb_settings()")
             return 
+        
+        ###################### 0x1F - Channel Control ######################
         og_cfg = self.read_register([0x1F], 4, return_ints=True) 
         new_cfg = 0x00_00_00_00
-
         ## First byte is the channel for RX and TX 
         byte1 = int(f"0x{channel}{channel}", base=16) 
         new_cfg |= byte1
@@ -197,7 +220,113 @@ class DW1000:
         ## Now writing TX_PCODE and RX_PCODE (bits 31-22) 
         new_cfg |= preamble_code << 22 
         new_cfg |= preamble_code << 27 
-
         ## Finally splitting this into bytes and sending 
         chan_cfg = [new_cfg & 0xFF, (new_cfg>>8) & 0xFF, (new_cfg>>16) & 0xFF, (new_cfg>>24) & 0xFF]
         self.write_register([0x9F], chan_cfg) 
+
+        ###################### 0x08 - Transmit Frame Control ######################
+        og_cfg = self.read_register([0x08], 5, return_ints = True) 
+        new_cfg = 0x00_00_00_00_00 
+        # TFLEN, TFLE and R stay unchanged (bits 0-12) 
+        new_cfg |= ((og_cfg[1]<<8) | og_cfg[0])  & 0x1FFF # mask only keeps bits 0-12 
+        # TXBR sets bitrate (bits 13-14)
+        if bitrate == 110:
+            new_cfg |= 0b00<<13 
+        elif bitrate == 850:
+            new_cfg |= 0b01<<13 
+        else: # check_valid_uwb_config ensures other values are 6.8, 6 or 7
+            new_cfg |= 0b10<<13 
+        # TR (bit 15) unchanged 
+        new_cfg |= (og_cfg[1]<<8) & 0x8000
+        # TXPRF - Sets PRF (bits 16-17)
+        if PRF==16: 
+            new_cfg |= 0b01<<16
+        elif PRF==64: 
+            new_cfg |= 0b10<<16 
+        # TXPSR and PE - Sets preamble length (bits 18-21)
+        if preamble_length==64: 
+            bits = 0b0001
+        elif preamble_length==128: 
+            bits = 0b0101
+        elif preamble_length==256: 
+            bits = 0b1001
+        elif preamble_length==512: 
+            bits = 0b1101
+        elif preamble_length==1024: 
+            bits = 0b0010
+        elif preamble_length==1536: 
+            bits = 0b0110
+        elif preamble_length==2048: 
+            bits = 0b1010
+        elif preamble_length==4096: 
+            bits = 0b0011
+        new_cfg |= bits<<18
+        # Not touching the rest (bits 22-40)
+        new_cfg |= ((og_cfg[2] & 0xC0)<<16) # bits 22 and 23 
+        new_cfg |= og_cfg[3]<<24 
+        new_cfg |= og_cfg[4]<<32
+        ## Splitting into bytes and sending 
+        new_cfg = [new_cfg&0xFF, (new_cfg>>8)&0xFF, (new_cfg>>16)&0xFF, (new_cfg>>24)&0xFF, (new_cfg>>32)&0xFF]
+        self.write_register([0x88], new_cfg)        
+
+        ###################### 0x28:0B, 0x28:0C, 0x2A:0B and ######################
+        ###################### 0x2B:07, 0x2B:0B,  ######################
+        og_0x28_B = self.read_register([0x68, 0x0B], 1, return_ints=True)
+        og_0x28_C = self.read_register([0x68, 0x0C], 4, return_ints=True) 
+        og_0x2A = self.read_register([0x6A, 0x0B], 1, return_ints=True)
+        og_0x2B_7 = self.read_register([0x6B, 0x07], 4, return_ints=True)
+        og_0x2B_B = self.read_register([0x6B, 0x0B], 1, return_ints=True)
+
+        if channel == 1: 
+            new_0x28_B = [0xD8]
+            new_0x28_C = [0x40, 0x5C, 0x00, 0x00]
+            new_0x2A = [0xC9]
+            new_0x2B_7 = [0x07, 0x04, 0x00, 0x09]
+            new_0x2B_B = [0x1E]
+        elif channel == 2: 
+            new_0x28_B = [0xD8]
+            new_0x28_C = [0xA0, 0x5C, 0x04, 0x00]
+            new_0x2A = [0xC2]
+            new_0x2B_7 = [0x08, 0x05, 0x40, 0x08]
+            new_0x2B_B = [0x26]
+        elif channel == 3: 
+            new_0x28_B = [0xD8]
+            new_0x28_C = [0xC0, 0x6C, 0x08, 0x00]
+            new_0x2A = [0xC5]
+            new_0x2B_7 = [0x09, 0x10, 0x40, 0x08]
+            new_0x2B_B = [0x5E]
+        elif channel == 4: 
+            new_0x28_B = [0xBC]
+            new_0x28_C = [0x80, 0x5C, 0x04, 0x00]
+            new_0x2A = [0x95]
+            new_0x2B_7 = [0x08, 0x05, 0x40, 0x08]
+            new_0x2B_B = [0x26]
+        elif channel == 5: 
+            new_0x28_B = [0xD8]
+            new_0x28_C = [0xE0, 0x3F, 0x1E, 0x00]
+            new_0x2A = [0xC0]
+            new_0x2B_7 = [0x1D, 0x04, 0x00, 0x08]
+            new_0x2B_B = [0xA6]
+        elif channel == 7:
+            new_0x28_B = [0xBC]
+            new_0x28_C = [0xE0, 0x7D, 0x1E, 0x00]
+            new_0x2A = [0x93]
+            new_0x2B_7 = [0x1D, 0x04, 0x00, 0x08]
+            new_0x2B_B = [0xA6]
+
+        if og_0x28_B != new_0x28_B:
+            self.write_register([0xE8, 0x0B], new_0x28_B)
+        if og_0x28_C!=new_0x28_C: 
+            self.write_register([0xE8, 0x0C], new_0x28_C)
+            # NOTE: for some reason, the last (0x00) byte I send doesn't seem to affect it
+            # it always reads as 0xDE after the operation. But all other bytes are good. 
+            # i assume those bytes are just not writeable or are overwritten immediately. 
+        if og_0x2A!=new_0x2A:
+            self.write_register([0xEA, 0x0B], new_0x2A)
+        if og_0x2B_7!=new_0x2B_7: 
+            self.write_register([0xEB, 0x07], new_0x2B_7)
+        if og_0x2B_B!=new_0x2B_B:
+            self.write_register([0xEB, 0x0B], new_0x2B_B)
+        
+        
+       
