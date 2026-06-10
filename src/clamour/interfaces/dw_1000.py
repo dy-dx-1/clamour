@@ -171,6 +171,16 @@ class DW1000:
         ## Preamble length 
         if preamble_length not in [64,128,256,512,1024,1536,2048,4096]: 
             return False 
+        ## Preamble and bitrate combination (for DRX_TUNE1b, p.133 of user manual)
+        if (preamble_length>1024) and (bitrate==110): 
+            pass # ok 
+        elif (128<=preamble_length<=1024) and (bitrate!=110):
+            pass # ok
+        elif preamble_length==64 and bitrate!=110 and bitrate!=850: 
+            pass # ok 
+        else: 
+            print("Invalid bitrate-preamble config for DRX_TUNE1b")
+            return False 
         ## If all passed, everything ok 
         return True 
 
@@ -183,6 +193,10 @@ class DW1000:
             - 0x28:0C - RF_TXCTRL 
             - 0x2A:0B - TC_PGDELAY
             - 0x2B:07 - FS_PLLCFG
+            - 0x27:02 - DRX_TUNE0b
+            - 0x27:04 - DRX_TUNE1a
+            - 0x27:06 - DRX_TUNE1b
+            - 0x27:08 - DRX_TUNE2
         
         Args: 
             - channel: Communication channel 
@@ -273,7 +287,7 @@ class DW1000:
         ###################### 0x2B:07, 0x2B:0B,  ######################
         og_0x28_B = self.read_register([0x68, 0x0B], 1, return_ints=True)
         og_0x28_C = self.read_register([0x68, 0x0C], 4, return_ints=True) 
-        og_0x2A = self.read_register([0x6A, 0x0B], 1, return_ints=True)
+        og_0x2A   = self.read_register([0x6A, 0x0B], 1, return_ints=True)
         og_0x2B_7 = self.read_register([0x6B, 0x07], 4, return_ints=True)
         og_0x2B_B = self.read_register([0x6B, 0x0B], 1, return_ints=True)
 
@@ -328,5 +342,61 @@ class DW1000:
         if og_0x2B_B!=new_0x2B_B:
             self.write_register([0xEB, 0x0B], new_0x2B_B)
         
-        
-       
+        ###################### 0x27:02 ######################
+        # NOTE: Assuming only using standard SFD! 
+        tune0b = self.read_register([0x67, 0x02], 2, return_ints=True)
+        if bitrate == 110:
+            new_cfg = [0x0A, 0x00]
+        elif bitrate == 850:
+            new_cfg = [0x01, 0x00]
+        else: # check_valid_uwb_config ensures other values are 6.8, 6 or 7
+            new_cfg = [0x01, 0x00] 
+        if tune0b!=new_cfg: 
+            self.write_register([0xE7, 0x02], new_cfg) 
+        ###################### 0x27:04 ######################
+        tune1a = self.read_register([0x67, 0x04], 2, return_ints=True)
+        if PRF==16: 
+            new_cfg = [0x87, 0x00]
+        elif PRF==64:
+            new_cfg = [0x8D, 0x00]
+        if tune1a!=new_cfg:
+            self.write_register([0xE7, 0x04], new_cfg)
+        ###################### 0x27:06 ######################
+        tune1b = self.read_register([0x67, 0x06], 2, return_ints=True)
+        if (preamble_length>1024) and (bitrate==110): 
+            new_cfg = [0x64, 0x00]
+        elif (128<=preamble_length<=1024) and (bitrate!=110):
+            new_cfg = [0x20, 0x00]
+        elif preamble_length==64 and bitrate!=110 and bitrate!=850: 
+            new_cfg = [0x10, 0x00]
+        if tune1b!=new_cfg: 
+            self.write_register([0xE7, 0x06], new_cfg)
+        ###################### 0x27:08 ######################
+        tune2 = self.read_register([0x67, 0x08], 4, return_ints=True)
+        # NOTE: this sets PAC size, using recommended # of Table 5 user manual (p.29)
+        if preamble_length<=128: 
+            PAC_size = 8 
+            if PRF==16:
+                new_cfg = [0x2D,0x00,0x1A,0x31] 
+            elif PRF==64: 
+                new_cfg = [0x6B,0x00,0x3B,0x31] 
+        elif preamble_length<=512: 
+            PAC_size = 16 
+            if PRF==16:
+                new_cfg = [0x52,0x00,0x1A,0x33]
+            elif PRF==64: 
+                new_cfg = [0xBE,0x00,0x3B,0x33]
+        elif preamble_length==1024: 
+            PAC_size = 32 
+            if PRF==16:
+                new_cfg = [0x9A,0x00,0x1A,0x35]
+            elif PRF==64: 
+                new_cfg = [0x5E,0x01,0x3B,0x35]
+        elif preamble_length>=1536: 
+            PAC_size = 64 
+            if PRF==16:
+                new_cfg = [0x1D,0x01,0x1A,0x37]
+            elif PRF==64: 
+                new_cfg = [0x96,0x02,0x3B,0x37]
+        if tune2!=new_cfg: 
+            self.write_register([0xE7, 0x08], new_cfg)
