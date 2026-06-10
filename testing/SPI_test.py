@@ -13,7 +13,7 @@ with DW1000(bus=0, cs=0) as dw:
     #d_id = dw.read_register([0x00], 4) 
     #print(f"{d_id=}")
     #dw.config_uwb_settings(2, 64, 9, 6.8, 128)
-    print(dw.read_register([0x6D, 0x06], 2, return_ints=False))
+    print(dw.read_register([0x6C, 0x00], 2, return_ints=False))
     #cc = dw.read_register([0x1F], 4)
     #print(cc) 
  

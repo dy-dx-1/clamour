@@ -41,6 +41,28 @@ class DW1000:
             self.close() 
             quit() 
 
+        ## Loading LDE microcode 
+        otp_ctrl = self.read_register([0x6D, 0x06], 2, return_ints=True)
+        byte2 = (otp_ctrl[1] & 0x7F) | 0x80 
+        self.write_register([0xED, 0x06], [otp_ctrl[0], byte2])
+        for _ in range(5): 
+            time.sleep(0.05) # wait for the code to load, it should go back to 0 
+            otp_ctrl = self.read_register([0x6D, 0x06], 2, return_ints=True)
+            if (otp_ctrl[1] & 0x80)==0:
+                break 
+        else:
+            print("[ERROR] DW1000 did not load LDE microcode successfully in time inside check_device_ready()") 
+            self.close() 
+            quit() 
+        
+        ## Make sure LDE loads after sleep 
+        aon = self.read_register([0x6C, 0x00], 2, return_ints=True)
+        value = aon[0] | (aon[1] << 8)
+        value |= (1 << 11)   # ONW_LLDE
+        new_aon = [value & 0xFF, (value >> 8) & 0xFF]
+        if aon!=new_aon: 
+            self.write_register([0xEC, 0x00], new_aon)
+
         ## If we get here, DW1000 should be in IDLE state, set rate to maximum 
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
     
