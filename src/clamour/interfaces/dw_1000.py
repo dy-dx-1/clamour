@@ -214,7 +214,7 @@ class DW1000:
         self.write_register([0xF6, 0x00], pmsc) 
         
         # Reset done, run our init checks and set speed back to 20MHz
-        self.check_device_ready() 
+        self.prep_device_for_use() 
         print("[INFO] Soft reset of DW1000 completed.")
 
     @staticmethod
