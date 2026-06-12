@@ -67,7 +67,7 @@ class DW1000:
     
     IMPORTANT: Use a context manager to ensure that the connection is properly closed. 
     """
-    def __init__(self, bus:int, cs:int): 
+    def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], preamble_code:int, bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096]): 
         self.spi = spidev.SpiDev() 
         self.spi.open(bus, cs) 
         
@@ -75,6 +75,7 @@ class DW1000:
         self.spi.mode = 0b00              # GPIO 5 and 6 dictate the mode, should be untouched 
         
         self.prep_device_for_use()        # Checks that device initialized properly and sets clock to 20MHz
+        self.config_uwb_settings(channel, PRF, preamble_code, bitrate, preamble_length) # Checks validity of settings and applies them 
         print("[OK] DW1000 DEVICE READY")
     
     def prep_device_for_use(self): 
@@ -218,7 +219,7 @@ class DW1000:
         print("[INFO] Soft reset of DW1000 completed.")
 
     @staticmethod
-    def check_valid_uwb_config(channel:int, PRF:int, preamble_code:int, bitrate:float, preamble_length:int)->bool: 
+    def check_valid_uwb_config(channel:int, PRF:int, bitrate:float, preamble_length:int, preamble_code:int)->bool: 
         """ 
         Checks if a specific UWB configuration is valid based on the DW1000 user manual. 
         """
@@ -262,9 +263,9 @@ class DW1000:
         ## If all passed, everything ok 
         return True 
 
-    def config_uwb_settings(self, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], preamble_code:int, bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096])->None: 
+    def config_uwb_settings(self, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int)->None: 
         """
-        Configures the DW1000's UWB settings. 
+        Configures the DW1000's UWB settings. Validates the settings before applying them. 
         
         ARGS: 
             - channel: Communication channel 
@@ -290,7 +291,7 @@ class DW1000:
             - 0x23:12 - AGC_TUNE3
             - 0x1E    - TX Power
         """
-        if not self.check_valid_uwb_config(channel, PRF, preamble_code, bitrate, preamble_length):
+        if not self.check_valid_uwb_config(channel, PRF, bitrate, preamble_length, preamble_code):
             # This ensures that the combination of values is valid 
             # and simplifies following if/elses 
             print("[ERROR] Unsupported UWB config for DW1000, check DW1000.config_uwb_settings()")
@@ -487,7 +488,7 @@ class DW1000:
         if tx_power != new_cfg: 
             self.write_register([0x1E], new_cfg)
         ###################### DONE! ######################
-        print(f"UWB settings configured.", 
+        print(f"--- DW 1000 UWB settings configured. ---", 
               f"Channel: {channel}", 
               f"Bitrate: {bitrate}",
               f"PRF: {PRF}", 
@@ -496,4 +497,3 @@ class DW1000:
               f"PAC size: {PAC_size}",
               f"**NOTE**: Settings currently only support smart TX power and standard SFD.",
               sep="\n")
-

@@ -14,7 +14,7 @@ from .interfaces import PozyxTag, BitcrazeTag
 
 #################################################### CONFIG PARAMETERS
 from .config import TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS
-
+# TODO: add new UWB config settings into config file in future 
 match TAG_TYPE:
     case "Bitcraze": 
         TAG_FACTORY = lambda: BitcrazeTag(tag_id = TAG_ID, dw1000_bus = DW1000_BUS, dw1000_cs = DW1000_CS)
