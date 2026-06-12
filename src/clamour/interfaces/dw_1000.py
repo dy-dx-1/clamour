@@ -67,7 +67,7 @@ class DW1000:
     
     IMPORTANT: Use a context manager to ensure that the connection is properly closed. 
     """
-    def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], preamble_code:int, bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096]): 
+    def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int): 
         self.spi = spidev.SpiDev() 
         self.spi.open(bus, cs) 
         
@@ -75,7 +75,7 @@ class DW1000:
         self.spi.mode = 0b00              # GPIO 5 and 6 dictate the mode, should be untouched 
         
         self.prep_device_for_use()        # Checks that device initialized properly and sets clock to 20MHz
-        self.config_uwb_settings(channel, PRF, preamble_code, bitrate, preamble_length) # Checks validity of settings and applies them 
+        self.config_uwb_settings(channel, PRF, bitrate, preamble_length, preamble_code) # Checks validity of settings and applies them 
         print("[OK] DW1000 DEVICE READY")
     
     def prep_device_for_use(self): 
@@ -218,6 +218,44 @@ class DW1000:
         self.prep_device_for_use() 
         print("[INFO] Soft reset of DW1000 completed.")
 
+    def listen(self, timeout:float, return_ints=True): 
+        """
+        Sets the DW1000 to RX mode and listens for messages. 
+        Returns the first message found, if any, and closes the connection. 
+        
+        ARGS: 
+            - timeout: Max amount of time [s] to stay listening 
+            - return_ints: Whether to return in hex string format or pure ints
+        """
+        data = None 
+        self.write_register([0x8D], [0, 1]) # enable RX at reg. SYS_CTRL 0x0D
+        start = time.perf_counter() 
+        while (time.perf_counter()-start)<timeout: 
+            # Listen in reg. SYS_STATUS 0x0F 
+            status = self.read_register([0x0F], 5, return_ints=True) 
+            bits8_23 = status[1] | (status[2]<<8) 
+            # Good frames have: RXFCG, RXDFR, RXPHD, LDEDONE, RXSFDD and RXPRD set  
+            if (bits8_23 & 0x006F)==0x006F: # Good frame 
+                # Checking RXFINFO for frame length 
+                rx_finfo = self.read_register([0x10], 4, return_ints=True)
+                rxfle_rxflen = (rx_finfo[0] | (rx_finfo[1]<<8)) & 0x3FF
+                # NOTE: currently not supporting non std operation, so RXFLE should be 0 
+                if rxfle_rxflen>0x7F: # Currently, messages should be <= 127bytes 
+                    print("[WARNING] in DW1000.listen(), received extended data frame (RXFLE!=0). Currently not supporting this, check the message?")
+                # Now reading buffer with frame length 
+                rxfle_rxflen-=2 # throwing away FCS at the end 
+                data = self.read_register([0x11], rxfle_rxflen, return_ints=return_ints)  
+                break 
+            else: 
+                # Either received a bad frame or nothing 
+                # NOTE, TODO: In the future, would be interesting to add more debugging info 
+                # (Checking individually error bits) 
+                # When doing that, also clearing latched bits during iter to make sure checks are properly done 
+                pass 
+        # Disabling RX, this will automatically clear latched bits related to it 
+        self.write_register([0x8D], [0x40])
+        return data 
+    
     @staticmethod
     def check_valid_uwb_config(channel:int, PRF:int, bitrate:float, preamble_length:int, preamble_code:int)->bool: 
         """ 
