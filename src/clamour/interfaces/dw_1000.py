@@ -173,9 +173,9 @@ class DW1000:
 
         ARGS: 
             - header: 1 to 3 octet header of the transaction in list format
-            - data: list of octets to write to the register 
+            - data: List of octets to write to the register (LSB first)
         """
-        if type(header) != list or type(data) != list:
+        if type(header) != list or type(data) != list or type(data[0]) != int:
             print("[ERROR] Unexpected type in write_register. Check your args.")
             return None 
         self.spi.xfer2(header + data) 
@@ -217,6 +217,41 @@ class DW1000:
         # Reset done, run our init checks and set speed back to 20MHz
         self.prep_device_for_use() 
         print("[INFO] Soft reset of DW1000 completed.")
+
+    def transmit(self, data:list, ranging:bool, timeout:float=0.05)->bool: 
+        """
+        Transmits a message with the DW1000. Returns bool on whether was successfully sent. 
+
+        ARGS: 
+            - data: List of bytes to send (LSB first) 
+            - ranging: Bool indicating if ranging type of message
+            - timeout: Max amount of time [s] to wait for confirmed send of message 
+        """
+        ### Writing data to TX buffer 
+        self.write_register([0x89], data)
+        ### Setting frame length in Transmit Frame Control 
+        data_length = len(data) + 2 # adding 2 octets of CRC check 
+        # NOTE: currently not supporting extended data frames, messages shouldn't exceed 127 bytes 
+        if data_length>127: 
+            print("[WARNING] in DW1000.transmit(), data frame exceed 127bytes (TFLE!=0). Currently not supporting this, check the message?")
+            return 
+        curr = self.read_register([0x08], 2, return_ints=True)
+        tx_fctrl = data_length | ((curr[1] & 0x60)<<8)  # TFLEN == data_length, keeping TXBR and 0 TFLE and R 
+        tx_fctrl |= int(ranging)<<15
+        self.write_register([0x88], [tx_fctrl & 0xFF, (tx_fctrl>>8) & 0xFF])
+        ### Starting transmission in System Control Register, this automatically clears TXFRS 
+        self.write_register([0x8D], [0x02])
+        ### Checking if TX completed with TXFRS in SYS_STATUS
+        t1 = time.perf_counter() 
+        while (time.perf_counter()-t1)<timeout: 
+            txfrs = self.read_register([0x0F], 1, return_ints=True)[0] >> 7  
+            if txfrs: 
+                break # DW1000 will return to IDLE automatically 
+        else: 
+            # TODO Can add more in depth inspection of error bits in future 
+            print("[ERROR] Transmit timeout in DW1000.transmit(), returning to IDLE")
+            self.write_register([0x8D], [0x40]) # Force return to IDLE 
+        return bool(txfrs) 
 
     def listen(self, timeout:float, return_ints=True): 
         """
