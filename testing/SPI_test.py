@@ -10,6 +10,7 @@ if parent_dir not in sys.path:
 
 from src.clamour.interfaces.dw_1000 import DW1000 
 
+
 with DW1000(bus=0, cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, preamble_code=9) as dw: 
     tosend = [
         0x41,
@@ -36,6 +37,7 @@ with DW1000(bus=0, cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, pr
         0x1,
         0x66
     ]
+
     tx = dw.transmit(data=tosend, ranging=False) 
     
     msg = dw.listen(timeout=5, return_ints=False)

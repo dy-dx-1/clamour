@@ -16,14 +16,5 @@ a1 = DeviceCoordinates(0, 1)
 a2 = DeviceCoordinates(1, 1) 
 t1 = DeviceCoordinates(13, 0) 
 
-with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0) as bc: 
-    bc.addDevice(a1) 
-    bc.addDevice(a2)
-    bc.addDevice(t1) 
-    print(f"{bc.device_list=}")
-    print(f"{bc.is_anchor(a1.network_id)=}")
-    print(f"{bc.is_anchor(a2.network_id)=}")
-    print(f"{bc.is_anchor(t1.network_id)=}")
-    print(f"{bc.is_anchor(bc.tag_id)=}")
-    bc.clearDevices() 
-    print(f"{bc.device_list=}")
+with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, preamble_code=9) as bc: 
+    print(bc.gen_message_header(1, 'POLL', 3))

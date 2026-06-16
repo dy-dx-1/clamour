@@ -1,6 +1,7 @@
 from .tag import Tag
 from .containers import Coordinates, Angles, DeviceCoordinates
 from .dw_1000 import DW1000
+from ..config import ANCHORS
 
 from typing import Literal
 
@@ -17,12 +18,12 @@ class BitcrazeTag(Tag):
     Attributes: 
         TODO 
     """
-    def __init__(self, tag_id:int, dw1000_bus:int, dw1000_cs:int):
+    def __init__(self, tag_id:int, dw1000_bus:int, dw1000_cs:int, channel:int, PRF:int, bitrate:int, preamble_length:int, preamble_code:int):
         if not tag_id>10: 
             raise Exception("Invalid tag_id for BitcrazeTag. Tag ID must > 10. Check your config file.")
         
         self._id = tag_id 
-        self._dw = DW1000(dw1000_bus, dw1000_cs)
+        self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
         self.device_list = [] 
 
         print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE") 
@@ -38,12 +39,39 @@ class BitcrazeTag(Tag):
     @property
     def tag_id(self)->int:
         return self._id
+    
+    def gen_message_header(self, target_id:int, msg_type:Literal['POLL', 'ANSWER', 'FINAL', 'REPORT'], TWR_seq:int)->list: 
+        """ 
+        Generates the first 7 sections needed for a message from this tag to another BC device.
+
+        These are: [Frame Control (2 bytes), SEQ (1byte), PAN ID (2bytes), Destination Addr (8bytes), Source Addr (8bytes), Msg Type (1 byte), TWR SEQ (1 byte)].
+
+        It's expected the caller of this function will add any remaining info if using REPORT type. 
+
+        Returns None if unsupported args are passed. 
+        """
+        BC_MESSAGE_HEADER = [0x41, 0xDC, 0x00, 0xCF, 0xBC] 
+        SOURCE_ADDR =      [self.tag_id>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
+        DESTINATION_ADDR = [target_id  >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
+        if msg_type == 'POLL': 
+            MSG_TYPE = [0x01] 
+        elif msg_type == 'ANSWER': 
+            MSG_TYPE = [0x02] 
+        elif msg_type == 'FINAL':
+            MSG_TYPE = [0x03]
+        elif msg_type == 'REPORT': 
+            MSG_TYPE = [0x04]
+        else:
+            return None 
+        if TWR_seq>0xFF: 
+            return None 
+        return BC_MESSAGE_HEADER + DESTINATION_ADDR + SOURCE_ADDR + MSG_TYPE + [TWR_seq]
 
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
     def is_anchor(device_id: int) -> bool:
         # NOTE: for BC as of 2026-05-26, I am defining anchors as devices with IDs <=10 
-        # Tags must have any other IDs. BC supports 0-255 in hexadecimal 
+        # Tags must have any other IDs. 
         return device_id<=10 
 
     def addDevice(self, device:DeviceCoordinates) -> None:
@@ -76,6 +104,13 @@ class BitcrazeTag(Tag):
         Returns:
             List of corresponding device IDs (ints) 
         """
+        # Iterating through known (config.py) anchors and checking who responds 
+        for anchor in ANCHORS: 
+            id = anchor['id'] 
+            #poll_msg = self.gen_message_header(target_id=id, msg_type='POLL', TWR_seq=)
+            # NOTE: when back look in firmware for seq generation after poll messages
+            # else add internal counter in BCTag and make sure it loops 
+
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     def sendData(self, destination:int, payload:bytes) -> bool: 
