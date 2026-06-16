@@ -4,7 +4,15 @@ from .dw_1000 import DW1000
 from ..config import ANCHORS
 
 from typing import Literal
+import time  
 
+TWR_POLL   = 0x01
+TWR_ANSWER = 0x02 
+TWR_FINAL  = 0x03 
+TWR_REPORT = 0x04
+
+DW_PAUSE_DELAY = 0.005    # Delay used to give some time for the DW to reset between loops 
+DW_LISTEN_TIMEOUT = 0.015 # Delay used to wait during RX 
 
 class BitcrazeTag(Tag):
     """
@@ -43,6 +51,11 @@ class BitcrazeTag(Tag):
     
     @property
     def TWR_seq(self)->int: 
+        """ 
+        TWR sequence identifier. Keeps track of each TWR transaction between 2 particular devices. 
+        Should be kept constant for the entirety of a TWR exchange between the devices. 
+        Only access through this property to ensure the counter prevents duplicate identifiers for separate transactions.
+        """
         self._twr_seq = (self._twr_seq + 1) & 0xFF  # Go from 0 to 255 and then restart 
         return self._twr_seq 
 
@@ -60,13 +73,13 @@ class BitcrazeTag(Tag):
         SOURCE_ADDR =      [self.tag_id>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
         DESTINATION_ADDR = [target_id  >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
         if msg_type == 'POLL': 
-            MSG_TYPE = [0x01] 
+            MSG_TYPE = [TWR_POLL] 
         elif msg_type == 'ANSWER': 
-            MSG_TYPE = [0x02] 
+            MSG_TYPE = [TWR_ANSWER] 
         elif msg_type == 'FINAL':
-            MSG_TYPE = [0x03]
+            MSG_TYPE = [TWR_FINAL]
         elif msg_type == 'REPORT': 
-            MSG_TYPE = [0x04]
+            MSG_TYPE = [TWR_REPORT]
         else:
             return None 
         if TWR_seq>0xFF: 
@@ -110,13 +123,28 @@ class BitcrazeTag(Tag):
         Returns:
             List of corresponding device IDs (ints) 
         """
+        device_list = [] 
         # Iterating through known (config.py) anchors and checking who responds 
-        for anchor in ANCHORS: 
-            id = anchor['id'] 
-            #poll_msg = self.gen_message_header(target_id=id, msg_type='POLL', TWR_seq=)
-            # NOTE: when back look in firmware for seq generation after poll messages
-            # else add internal counter in BCTag and make sure it loops 
+        twr_seq = self.TWR_seq 
+        if discovery_type == "all" or discovery_type == "anchor": 
+            for anchor in ANCHORS: 
+                poll_msg = self.gen_message_header(target_id=anchor['id'], msg_type='POLL', TWR_seq=twr_seq)
+                self._dw.transmit(data=poll_msg, ranging=False) 
+                resp = self._dw.listen(timeout=DW_LISTEN_TIMEOUT) 
+                if resp:
+                    # Truncating to expected size because if the anchor had a position set internally, it'll make the message longer to include it. We discard this as we don't care, our anchor positions are set in config file ONLY.  
+                    resp = resp[:23] 
+                    # If we got a proper response, it should be the same structure, but with 
+                    # source address and destination address swapped & with msg_type answer 
+                    expected_msg = poll_msg[:5] + poll_msg[13:21] + poll_msg[5:13] + [TWR_ANSWER] + [twr_seq]
+                    if resp == expected_msg: 
+                        device_list.append(anchor['id'])
+                # Adding a little pause to make sure the DW properly resets. Else, we miss anchors. 
+                time.sleep(DW_PAUSE_DELAY)
 
+        if discovery_type == "all" or discovery_type == "tag":
+            pass # TODO 
+        return device_list 
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     def sendData(self, destination:int, payload:bytes) -> bool: 
