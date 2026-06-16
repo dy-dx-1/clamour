@@ -1,4 +1,4 @@
-import sys
+from .custom_terminal import print 
 import traceback as tb
 from multiprocessing import Process
 
@@ -9,7 +9,7 @@ class ContextManagedProcess(Process):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.join()
         if exc_type: 
-            print(f"[ERROR] {exc_type.__name__}: {exc_val}")
+            print(f"{exc_type.__name__}: {exc_val}", status='error', type='gen')
             tb.print_exception(exc_type, exc_val, exc_tb)
         else:
-            print("[OK] Process completed without exception")
+            print("Process completed without exception", status='ok', type='gen')

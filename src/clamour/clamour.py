@@ -11,6 +11,7 @@ from .messages import PoseMessage, CustomOdometryMessage
 from .runnableProcess import RunnableProcess
 #from .soundmanager import SoundManager
 from .interfaces import PozyxTag, BitcrazeTag
+from .custom_terminal import print 
 
 #################################################### CONFIG PARAMETERS
 from .config import TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS
@@ -30,7 +31,7 @@ def keep_alive(process: RunnableProcess) -> None:
         try:
             process.run()
         except Exception as e:
-            print("[ERROR] Clamour.keep_alive(): A process that needs to be kept alive died and will be restarted. Error:", str(e))
+            print(f"Clamour.keep_alive(): A process that needs to be kept alive died and will be restarted. Error:{str(e)}", status='error', type='gen')
 
 class Clamour:
     def __init__(self, custom_odometries):

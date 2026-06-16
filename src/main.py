@@ -1,10 +1,11 @@
 from clamour import Clamour, PoseMessage, ContextManagedQueue
+from clamour.custom_terminal import print
 import sys
 from rich.traceback import install ; install() # For clearer traceback printing 
 
 def onNewPoseEstimated(poseMsg: PoseMessage):
     ### PoseMessage is defined in ./clamour/messages/poseMessage.py and it's attributes describe the pose of an agent
-    print("[POSE INFO] New pose estimated: x:", poseMsg.x, ", y:", poseMsg.y, ", z:", poseMsg.z, ", yaw:", poseMsg.yaw)
+    print(text=f"Pose estimated: x: {poseMsg.x}, y: {poseMsg.y}, z: {poseMsg.z}, yaw: {poseMsg.yaw}", status='info', type='loc')
 
 if __name__ == "__main__":
     # An argument of anything else than 0 sets debug to True.
