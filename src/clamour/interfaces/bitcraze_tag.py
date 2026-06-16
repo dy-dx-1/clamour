@@ -23,6 +23,7 @@ class BitcrazeTag(Tag):
             raise Exception("Invalid tag_id for BitcrazeTag. Tag ID must > 10. Check your config file.")
         
         self._id = tag_id 
+        self._twr_seq = 0  # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
         self.device_list = [] 
 
@@ -40,6 +41,11 @@ class BitcrazeTag(Tag):
     def tag_id(self)->int:
         return self._id
     
+    @property
+    def TWR_seq(self)->int: 
+        self._twr_seq = (self._twr_seq + 1) & 0xFF  # Go from 0 to 255 and then restart 
+        return self._twr_seq 
+
     def gen_message_header(self, target_id:int, msg_type:Literal['POLL', 'ANSWER', 'FINAL', 'REPORT'], TWR_seq:int)->list: 
         """ 
         Generates the first 7 sections needed for a message from this tag to another BC device.
