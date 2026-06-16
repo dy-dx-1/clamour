@@ -17,7 +17,7 @@ with DW1000(bus=0, cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, pr
         0x0,
         0xcf,
         0xbc,
-        0x2,
+        0x1,
         0x0,
         0x0,
         0x0,

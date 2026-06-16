@@ -1,30 +1,19 @@
 from .containers import Coordinates, DeviceCoordinates
-import csv
-import sys
-
+from ..config import ANCHORS
 
 class Anchors:
     def __init__(self):
         self.available_anchors = []
         self.floor_height = 18900 - 300
-        self.anchors_list = self.load_anchors_from_csv()
-        self.anchors_dict = {anchor.network_id: anchor for (_, anchor) in enumerate(self.anchors_list)}
+        self.anchors_list = self.load_anchors_from_config()
+        self.anchors_dict = {anchor.network_id: anchor for anchor in self.anchors_list}
 
-    def load_anchors_from_csv(self) -> list:
-        with open(sys.path[0]+'/interfaces/anchors.csv') as r:
-            reader = csv.reader(r, delimiter=';')
-            next(reader)  # We don't want to read the header, so we skip it
-            return [self.add_anchor(anc) for anc in reader]
-
-    def add_anchor(self, anchor_data: list) -> DeviceCoordinates:
-        #label = int(anchor_data[0], base=16)
-        label = int(anchor_data[0])
-        lvl = int(anchor_data[1])
-        x = int(anchor_data[2])
-        y = int(anchor_data[3])
-        z = int(anchor_data[4])
-
-        if lvl == 2:
-            z += self.floor_height
-
-        return DeviceCoordinates(network_id=label, flag=1, pos=Coordinates(x, y, z))
+    def load_anchors_from_config(self) -> list:
+        anchor_list = list() 
+        for anc_dict in ANCHORS: 
+            if anc_dict['level'] == 2: # NOTE: 2026-06-16, this was from old code with anchors.csv, no idea what floor level does if anything
+                z += self.floor_height
+            
+            anchor_list.append(DeviceCoordinates(network_id = anc_dict['id'],
+                              flag = 1, 
+                              pos = Coordinates(anc_dict['x'], anc_dict['y'], anc_dict['z']) ) ) 
