@@ -4,7 +4,6 @@ It uses the rich module for clearer printing and allows for clearer terminal out
 """
 from rich.console import Console
 from rich.text import Text 
-from rich.emoji import Emoji 
 from typing import Literal
 
 from .config import GEN_MSGS, DEVICE_MSGS, TDMA_MSGS, LOC_MSGS

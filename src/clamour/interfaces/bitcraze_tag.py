@@ -1,3 +1,5 @@
+from ..custom_terminal import print 
+
 from .tag import Tag
 from .containers import Coordinates, Angles, DeviceCoordinates
 from .dw_1000 import DW1000
@@ -35,15 +37,15 @@ class BitcrazeTag(Tag):
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
         self.device_list = [] 
 
-        print(f"[OK] SUCCESSFULLY CONNECTED TO BC DEVICE") 
-        print(f"[OK] TAG ID: {self._id}")
+        print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
+        print(f"TAG ID: {self._id}", 'ok', 'device')
 
     def __enter__(self): 
         return self 
     
     def __exit__(self, exc_type, exc_val, exc_tb): 
         self._dw.close() 
-        print("DW1000 closed with BitcrazeTag.__exit__()")
+        print("DW1000 closed with BitcrazeTag.__exit__()", 'ok', 'device')
 
     @property
     def tag_id(self)->int:
@@ -101,7 +103,7 @@ class BitcrazeTag(Tag):
 
     def resetSystem(self) -> None:
         self._dw.soft_reset() 
-        print("[INFO] BitcrazeTag was reset")
+        print("BitcrazeTag was reset", 'info', 'device')
 
     def printCurrentError(self, function_name:str) -> bool:
         # NOTE: This function cannot be used in the same way as originally intended with Pozyx
@@ -110,7 +112,7 @@ class BitcrazeTag(Tag):
         # this function as a simple formatter that outputs the function name where the error occurred. 
         # Since we can't check if there was really an error, I assume this function is only called when there is one 
         # and so the function always returns True. 
-        print(f"[ERROR] There was an error in the function: {function_name}")
+        print(f"There was an error in the function: {function_name}", 'error', 'gen')
         return True 
     
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:

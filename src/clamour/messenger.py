@@ -1,3 +1,4 @@
+from .custom_terminal import print 
 import random
 from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from time import perf_counter, time
@@ -12,7 +13,6 @@ from .interfaces.timing import NB_TASK_SLOTS
 from .messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
                       UWBTopologyMessage, UpdateMessage, UpdateType)
 from .messages.messageFactory import CUSTOM_MESSAGE_SIGNATURE
-
 
 class Messenger:
     def __init__(self, id: int, shared_tag: Tag, neighborhood: Neighborhood,
@@ -126,13 +126,11 @@ class Messenger:
 
     def accept_proposal(self, message: UWBTDMAMessage) -> None:
         """Assigns requested slot to the message's sender."""
-
         self.slot_assignment.receive_list[message.slot] = message.sender_id
 
     def accept_receiving(self, message: UWBTDMAMessage) -> None:
         """Since this slot is unavailable for sending message,
         the current node will listen while this slot is active."""
-
         self.slot_assignment.send_list[message.slot] = -1
         self.slot_assignment.receive_list[message.slot] = message.sender_id
 
@@ -171,12 +169,12 @@ class Messenger:
         sender_id, data = self.obtain_message_from_tag()
 
         if sender_id != 0 and data!=b"":
-            print(f"[DEBUG] Raw received: {data}")
+            print(f"Raw received: {data}", 'info', 'tdma')
 
         if sender_id != 0 and len(data)>0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
             received_message = MessageFactory.create(sender_id, data)
             if received_message is None:  # NOTE: from 2026-05-03 TDMA testing after decoupling, may not be right 
-                print(f"[WARNING] Dropped unknown message: {data}")
+                print(f"[WARNING] Dropped unknown message: {data}", 'info', 'tdma')
                 return False, False 
             if isinstance(received_message, UWBTopologyMessage):
                 received_message.decode()
@@ -188,7 +186,7 @@ class Messenger:
                 self.should_go_back_to_sync += int(state != State.SYNCHRONIZATION and isinstance(received_message, UWBSynchronizationMessage))
 
             if self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10):
-                print("[INFO] Messenger.receive_new_message: Received sync messages, going back to sync.", self.should_go_back_to_sync, len(self.neighborhood.current_neighbors))
+                print(f"Messenger.receive_new_message: Received sync messages, going back to sync. {self.should_go_back_to_sync} {len(self.neighborhood.current_neighbors)}", 'info', 'tdma')
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
 

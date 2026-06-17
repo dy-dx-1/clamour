@@ -3,6 +3,7 @@ import os.path
 import csv
 from multiprocessing.synchronize import Lock
 from numpy import linalg
+from ..custom_terminal import print 
 from ..interfaces import Tag
 from ..interfaces import Coordinates
 from struct import error as StructError
@@ -12,7 +13,6 @@ from .ekf import CustomEKF, DT_THRESHOLD
 from ..contextManagedQueue import ContextManagedQueue
 from ..messages import UpdateMessage, SoundMessage, UpdateType, PoseMessage
 from ..rooms import Floorplan
-
 
 class EKFManager:
     def __init__(self, pose_callback, sound_queue: ContextManagedQueue, communication_queue: ContextManagedQueue,
@@ -65,7 +65,7 @@ class EKFManager:
                     poseMsg = PoseMessage(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, self.ekf.get_yaw())
                     self.pose_callback(poseMsg)
 
-        print("[OK] EKF INITIALIZING DONE")
+        print("EKF INITIALIZING DONE", 'ok', 'loc')
 
     def process_latest_state_info(self) -> None:
         update_functions = {
@@ -93,7 +93,7 @@ class EKFManager:
                 with self.tag_lock:
                     self.tag.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
             except StructError as s:
-                print("[ERROR] in EKFManager.process_latest_state_info(): ", str(s))
+                print(f"EKFManager.process_latest_state_info(): {str(s)}", 'error' 'loc')
 
             coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
             self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
@@ -144,7 +144,7 @@ class EKFManager:
 
         new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates, self.floorplan.rooms)
         if new_neighbor is not None:
-            print("[INFO] Changed room.")
+            print("Changed room.", 'info', 'loc')
             self.current_room = self.floorplan.rooms[new_neighbor]
             return True
 

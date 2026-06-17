@@ -1,3 +1,4 @@
+from ..custom_terminal import print 
 from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, asarray, ndarray, dot, eye, linalg
 
@@ -6,7 +7,6 @@ from .customOdometry import CustomOdometry
 from ..messages import PoseMessage
 
 DT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
-
 
 class CustomEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates, yaw: float):
@@ -116,11 +116,11 @@ class CustomEKF(ExtendedKalmanFilter):
             self.last_measurement_time = timestamp
             self.set_qf()
         else:
-            print("[ERROR] CustomEKF.pre_update(): Received message with bad timestamp")
+            print("CustomEKF.pre_update(): Received message with bad timestamp", 'error', 'loc')
         self.predict()
 
     def custom_odometry_update(self, position: Coordinates, yaw: float, R, timestamp: float) -> None:
-        print("[ERROR] CustomEKF.custom_odometry_update(): Custom odometry update")
+        print("CustomEKF.custom_odometry_update(): Custom odometry update", 'error', 'loc')
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(

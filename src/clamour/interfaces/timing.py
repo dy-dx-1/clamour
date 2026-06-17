@@ -1,9 +1,5 @@
-import os
-import sys
 from math import floor
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from logicalClock import LogicalClock
+from ..logicalClock import LogicalClock
 
 SECONDS_TO_MILLISECONDS = 1000
 

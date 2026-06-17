@@ -6,7 +6,6 @@ from .interfaces.tag import Tag
 from .messenger import Messenger
 from .states import (TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task)
 
-
 class TDMANode:
     def __init__(self, multiprocess_communication_queue, shared_tag: Tag,
                  shared_tag_lock: Lock, tag_id: int):
@@ -36,7 +35,6 @@ class TDMANode:
         self.last_state_id = State.INITIALIZATION
         self.current_state_id = State.INITIALIZATION
 
-
     def run(self) -> None:
         while True:
             start_time = time()
@@ -46,7 +44,7 @@ class TDMANode:
 
             if(self.last_state_id == State.LISTEN and self.current_state_id == State.SYNCHRONIZATION):
                 self.current_state.first_exec_time = None
-                print("[INFO] TDMANode.run(): Enter SYNC, new Full Cycle starts")
+                print("TDMANode.run(): Enter SYNC, new Full Cycle starts", 'info', 'tdma')
             self.last_state_id = self.current_state_id
 
             self.wait(start_time)

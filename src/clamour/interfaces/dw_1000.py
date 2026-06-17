@@ -1,3 +1,5 @@
+from ..custom_terminal import print 
+
 import spidev 
 import time 
 from typing import Literal
@@ -76,7 +78,7 @@ class DW1000:
         
         self.prep_device_for_use()        # Checks that device initialized properly and sets clock to 20MHz
         self.config_uwb_settings(channel, PRF, bitrate, preamble_length, preamble_code) # Checks validity of settings and applies them 
-        print("[OK] DW1000 DEVICE READY")
+        print("DW1000 DEVICE READY", 'ok', 'gen')
     
     def prep_device_for_use(self): 
         """
@@ -89,8 +91,8 @@ class DW1000:
         ## Checking device ID is expected for DW1000 
         d_id = self.read_register([0x00], 4, reverse=True)
         if d_id != ['0xde', '0xca', '0x1', '0x30']:
-            print("[ERROR] DW1000 did not return the correct ID. Is it plugged in correctly?")
-            print(f"Expected ID: ['0xde', '0xca', '0x1', '0x30'], got {d_id}")
+            print("DW1000 did not return the correct ID. Is it plugged in correctly?", 'error', 'gen')
+            print(f"Expected ID: ['0xde', '0xca', '0x1', '0x30'], got {d_id}", 'error', 'gen')
             self.close() 
             quit() 
         
@@ -123,19 +125,19 @@ class DW1000:
     def close(self, verbose=True): 
         self.spi.close() 
         if verbose: 
-            print("[INFO] DW1000 connection closed")
+            print("DW1000 connection closed", 'info', 'gen')
 
     def __enter__(self):
         return self 
 
     def __exit__(self, exc_type, exc_val, exc_tb): 
         self.close() 
-        print("DW1000 exited context manager successfully")
+        print("DW1000 exited context manager successfully", 'ok', 'gen')
 
     def __del__(self):
         try:
             self.close(verbose=False) 
-            print("[INFO] __del__ called on dw1000 obj")
+            print("__del__ called on dw1000 obj", 'info', 'gen')
         except: 
             pass 
 
@@ -160,7 +162,7 @@ class DW1000:
             - List of values read from the register. 
         """
         if type(header) != list or type(length) != int or type(reverse) != bool: 
-            print("[ERROR] Unexpected type in read_register. Check your args.")
+            print("Unexpected type in read_register. Check your args.", 'error', 'device')
             return None 
         response = self.spi.xfer2(header + [0]*length) # xfer2 is supposed to keep CS pressed for the entire transaction, although some sources differ, I use it to be safe. At worst its equivalent to xfer 
         response = response[len(header):]              # throwing away the header
@@ -176,7 +178,7 @@ class DW1000:
             - data: List of octets to write to the register (LSB first)
         """
         if type(header) != list or type(data) != list or type(data[0]) != int:
-            print("[ERROR] Unexpected type in write_register. Check your args.")
+            print("Unexpected type in write_register. Check your args.", 'error', 'device')
             return None 
         self.spi.xfer2(header + data) 
 
@@ -216,7 +218,7 @@ class DW1000:
         
         # Reset done, run our init checks and set speed back to 20MHz
         self.prep_device_for_use() 
-        print("[INFO] Soft reset of DW1000 completed.")
+        print("Soft reset of DW1000 completed.", 'info', 'device')
 
     def transmit(self, data:list, ranging:bool, timeout:float=0.05)->bool: 
         """
@@ -233,7 +235,7 @@ class DW1000:
         data_length = len(data) + 2 # adding 2 octets of CRC check 
         # NOTE: currently not supporting extended data frames, messages shouldn't exceed 127 bytes 
         if data_length>127: 
-            print("[WARNING] in DW1000.transmit(), data frame exceed 127bytes (TFLE!=0). Currently not supporting this, check the message?")
+            print("[WARNING] in DW1000.transmit(), data frame exceed 127bytes (TFLE!=0). Currently not supporting this, check the message?", 'info', 'device')
             return 
         curr = self.read_register([0x08], 2, return_ints=True)
         tx_fctrl = data_length | ((curr[1] & 0x60)<<8)  # TFLEN == data_length, keeping TXBR and 0 TFLE and R 
@@ -249,7 +251,7 @@ class DW1000:
                 break # DW1000 will return to IDLE automatically 
         else: 
             # TODO Can add more in depth inspection of error bits in future 
-            print("[ERROR] Transmit timeout in DW1000.transmit(), returning to IDLE")
+            print("Transmit timeout in DW1000.transmit(), returning to IDLE", 'error', 'device')
             self.write_register([0x8D], [0x40]) # Force return to IDLE 
         return bool(txfrs) 
 
@@ -276,7 +278,7 @@ class DW1000:
                 rxfle_rxflen = (rx_finfo[0] | (rx_finfo[1]<<8)) & 0x3FF
                 # NOTE: currently not supporting non std operation, so RXFLE should be 0 
                 if rxfle_rxflen>0x7F: # Currently, messages should be <= 127bytes 
-                    print("[WARNING] in DW1000.listen(), received extended data frame (RXFLE!=0). Currently not supporting this, check the message?")
+                    print("[WARNING] in DW1000.listen(), received extended data frame (RXFLE!=0). Currently not supporting this, check the message?", 'info', 'device')
                 # Now reading buffer with frame length 
                 rxfle_rxflen-=2 # throwing away FCS at the end 
                 data = self.read_register([0x11], rxfle_rxflen, return_ints=return_ints)  
@@ -331,7 +333,7 @@ class DW1000:
         elif preamble_length==64 and bitrate!=110 and bitrate!=850: 
             pass # ok 
         else: 
-            print("Invalid bitrate-preamble config for DRX_TUNE1b")
+            print("Invalid bitrate-preamble config for DRX_TUNE1b", 'error', 'device')
             return False 
         ## If all passed, everything ok 
         return True 
@@ -367,7 +369,7 @@ class DW1000:
         if not self.check_valid_uwb_config(channel, PRF, bitrate, preamble_length, preamble_code):
             # This ensures that the combination of values is valid 
             # and simplifies following if/elses 
-            print("[ERROR] Unsupported UWB config for DW1000, check DW1000.config_uwb_settings()")
+            print("Unsupported UWB config for DW1000, check DW1000.config_uwb_settings()", 'error', 'device')
             return 
         
         ###################### 0x1F - Channel Control ######################

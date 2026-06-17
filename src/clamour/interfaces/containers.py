@@ -1,14 +1,11 @@
 """ 
 This file defines many objects that serve to transport info from the tag to Clamour. 
-Originally, all of these directly came from the pypozyx lib. 
-In an effort to decouple the code from it, these are general versions that can be used in a platform agnostic manner. 
+These are directly inspired from PozyxLib 
 """
 
 class Coordinates: 
     """
     Container for x, y, z coordinates (in mm)
-    This is based on the Coordinates object from pypozyx that inherits from XYZ who inherits from ByteStructure
-    It used to have inherited attributes as well as byte_size and data_format 
     """ 
     def __init__(self, x:int=0, y:int=0, z:int=0): 
         self.data = [x,y,z] 
@@ -53,8 +50,7 @@ class Coordinates:
 
 class Angles:
     """
-    Container for euler angles as heading(yaw), roll, and pitch (in degrees).
-    This is based on the EulerAngles object from pypozyx, and used inherit from ByteStructure and have the attributes physical_convet, byte_size and data_format
+    Container for angles as heading(yaw), roll, and pitch (in degrees).
     """
 
     def __init__(self, heading=0, roll=0, pitch=0):
