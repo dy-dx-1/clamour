@@ -109,7 +109,7 @@ class Task(TDMAState):
                 if ranging_target_id not in self.anchors.anchors_dict:
                     ref_coordinates = self.tag.getCoordinates()
                 else:
-                    ref_coordinates = self.anchors.anchors_dict[ranging_target_id].pos
+                    ref_coordinates = self.anchors.anchors_dict[ranging_target_id]
 
                 measured_position = self.tag.doRanging(ranging_target_id) 
                 angles = self.tag.getOrientation() 

@@ -1,6 +1,5 @@
 """ 
 This file defines many objects that serve to transport info from the tag to Clamour. 
-These are directly inspired from PozyxLib 
 """
 
 class Coordinates: 
@@ -85,50 +84,3 @@ class Angles:
     @pitch.setter
     def pitch(self, value):
         self.data[2] = value 
-
-class DeviceCoordinates: 
-    """
-    Container representing a tag or anchor. Holds it's ID, the type and it's coordinates. 
-    This is based on DeviceCoordinates from pypozyx, which inherits from ByteStructure
-
-    Kwargs (can be accessed as properties):
-        network_id: Network ID of the device
-        flag: Type of the device. 1 for anchor and 0 for tag. 
-        pos: Coordinates of the device. Coordinates().
-    """
-
-    def __init__(self, network_id=0, flag=0, pos=Coordinates()):
-        self.data = [network_id, flag, int(pos.x), int(pos.y), int(pos.z)]
-
-    def load(self, data):
-        self.data = data
-
-    def __str__(self):
-        return "ID: 0x{:04X}, flag: {}, ".format(self.network_id, self.flag) + str(self.pos)
-
-    @property
-    def network_id(self):
-        return self.data[0]
-
-    @network_id.setter
-    def network_id(self, value):
-        self.data[0] = value
-
-    @property
-    def flag(self):
-        return self.data[1]
-
-    @flag.setter
-    def flag(self, value):
-        self.data[1] = value
-
-    @property
-    def pos(self):
-        # NOTE: i checked this should be coherent with the rest of code 
-        return Coordinates(self.data[2], self.data[3], self.data[4])
-
-    @pos.setter
-    def pos(self, value):
-        self.data[2] = value.x
-        self.data[3] = value.y
-        self.data[4] = value.z

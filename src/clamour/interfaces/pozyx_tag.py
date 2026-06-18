@@ -81,7 +81,7 @@ class PozyxTag(Tag):
         net_id = device_coordinates.network_id
         fl = device_coordinates.flag
         coords = device_coordinates.pos # General coordinates object, needs to be converted 
-        pozyx_obj = pozyxDeviceCoordinates(network_id=net_id, flag=fl, pos = pozyxCoordinates(coords.x, coords.y, coords.z) )
+        pozyx_obj = pozyxDeviceCoordinates(network_id=net_id, flag=1, pos = pozyxCoordinates(coords.x, coords.y, coords.z) )
         self._pozyx_serial.addDevice(pozyx_obj)
     
     def clearDevices(self):
