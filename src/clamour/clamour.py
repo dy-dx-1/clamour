@@ -14,11 +14,19 @@ from .interfaces import PozyxTag, BitcrazeTag
 from .custom_terminal import print 
 
 #################################################### CONFIG PARAMETERS
-from .config import TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS
-# TODO: add new UWB config settings into config file in future 
+from .config import (TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS, 
+                     UWB_CHANNEL, UWB_BITRATE, UWB_PRF, UWB_PREAMBLE_CODE, UWB_PREAMBLE_LENGTH)
+
 match TAG_TYPE:
     case "Bitcraze": 
-        TAG_FACTORY = lambda: BitcrazeTag(tag_id = TAG_ID, dw1000_bus = DW1000_BUS, dw1000_cs = DW1000_CS)
+        TAG_FACTORY = lambda: BitcrazeTag(tag_id = TAG_ID, 
+                                          dw1000_bus = DW1000_BUS, 
+                                          dw1000_cs = DW1000_CS, 
+                                          channel = UWB_CHANNEL, 
+                                          PRF=UWB_PRF,
+                                          bitrate=UWB_BITRATE,
+                                          preamble_length=UWB_PREAMBLE_LENGTH,
+                                          preamble_code=UWB_PREAMBLE_CODE)
     case "Pozyx": 
         # TODO NOTE: pozyx doesn't currently support setting IDs through config file. 
         TAG_FACTORY = lambda: PozyxTag() 
