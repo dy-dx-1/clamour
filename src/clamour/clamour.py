@@ -28,8 +28,7 @@ match TAG_TYPE:
                                           preamble_length=UWB_PREAMBLE_LENGTH,
                                           preamble_code=UWB_PREAMBLE_CODE)
     case "Pozyx": 
-        # TODO NOTE: pozyx doesn't currently support setting IDs through config file. 
-        TAG_FACTORY = lambda: PozyxTag() 
+        TAG_FACTORY = lambda: PozyxTag(id=TAG_ID) 
     case _: 
         raise ValueError(f"Invalid tag type: {TAG_TYPE}. Check your config file.")
 

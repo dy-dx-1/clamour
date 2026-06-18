@@ -7,7 +7,7 @@ Defines all configuration parameters for Clamour.
 """
 ### Tag type and ID 
 TAG_TYPE = "Bitcraze" # Manufacturer of the tag. Bitcraze or Pozyx
-TAG_ID = 11           # Tag IDs must be >10. Pozyx does not currently support ID assignement through config file. 
+TAG_ID = 11           # Tag IDs must be >10. This will overwrite any hardware-defined ID if it exists.  
 
 ### DW1000 and UWB config - only applicable for Bitcraze Tags
 DW1000_BUS =  0            # SPI bus where the deck is connected 

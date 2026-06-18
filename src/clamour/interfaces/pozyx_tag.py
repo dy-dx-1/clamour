@@ -14,18 +14,10 @@ from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
 def get_pozyx_id(pozyx:PozyxSerial) -> int:
     """
-    Read and return the Pozyx device's network ID as an int.
-
-    POZYX_NETWORK_ID is a register address, not the ID value itself. This
-    function reads the 2-byte network ID from the device, combines the
-    little-endian bytes, and returns the resulting 16-bit integer.
-
-    The returned value uniquely identifies the device within a Pozyx
-    network and can be used as a stable application-level identifier.
+    Read and return the Pozyx device's network ID (16bit based) as an int.
     """
     data = Data([0] * 2)
     pozyx.getRead(POZYX_NETWORK_ID, data)
-
     return data[1] * 256 + data[0]
 
 def get_nb_devices(pozyx:PozyxSerial) -> tuple:
@@ -49,12 +41,14 @@ class PozyxTag(Tag):
     Methods are adapted from abstractclass Tag. 
     Refer to Tag class for typehints and docstrings, except when overwritten for clarity. 
     """
-    def __init__(self):
+    def __init__(self, id:int):
         serial_port = get_first_pozyx_serial_port()
         if serial_port is None:
             raise Exception("No Pozyx connected. Check your USB cable or your driver.")
         self._pozyx_serial = PozyxSerial(serial_port)
-        self._id = get_pozyx_id(self._pozyx_serial)
+        self._id = id 
+        if self._id != get_pozyx_id(self._pozyx_serial): 
+            self._pozyx_serial.setNetworkId(id)
         print(f"[OK] Successfully initialized pozyx tag on port {serial_port} with id: {self._id}")
         print(f"This ID means that the constant NB_NODES in timing.py must >{self._id & 0xFF} for the node to do slot proposals.")
 
