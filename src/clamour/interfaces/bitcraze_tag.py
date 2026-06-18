@@ -125,6 +125,7 @@ class BitcrazeTag(Tag):
         Returns:
             List of corresponding device IDs (ints) 
         """
+        # TODO: ensure that this will never return duplicates and same for pozyx / Tag 
         device_list = [] 
         # Iterating through known (config.py) anchors and checking who responds 
         twr_seq = self.TWR_seq 

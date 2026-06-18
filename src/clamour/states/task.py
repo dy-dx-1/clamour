@@ -3,10 +3,10 @@ from multiprocessing.synchronize import Lock # multiprocessing.Lock
 from time import perf_counter
 
 from numpy import array, atleast_2d
-from ..interfaces import Tag, Coordinates
 import struct
 
-from ..interfaces import Anchors, Neighborhood, Timing, SlotAssignment
+from ..custom_terminal import print 
+from ..interfaces import Tag, Coordinates, Anchors, Neighborhood, Timing, SlotAssignment
 from ..messages import UpdateMessage, UpdateType
 from ..messenger import Messenger
 
@@ -137,17 +137,15 @@ class Task(TDMAState):
 
         with self.tag_lock:
             self.tag.clearDevices()
-
-        self.discover(discovery_type='all')
+            devices = self.tag.get_device_list("all")
 
         new_anchors, new_tags = [], []
-        for device in self.anchors.available_anchors:
-            print(f"[INFO] Task.discover_devices(): Found device: {device}", end=", ")
+        for device in devices:
             if self.tag.is_anchor(device):
-                print("it's an ANCHOR!")
+                print(f"Task.discover_devices(): Found device: {device}, it's an ANCHOR!", 'info', 'tdma')
                 new_anchors.append(device)
             else:
-                print("it's a TAG!")
+                print(f"Task.discover_devices(): Found device: {device}, it's a TAG!", 'info', 'tdma')
                 new_tags.append(device)
 
         self.anchors.available_anchors = new_anchors
@@ -159,14 +157,6 @@ class Task(TDMAState):
             for tag in new_tags:
                 self.neighborhood.add_neighbor(tag, perf_counter(), State.TASK)
                 self.neighborhood.changed = True
-
-    def discover(self, discovery_type: str) -> None:
-        with self.tag_lock:
-            devices = self.tag.get_device_list(discovery_type)
-
-        for device_id in devices:
-            if device_id not in self.anchors.available_anchors:
-                self.anchors.available_anchors.append(device_id)
 
     def set_manually_measured_anchors(self) -> None:
         with self.tag_lock:
