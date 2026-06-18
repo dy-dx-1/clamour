@@ -11,7 +11,6 @@ from ..interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRO
 from .constants import *
 from .tdmaState import TDMAState
 
-
 class Synchronization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
                  timing: Timing, messenger: Messenger, id: int, multiprocess_communication_queue):
@@ -28,28 +27,31 @@ class Synchronization(TDMAState):
         self.has_done_first_correction = False
 
     def execute(self) -> State:
+        # Record first execution time to init timing 
         if self.first_exec_time is None:
             self.first_exec_time = int(round(time() * SECONDS_TO_MILLISECONDS))
-
+        # Calculate sync offset 
         self.timing.synchronization_offset_mean = 20 if len(self.timing.clock_differential_stat) < NB_SAMPLES_OFFSET \
             else mean(self.timing.clock_differential_stat)
-
+        # Call sync - this is where msgs are received and processed
         self.synchronize()
+        # Check sync status 
         self.timing.synchronized = abs(self.timing.synchronization_offset_mean) < THRESHOLD_SYNCTIME
-
+        # Track sync cycles (consecutive cycles where synced)
         if self.neighborhood.are_neighbors_synced():
             self.nb_cycles_neighbors_synced += 1
         else:
             self.nb_cycles_neighbors_synced = 0
-
+        # Periodically broadcast own sync message 
         if self.time_to_sleep <= time() - self.start_t:
             self.broadcast_synchronization_message()
             self.time_to_sleep = abs(random.gauss(RANDOM_DELAY_MEAN, RANDOM_DELAY_VARIANCE))
             self.start_t = time()
-
+        # Remove old neighbor data
         self.neighborhood.collect_garbage(delay=1)
+        # Decide if moving to SCHEDULING 
         next_state = self.next()
-
+        # If transitioning, final broadcast burst to let others sync 
         if next_state == State.SCHEDULING:
             for _ in range(10):
                 sleep(0.005)
