@@ -82,15 +82,15 @@ class Tag(ABC):
         """
     
     @abstractmethod
-    def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:
+    def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> set[int]:
         """
-        Gets the list of IDs of devices seen by the tag. 
+        Gets the IDs of devices seen by the tag. This must never return duplicated elements. 
 
         Args: 
             discovery_type: String specifying what type of device to return
         
         Returns:
-            List of corresponding device IDs (ints) 
+            Set of corresponding device IDs (ints) 
         """
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------

@@ -109,7 +109,7 @@ class PozyxTag(Tag):
         status = self._pozyx_serial.doDiscovery(discovery_type=POZYX_DISCOVERY_ALL_DEVICES)
         if status != POZYX_SUCCESS:
             self.printCurrentError("PozyxSerial.doDiscovery")
-            return [] # NOTE: there wasn't any return before, function would have just continued with an error
+            return set() # NOTE: there wasn't any return before, function would have just continued with an error
         
         status, size = get_nb_devices(self._pozyx_serial)
         devices = pozyxDeviceList(list_size=size)
@@ -131,7 +131,7 @@ class PozyxTag(Tag):
         else: 
             raise ValueError("discovery_type arg must be 'all' or 'tag' or 'anchor'")
 
-        return devices
+        return set(devices) 
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     def sendData(self, destination, payload): 

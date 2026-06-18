@@ -116,17 +116,8 @@ class BitcrazeTag(Tag):
         return True 
     
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:
-        """
-        Gets the list of IDs of devices seen by the tag. 
-
-        Args: 
-            discovery_type: String specifying what type of device to return
-        
-        Returns:
-            List of corresponding device IDs (ints) 
-        """
         # TODO: ensure that this will never return duplicates and same for pozyx / Tag 
-        device_list = [] 
+        device_list = set() 
         # Iterating through known (config.py) anchors and checking who responds 
         twr_seq = self.TWR_seq 
         if discovery_type == "all" or discovery_type == "anchor": 
@@ -141,7 +132,7 @@ class BitcrazeTag(Tag):
                     # source address and destination address swapped & with msg_type answer 
                     expected_msg = poll_msg[:5] + poll_msg[13:21] + poll_msg[5:13] + [TWR_ANSWER] + [twr_seq]
                     if resp == expected_msg: 
-                        device_list.append(anchor['id'])
+                        device_list.add(anchor['id'])
                 # Adding a little pause to make sure the DW properly resets. Else, we miss anchors. 
                 time.sleep(DW_PAUSE_DELAY)
 
