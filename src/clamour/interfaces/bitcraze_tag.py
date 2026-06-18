@@ -115,8 +115,7 @@ class BitcrazeTag(Tag):
         print(f"There was an error in the function: {function_name}", 'error', 'gen')
         return True 
     
-    def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> list[int]:
-        # TODO: ensure that this will never return duplicates and same for pozyx / Tag 
+    def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> set[int]: 
         device_list = set() 
         # Iterating through known (config.py) anchors and checking who responds 
         twr_seq = self.TWR_seq 
