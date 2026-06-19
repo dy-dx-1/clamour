@@ -54,7 +54,7 @@ class Initialization(TDMAState):
 
     def clear_known_devices(self):
         with self.tag_lock:
-            self.tag.clearDevices()
+            self.tag.clearAnchors()
 
         self.neighborhood.neighbor_list = []
         self.anchors.available_anchors = []

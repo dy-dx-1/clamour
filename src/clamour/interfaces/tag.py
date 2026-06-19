@@ -4,7 +4,7 @@ This allows the code to be hardware agnostic.
 All tag classes should follow this blueprint to work with the rest of the codebase.
 """
 from abc import ABC, abstractmethod
-from .containers import Coordinates, DeviceCoordinates, Angles
+from .containers import Coordinates, Angles
 from typing import Literal
 
 class Tag(ABC):
@@ -66,18 +66,15 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def addDevice(self, device:DeviceCoordinates) -> None:
+    def addAnchor(self, anchor_id: int, anchor_coords: Coordinates) -> None:
         """
-        Adds an anchor or tag to the tag's internal device list.
-
-        Args:
-            device: DeviceCoordinates object representing a UWB device. 
+        Adds an anchor to the tag's available anchors dict 
         """
 
     @abstractmethod
-    def clearDevices(self) -> None:
+    def clearAnchors(self) -> None:
         """
-        Clears the tag's internal device list.
+        Clears the available anchors dict
         """
 
     @abstractmethod

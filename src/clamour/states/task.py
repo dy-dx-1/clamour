@@ -136,7 +136,7 @@ class Task(TDMAState):
         self.anchors.available_anchors.clear()
 
         with self.tag_lock:
-            self.tag.clearDevices()
+            self.tag.clearAnchors() # Internal tag list automatically discards old tags 
             devices = self.tag.get_device_list("all")
 
         new_anchors, new_tags = [], []
@@ -160,12 +160,11 @@ class Task(TDMAState):
 
     def set_manually_measured_anchors(self) -> None:
         with self.tag_lock:
-            self.tag.clearDevices()
+            self.tag.clearAnchors()
 
         for anchor in self.anchors.available_anchors:
-            if anchor in self.anchors.anchors_dict:
-                with self.tag_lock:
-                    self.tag.addDevice(self.anchors.anchors_dict[anchor])
+            with self.tag_lock:
+                self.tag.addAnchor(anchor, self.anchors.anchors_dict[anchor])
 
         if len(self.anchors.available_anchors) > 3:
             with self.tag_lock:

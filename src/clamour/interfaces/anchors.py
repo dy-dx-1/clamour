@@ -1,4 +1,4 @@
-from .containers import Coordinates, DeviceCoordinates
+from .containers import Coordinates
 from ..config import ANCHORS
 
 class Anchors:

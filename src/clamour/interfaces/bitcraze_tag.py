@@ -38,6 +38,7 @@ class BitcrazeTag(Tag):
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
         self._active_tags = {}   # keeps track of nearby tags and when they were last seen 
+        self.available_anchors = {} # TODO: check if this can be used to simplify Anchors.available_anchors
 
         print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
         print(f"TAG ID: {self._id}", 'ok', 'device')
@@ -97,19 +98,19 @@ class BitcrazeTag(Tag):
 
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
-    def is_anchor(device_id: int) -> bool:
+    def is_anchor(device_id: int)->bool:
         # NOTE: for BC as of 2026-05-26, I am defining anchors as devices with IDs <=10 
         # Tags must have any other IDs. 
         return device_id<=10 
     
-    def addNeighborTag(self, tag_id: int) -> None: 
+    def addNeighborTag(self, tag_id:int)->None: 
         self._active_tags[tag_id] = time.perf_counter() 
 
-    def addDevice(self, device) -> None:
-        self.device_list.append(device)
+    def addAnchor(self, anchor_id:int, anchor_coords:Coordinates)->None:
+        self.available_anchors[anchor_id] = anchor_coords
 
-    def clearDevices(self) -> None:
-        self.device_list = [] 
+    def clearAnchors(self) -> None:
+        self.available_anchors = {} 
 
     def resetSystem(self) -> None:
         self._dw.soft_reset() 
@@ -181,7 +182,9 @@ class BitcrazeTag(Tag):
         Args:
             number_of_anchors: int specifying how many anchors are available for positioning
         """
-    
+        # NOTE TODO: when here, look into simplifying Anchors.available_anchors with tag.available_anchors I'm sure they're repeating for nothing 
+        # Check use of Anchors.available_anchors property, when is it updated and connect it to internal self.available_anchors instead
+
     def setCoordinates(self, coord_list:list[int]) -> None:
         """
         Manually sets the position of the tag. 

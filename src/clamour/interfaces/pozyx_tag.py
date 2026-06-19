@@ -1,5 +1,5 @@
 from .tag import Tag
-from .containers import Coordinates, DeviceCoordinates, Angles
+from .containers import Coordinates, Angles
 import struct 
 
 from pypozyx import PozyxSerial 
@@ -56,7 +56,7 @@ class PozyxTag(Tag):
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.clearDevices() 
+        self.clearAnchors() 
         self.resetSystem()
         print("PozyxTag.__exit__() completed.")
 
@@ -90,16 +90,13 @@ class PozyxTag(Tag):
         """
         pass 
     
-    def addDevice(self, device_coordinates:DeviceCoordinates): 
-        # Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return
-        # DeviceCoordinates is our general version, needs to be formatted to pypozyx version 
-        net_id = device_coordinates.network_id
-        fl = device_coordinates.flag
-        coords = device_coordinates.pos # General coordinates object, needs to be converted 
-        pozyx_obj = pozyxDeviceCoordinates(network_id=net_id, flag=1, pos = pozyxCoordinates(coords.x, coords.y, coords.z) )
+    def addAnchor(self, anchor_id, anchor_coords): 
+        # Only used in task.py
+        # Coordinates is our general version, needs to be formatted to pypozyx version 
+        pozyx_obj = pozyxDeviceCoordinates(network_id=anchor_id, flag=1, pos = pozyxCoordinates(anchor_coords.x, anchor_coords.y, anchor_coords.z) )
         self._pozyx_serial.addDevice(pozyx_obj)
     
-    def clearDevices(self):
+    def clearAnchors(self):
         self._pozyx_serial.clearDevices() 
 
     def resetSystem(self): 

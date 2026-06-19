@@ -60,4 +60,4 @@ class TDMANode:
     @staticmethod
     def clear_devices(tag: Tag, tag_lock: Lock) -> None:
         with tag_lock:
-            tag.clearDevices()
+            tag.clearAnchors()
