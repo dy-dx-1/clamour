@@ -563,12 +563,13 @@ class DW1000:
         if tx_power != new_cfg: 
             self.write_register([0x1E], new_cfg)
         ###################### DONE! ######################
-        print(f"--- DW 1000 UWB settings configured. ---", 
-              f"Channel: {channel}", 
-              f"Bitrate: {bitrate}",
-              f"PRF: {PRF}", 
-              f"Preamble length: {preamble_length}",
-              f"Preamble code: {preamble_code}",
-              f"PAC size: {PAC_size}",
-              f"**NOTE**: Settings currently only support smart TX power and standard SFD.",
-              sep="\n")
+        to_print = f"""
+        --- DW 1000 UWB settings configured. ---
+        Channel: {channel}
+        Bitrate: {bitrate}
+        PRF: {PRF}
+        Preamble length: {preamble_length}
+        Preamble code: {preamble_code}
+        PAC size: {PAC_size}
+        **NOTE**: Settings currently only support smart TX power and standard SFD.""" 
+        print(to_print, 'ok', 'device')
