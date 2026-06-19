@@ -1,7 +1,7 @@
 from ..interfaces import SlotAssignment, Timing, Neighborhood
 from ..interfaces.timing import Timing
 from ..messenger import Messenger
-
+from ..custom_terminal import print 
 from .constants import State
 from .tdmaState import TDMAState
 
@@ -21,7 +21,7 @@ class Listen(TDMAState):
 
     def next(self) -> State:
         if self.should_go_back_to_sync or not self.timing.in_cycle():
-            print("[INFO] Listen.next(): should_go_back_to_sync: ",self.should_go_back_to_sync, " time: ", self.timing.in_cycle())
+            print(f"Listen.next(): should_go_back_to_sync: {self.should_go_back_to_sync} time: {self.timing.in_cycle()}", 'info', 'tdma')
             self.should_go_back_to_sync = False
             self.messenger.message_box.clear()
             self.messenger.received_messages.clear()

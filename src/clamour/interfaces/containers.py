@@ -40,13 +40,6 @@ class Coordinates:
     def z(self, value):
         self.data[2] = value 
 
-    def to_dict(self):
-        return {
-            "x": self.x,
-            "y": self.y,
-            "z": self.z,
-        }
-
 class Angles:
     """
     Container for angles as heading(yaw), roll, and pitch (in degrees).

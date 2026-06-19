@@ -3,6 +3,7 @@ from ctypes import c_int32 as int32
 from time import time, sleep
 import random
 
+from ..custom_terminal import print 
 from ..interfaces import Neighborhood, SlotAssignment, Timing
 from ..messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
 from ..messenger import Messenger
@@ -58,9 +59,7 @@ class Synchronization(TDMAState):
                 self.broadcast_synchronization_message()
 
             self.prepare_next_state()
-            print("[INFO] Synchronization.execute(): Entering scheduling at ", self.timing.logical_clock.clock, " in cycle with offset",
-                  self.timing.synchronization_offset_mean)
-
+            print(f"Synchronization.execute(): Entering scheduling at {self.timing.logical_clock.clock} in cycle with offset {self.timing.synchronization_offset_mean}", 'info', 'tdma')
         return next_state
 
     def next(self) -> State:
@@ -75,11 +74,13 @@ class Synchronization(TDMAState):
                  self.neighborhood.are_neighbors_synced()):
             # If the tag is the only left trying to sync or ran out of time or everyone is ~~ in sync, let's move on to scheduling
             # Following print explicits what between the 'or's caused the transition 
-            print("[INFO] Synchronization.next(), moving to scheduling. Transition trace: ")
-            print(f"Tag is the only one left trying to sync: {self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION)}")
-            print(f"Tag timed out: {current_exec_time > SYNCHRONIZATION_PERIOD}")
-            print(f"Everyone ~ready to move on: {((self.timing.synchronized or self.is_left_behind()) and self.neighborhood.are_neighbors_synced())}")
-
+            info = f"""
+            Synchronization.next(), moving to scheduling. Transition trace: 
+            Tag is the only one left trying to sync: {self.neighborhood.is_alone_in_state(State.SYNCHRONIZATION)}
+            Tag timed out: {current_exec_time > SYNCHRONIZATION_PERIOD}
+            Everyone ~ready to move on: {((self.timing.synchronized or self.is_left_behind()) and self.neighborhood.are_neighbors_synced())}
+            """
+            print(info, 'info', 'tdma')
             self.timing.sync_timestamp = self.timing.logical_clock.clock
             return State.SCHEDULING
         else:

@@ -64,16 +64,16 @@ class Task(TDMAState):
                 self.tag.sendData(destination=0, payload=struct.pack('<BBBBBBBBB', *tosend))
         else:
             tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
-            print("[INFO] Task.testTDMA(): tosend: ", tosend)
+            print(f"Task.testTDMA(): tosend: {tosend}", 'info', 'tdma')
             with self.tag_lock:
                 self.tag.sendData(destination=0, payload=struct.pack('<BBBBBBBBB', *tosend))
-        print("[INFO] Task.testTDMA(): ", self.timing.frame_id, self.timing.current_slot_id, self.timing.get_full_cycle_duration(),self.timing.current_time_in_cycle)
+        print(f"Task.testTDMA(): {self.timing.frame_id} {self.timing.current_slot_id} {self.timing.get_full_cycle_duration()} {self.timing.current_time_in_cycle}", 'info', 'tdma')
 
     def next(self) -> State:
         if self.timing.in_cycle():
             return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN
         else:
-            print("[INFO] Task.next(): Moving to SYNC state")
+            print("Task.next(): Moving to SYNC state", 'info', 'tdma')
             return State.SYNCHRONIZATION
 
     def select_localization_method(self) -> None:
@@ -81,12 +81,12 @@ class Task(TDMAState):
 
     def positioning(self) -> None:
         with self.tag_lock:
-            print("[INFO] Task.positioning(): Attempting positioning with anchors: ", self.anchors.anchors_dict)
+            print(f"Task.positioning(): Attempting positioning with anchors: {self.anchors.anchors_dict}", 'info', 'loc')
             position = self.tag.doPositioning()
             angles = self.tag.getOrientation() 
 
         if (position is not None) and (angles is not None): 
-            print("[OK] Task.positioning(): Successful positioning")
+            print(f"Task.positioning(): Successful positioning", 'ok', 'loc')
         else: 
             if position is None: 
                 self.handle_error("Tag.doPositioning()")

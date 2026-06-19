@@ -4,6 +4,7 @@ from multiprocessing.synchronize import Lock
 import struct
 from time import sleep
 
+from ..custom_terminal import print 
 from ..interfaces import Tag, Anchors, Neighborhood
 from ..messenger import Messenger
 
@@ -29,18 +30,18 @@ class Initialization(TDMAState):
         return self.next()
 
     def next(self) -> State:
-        print("[INFO] Initialization.next(): Entering synchronization...")
+        print("Initialization.next(): Entering synchronization...", 'info', 'tdma')
         return State.SYNCHRONIZATION
 
     def clear_tag_buffer(self):
         if self.tag.sendData(destination=self.id, payload= struct.pack('<i', 0)):
-            print(f"[INFO] Initialization.clear_tag_buffer(): sendData to {self.id=} was a success!")
+            print(f"Initialization.clear_tag_buffer(): sendData to {self.id=} was a success!", 'info', 'tdma')
         else:
-            print(f"[INFO] Initialization.clear_tag_buffer(): sendData to {self.id=} FAILED")
+            print(f"Initialization.clear_tag_buffer(): sendData to {self.id=} FAILED", 'info', 'tdma')
         sleep(0.25)
         with self.tag_lock: 
             for _ in range(50):
-                print(self.tag.receiveData())
+                print(f"{self.tag.receiveData()=}", 'info', 'tdma')
                 sleep(0.05)
 
     def discover_neighbors(self):
@@ -48,7 +49,7 @@ class Initialization(TDMAState):
         with self.tag_lock:
             devices = self.tag.get_device_list(discovery_type = "tag")
 
-        print("[INFO] Initialization.discover_neighbors(): Tags discovered: ", devices)
+        print(f"Initialization.discover_neighbors(): Tags discovered: {devices}", 'info', 'tdma')
 
         self.messenger.update_topology(State.SYNCHRONIZATION, devices)  # Put state to Sync for next phase
 

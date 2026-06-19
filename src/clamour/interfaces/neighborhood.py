@@ -1,18 +1,8 @@
-from enum import Enum
 from time import perf_counter
-
+from ..custom_terminal import print 
+from ..states.constants import State
 
 OBSOLESCENCE_DELAY = 20  # nb of seconds beyond which a neighbor becomes irrelevant
-
-
-# TODO: import properly
-class State(Enum):
-    INITIALIZATION = 0
-    SYNCHRONIZATION = 1
-    SCHEDULING = 2
-    TASK = 3
-    LISTEN = 4
-
 
 class Neighborhood:
     def __init__(self):
@@ -28,7 +18,7 @@ class Neighborhood:
 
     def is_alone_in_state(self, state: State) -> bool:
         if len(self.current_neighbors) == 0:
-            print("[INFO] No neighbors detected")
+            print("No neighbors detected", 'info', 'tdma')
 
         if state == -1:
             return len(self.current_neighbors) == 0
