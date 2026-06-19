@@ -1,7 +1,7 @@
 from ..custom_terminal import print 
 
 from .tag import Tag
-from .containers import Coordinates, Angles, DeviceCoordinates
+from .containers import Coordinates, Angles
 from .dw_1000 import DW1000
 from ..config import ANCHORS
 
@@ -16,7 +16,7 @@ TWR_REPORT = 0x04
 DW_PAUSE_DELAY = 0.005    # Delay used to give some time for the DW to reset between loops 
 DW_LISTEN_TIMEOUT = 0.015 # Delay used to wait during RX 
 
-DISCOVERY_TIMEOUT = 10    # If we don't hear from another tag after this time, we consider it inactive 
+DISCOVERY_TIMEOUT = 5     # If we don't hear from another tag after this time, we consider it inactive 
 
 class BitcrazeTag(Tag):
     """
@@ -105,7 +105,7 @@ class BitcrazeTag(Tag):
     def addNeighborTag(self, tag_id: int) -> None: 
         self._active_tags[tag_id] = time.perf_counter() 
 
-    def addDevice(self, device:DeviceCoordinates) -> None:
+    def addDevice(self, device) -> None:
         self.device_list.append(device)
 
     def clearDevices(self) -> None:
@@ -146,7 +146,8 @@ class BitcrazeTag(Tag):
                 time.sleep(DW_PAUSE_DELAY)
 
         if discovery_type == "all" or discovery_type == "tag":
-            pass # TODO 
+            device_list = device_list.union(self.active_tags)
+
         return device_list 
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
