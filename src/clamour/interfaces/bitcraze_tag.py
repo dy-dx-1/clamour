@@ -16,6 +16,8 @@ TWR_REPORT = 0x04
 DW_PAUSE_DELAY = 0.005    # Delay used to give some time for the DW to reset between loops 
 DW_LISTEN_TIMEOUT = 0.015 # Delay used to wait during RX 
 
+DISCOVERY_TIMEOUT = 10    # If we don't hear from another tag after this time, we consider it inactive 
+
 class BitcrazeTag(Tag):
     """
     Defines the UWB tag interface for a Bitcraze Loco Positioning Deck (Tag). 
@@ -33,9 +35,9 @@ class BitcrazeTag(Tag):
             raise Exception("Invalid tag_id for BitcrazeTag. Tag ID must > 10. Check your config file.")
         
         self._id = tag_id 
-        self._twr_seq = 0  # keeps track of TWR Sequence, only access through property. 
+        self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
-        self.device_list = [] 
+        self._active_tags = {}   # keeps track of nearby tags and when they were last seen 
 
         print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
         print(f"TAG ID: {self._id}", 'ok', 'device')
@@ -50,6 +52,11 @@ class BitcrazeTag(Tag):
     @property
     def tag_id(self)->int:
         return self._id
+    
+    @property
+    def active_tags(self)->set[int]:
+        now = time.perf_counter() 
+        return {tag_id for tag_id, last_seen in self._active_tags.items() if (now-last_seen)<DISCOVERY_TIMEOUT}
     
     @property
     def TWR_seq(self)->int: 
@@ -94,6 +101,9 @@ class BitcrazeTag(Tag):
         # NOTE: for BC as of 2026-05-26, I am defining anchors as devices with IDs <=10 
         # Tags must have any other IDs. 
         return device_id<=10 
+    
+    def addNeighborTag(self, tag_id: int) -> None: 
+        self._active_tags[tag_id] = time.perf_counter() 
 
     def addDevice(self, device:DeviceCoordinates) -> None:
         self.device_list.append(device)

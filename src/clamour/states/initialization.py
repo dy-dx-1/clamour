@@ -38,9 +38,10 @@ class Initialization(TDMAState):
         else:
             print(f"[INFO] Initialization.clear_tag_buffer(): sendData to {self.id=} FAILED")
         sleep(0.25)
-        for _ in range(50):
-            print(self.messenger.obtain_message_from_tag())
-            sleep(0.05)
+        with self.tag_lock: 
+            for _ in range(50):
+                print(self.tag.receiveData())
+                sleep(0.05)
 
     def discover_neighbors(self):
         self.clear_known_devices()

@@ -64,6 +64,14 @@ class PozyxTag(Tag):
     def tag_id(self):
         return self._id
     
+    @property
+    def active_tags(self):
+        """
+        Since pozyx offers network discovery, no need for a timeout here. 
+        Also don't need to maintain internal dictionary like in BitcrazeTag
+        """
+        return self.get_device_list('tag') 
+    
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
     def is_anchor(device_id):
@@ -74,6 +82,13 @@ class PozyxTag(Tag):
         if device_id in testing_tags: 
             return True 
         return device_id < 0x500
+    
+    def addNeighborTag(tag_id):
+        """
+        Since pozyx offers network discovery, no need for a timeout here. 
+        Also don't need to maintain internal dictionary like in BitcrazeTag
+        """
+        pass 
     
     def addDevice(self, device_coordinates:DeviceCoordinates): 
         # Only used in task.py, this is passed as self.anchors.anchors_dict[anchor], without expecting a return

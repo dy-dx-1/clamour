@@ -97,6 +97,9 @@ class Messenger:
             self.tag.sendData(0, struct.pack('<BI', 0xAA, int(message.data)))
 
     def receive_message(self, state: State) -> bool:
+        """
+        Only used in scheduling.py
+        """
         is_new_message, should_go_to_sync = self.receive_new_message(state)
         if is_new_message:
             self.update_topology(state)
@@ -166,12 +169,15 @@ class Messenger:
         returns False."""
 
         is_new_message = False
-        sender_id, data = self.obtain_message_from_tag()
+
+        with self.tag_lock: 
+            sender_id, data = self.tag.receiveData()
 
         if sender_id != 0 and data!=b"":
             print(f"Raw received: {data}", 'info', 'tdma')
 
         if sender_id != 0 and len(data)>0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
+            self.tag.addNeighborTag(sender_id) # Received valid message, update our neighbor info 
             received_message = MessageFactory.create(sender_id, data)
             if received_message is None:  # NOTE: from 2026-05-03 TDMA testing after decoupling, may not be right 
                 print(f"[WARNING] Dropped unknown message: {data}", 'info', 'tdma')
@@ -189,11 +195,6 @@ class Messenger:
                 print(f"Messenger.receive_new_message: Received sync messages, going back to sync. {self.should_go_back_to_sync} {len(self.neighborhood.current_neighbors)}", 'info', 'tdma')
 
         return is_new_message, (self.should_go_back_to_sync > max(len(self.neighborhood.current_neighbors) * 3, 10))
-
-    def obtain_message_from_tag(self) -> tuple[int, bytes]:
-        with self.tag_lock: 
-            sender_id, data = self.tag.receiveData()
-        return sender_id, data 
 
     def update_topology(self, state: State, device_list: list=None, topology_info: list=None, sender_id:int=None) -> None:
         if device_list is not None:

@@ -33,6 +33,15 @@ class Tag(ABC):
         Return the tag's unique identifier as an integer.
         """
 
+    @property
+    @abstractmethod
+    def active_tags(self) -> set[int]: 
+        """
+        Return the set of the IDs of the current active tags in the neighborhood.
+        This method should implement a DISCOVERY_TIMEOUT that allows it to return 
+        only devices that have been active recently. See BitcrazeTag implementation.  
+        """
+
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
     @abstractmethod
@@ -46,6 +55,14 @@ class Tag(ABC):
 
         Returns:
             Bool of the result
+        """
+
+    @abstractmethod
+    def addNeighborTag(tag_id: int) -> None: 
+        """
+        Adds a neighboring tag to the tag's internal active tags dictionary
+        Used in Messenger.receive_new_message(), whenever we receive a valid message
+        The dictionary should keep timestamp info to allow for correct return of property active_tags. 
         """
 
     @abstractmethod
