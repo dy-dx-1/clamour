@@ -37,8 +37,11 @@ class BitcrazeTag(Tag):
         self._id = tag_id 
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
-        self._active_tags = {}   # keeps track of nearby tags and when they were last seen 
+
+        self._active_tags = {}      # keeps track of nearby tags and when they were last seen 
         self.available_anchors = {} # TODO: check if this can be used to simplify Anchors.available_anchors
+        self.pos = Coordinates()    # Tag position 
+        self.orientation = Angles() 
 
         print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
         print(f"TAG ID: {self._id}", 'ok', 'device')
@@ -186,29 +189,13 @@ class BitcrazeTag(Tag):
         # Check use of Anchors.available_anchors property, when is it updated and connect it to internal self.available_anchors instead
 
     def setCoordinates(self, coord_list:list[int]) -> None:
-        """
-        Manually sets the position of the tag. 
+        self.pos.load(coord_list)
 
-        Args:
-            coord_list: List of ints [x, y, z] representing the position of the tag
-        """
+    def getCoordinates(self) -> Coordinates: 
+        return self.pos 
 
-    def getCoordinates(self) -> Coordinates | None: 
-        """
-        Gets the coordinates of the device. 
-        Does not trigger positioning, only retrieves last known coordinates. 
-
-        Returns:
-            Coordinates object of the last known position 
-        """
-
-    def getOrientation(self) -> Angles | None: 
-        """ 
-        Gets the current orientation of the tag in degrees. 
-        
-        Returns:
-            Angles object of the current orientation (heading, roll, pitch)
-        """
+    def getOrientation(self) -> Angles: 
+        return self.orientation
 
     def doPositioning(self) -> Coordinates | None:
         """
