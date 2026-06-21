@@ -1,5 +1,6 @@
 from .tag import Tag
 from .containers import Coordinates, Angles
+from ..config import ANCHORS
 from ..custom_terminal import print 
 import struct 
 
@@ -73,6 +74,10 @@ class PozyxTag(Tag):
         """
         return self.get_device_list('tag') 
     
+    @property
+    def available_anchors(self):
+        return self.get_device_list('anchor')
+    
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
     def is_anchor(device_id):
@@ -91,10 +96,18 @@ class PozyxTag(Tag):
         """
         pass 
     
-    def addAnchor(self, anchor_id, anchor_coords): 
+    def addAnchor(self, anchor_id): 
         # Only used in task.py
         # Coordinates is our general version, needs to be formatted to pypozyx version 
-        pozyx_obj = pozyxDeviceCoordinates(network_id=anchor_id, flag=1, pos = pozyxCoordinates(anchor_coords.x, anchor_coords.y, anchor_coords.z) )
+        # TODO: ik this is a horrible fix
+        # In the future, I should have a better way to do this. Either removing anchors.py and importing from config 
+        # or shift anchors into clamour dir and use it everywhere cleanly? 
+        for anchor_dict in ANCHORS:
+            if anchor_dict['id']==anchor_id: 
+                x = anchor_dict['x']
+                y = anchor_dict['y']
+                z = anchor_dict['z']
+        pozyx_obj = pozyxDeviceCoordinates(network_id=anchor_id, flag=1, pos = pozyxCoordinates(x, y, z) )
         self._pozyx_serial.addDevice(pozyx_obj)
     
     def clearAnchors(self):

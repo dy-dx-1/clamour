@@ -39,7 +39,7 @@ class BitcrazeTag(Tag):
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
 
         self._active_tags = {}      # keeps track of nearby tags and when they were last seen 
-        self.available_anchors = {} # TODO: check if this can be used to simplify Anchors.available_anchors
+        self.available_anchors = {} # keeps track of currently in-range anchors 
         self.pos = Coordinates()    # Tag position 
         self.orientation = Angles() 
 
@@ -109,11 +109,11 @@ class BitcrazeTag(Tag):
     def addNeighborTag(self, tag_id:int)->None: 
         self._active_tags[tag_id] = time.perf_counter() 
 
-    def addAnchor(self, anchor_id:int, anchor_coords:Coordinates)->None:
-        self.available_anchors[anchor_id] = anchor_coords
+    def addAnchor(self, anchor_id:int)->None:
+        self.available_anchors.add(anchor_id)
 
     def clearAnchors(self) -> None:
-        self.available_anchors = {} 
+        self.available_anchors.clear() 
 
     def resetSystem(self) -> None:
         self._dw.soft_reset() 
@@ -185,8 +185,6 @@ class BitcrazeTag(Tag):
         Args:
             number_of_anchors: int specifying how many anchors are available for positioning
         """
-        # NOTE TODO: when here, look into simplifying Anchors.available_anchors with tag.available_anchors I'm sure they're repeating for nothing 
-        # Check use of Anchors.available_anchors property, when is it updated and connect it to internal self.available_anchors instead
 
     def setCoordinates(self, coord_list:list[int]) -> None:
         self.pos.load(coord_list)

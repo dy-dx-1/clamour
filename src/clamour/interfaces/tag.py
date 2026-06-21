@@ -37,9 +37,16 @@ class Tag(ABC):
     @abstractmethod
     def active_tags(self) -> set[int]: 
         """
-        Return the set of the IDs of the current active tags in the neighborhood.
+        Set of the IDs of the current active tags in the neighborhood.
         This method should implement a DISCOVERY_TIMEOUT that allows it to return 
         only devices that have been active recently. See BitcrazeTag implementation.  
+        """
+    
+    @property 
+    @abstractmethod 
+    def available_anchors(self) -> set[int]: 
+        """ 
+        Set of the IDs of the anchors that this tag can currently reach. 
         """
 
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
@@ -66,15 +73,15 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def addAnchor(self, anchor_id: int, anchor_coords: Coordinates) -> None:
+    def addAnchor(self, anchor_id: int) -> None:
         """
-        Adds an anchor to the tag's available anchors dict 
+        Adds an anchor to the tag's list of available anchors 
         """
 
     @abstractmethod
     def clearAnchors(self) -> None:
         """
-        Clears the available anchors dict
+        Clears the list of available anchors
         """
 
     @abstractmethod

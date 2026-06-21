@@ -3,9 +3,8 @@ from ..config import ANCHORS
 
 class Anchors:
     def __init__(self):
-        self.available_anchors = []
         self.floor_height = 18900 - 300
-        self.anchors_dict = self.load_anchors_from_config() # Dict {anchor_id: Coordinates()}
+        self.anchors_dict = self.load_anchors_from_config() # Dict of ALL deployed anchors {anchor_id: Coordinates()}
 
     def load_anchors_from_config(self) -> dict:
         anchor_dict = {} 

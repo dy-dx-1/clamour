@@ -77,7 +77,7 @@ class Task(TDMAState):
             return State.SYNCHRONIZATION
 
     def select_localization_method(self) -> None:
-        self.localize = self.positioning if len(self.anchors.available_anchors) >= 3 else self.ranging
+        self.localize = self.positioning if len(self.tag.available_anchors) >= 3 else self.ranging
 
     def positioning(self) -> None:
         with self.tag_lock:
@@ -125,30 +125,28 @@ class Task(TDMAState):
         """We select a target for doing a range measurement.
         Anchors are prioritized because of their lower uncertainty."""
 
-        if len(self.anchors.available_anchors) > 0:
-            return random.choice(self.anchors.available_anchors)
+        if len(self.tag.available_anchors) > 0:
+            return random.choice(self.tag.available_anchors)
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
         Prioritizes the anchors because of their smaller measurement uncertainty.
         If there aren't enough anchors, will use tags as well."""
 
-        self.anchors.available_anchors.clear()
-
         with self.tag_lock:
             self.tag.clearAnchors() # Internal tag list automatically discards old tags 
             devices = self.tag.get_device_list("all")
 
-        new_anchors, new_tags = [], []
+        new_tags = []
         for device in devices:
             if self.tag.is_anchor(device):
                 print(f"Task.discover_devices(): Found device: {device}, it's an ANCHOR!", 'info', 'tdma')
-                new_anchors.append(device)
+                with self.tag_lock: 
+                    self.tag.addAnchor(device)
             else:
                 print(f"Task.discover_devices(): Found device: {device}, it's a TAG!", 'info', 'tdma')
                 new_tags.append(device)
 
-        self.anchors.available_anchors = new_anchors
         self.update_neighborhood(new_tags)
 
     def update_neighborhood(self, new_tags: list) -> None:
@@ -159,16 +157,9 @@ class Task(TDMAState):
                 self.neighborhood.changed = True
 
     def set_manually_measured_anchors(self) -> None:
-        with self.tag_lock:
-            self.tag.clearAnchors()
-
-        for anchor in self.anchors.available_anchors:
+        if len(self.tag.available_anchors) > 3:
             with self.tag_lock:
-                self.tag.addAnchor(anchor, self.anchors.anchors_dict[anchor])
-
-        if len(self.anchors.available_anchors) > 3:
-            with self.tag_lock:
-                self.tag.configureAnchorSelection(number_of_anchors = len(self.anchors.available_anchors))
+                self.tag.configureAnchorSelection(number_of_anchors = len(self.tag.available_anchors))
 
     def handle_error(self, function_name: str) -> None: 
         """
