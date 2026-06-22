@@ -30,7 +30,7 @@ class Tag(ABC):
     @abstractmethod
     def tag_id(self) -> int:
         """
-        Return the tag's unique identifier as an integer.
+        Tag's unique network identifier (int).
         """
 
     @property
@@ -38,7 +38,8 @@ class Tag(ABC):
     def active_tags(self) -> set[int]: 
         """
         Set of the IDs of the current active tags in the neighborhood.
-        This method should implement a DISCOVERY_TIMEOUT that allows it to return 
+
+        This method can implement a DISCOVERY_TIMEOUT that allows it to return 
         only devices that have been active recently. See BitcrazeTag implementation.  
         """
     
@@ -57,31 +58,29 @@ class Tag(ABC):
         Evaluates if a particular device is a UWB anchor. 
         Does not require the use of Lock. 
 
-        Args: 
-            device_id: Int ID of the device to check 
-
-        Returns:
-            Bool of the result
+        ARGS: 
+            - device_id: Int ID of the device to check 
         """
 
     @abstractmethod
     def addNeighborTag(tag_id: int) -> None: 
         """
-        Adds a neighboring tag to the tag's internal active tags dictionary
-        Used in Messenger.receive_new_message(), whenever we receive a valid message
+        Adds a neighboring tag to the tag's internal active tags dictionary. 
+
+        Used in Messenger.receive_new_message(), whenever we receive a valid message. 
         The dictionary should keep timestamp info to allow for correct return of property active_tags. 
         """
 
     @abstractmethod
     def addAnchor(self, anchor_id: int) -> None:
         """
-        Adds an anchor to the tag's list of available anchors 
+        Adds an anchor to the tag's list of available anchors.
         """
 
     @abstractmethod
     def clearAnchors(self) -> None:
         """
-        Clears the list of available anchors
+        Clears the list of available anchors. 
         """
 
     @abstractmethod
@@ -96,10 +95,10 @@ class Tag(ABC):
         Checks if the tag experienced an error and retrieves it. 
         If there was an error, prints it to the terminal & the function name where it happened.
         
-        Args:
-            function_name: String indicating the function name where this was checked
-        Returns: 
-            Bool on whether there was really an error or not 
+        ARGS:
+            - function_name: String indicating the function name where this was checked
+        RETURNS: 
+            - bool on whether there was really an error or not 
         """
     
     @abstractmethod
@@ -107,11 +106,11 @@ class Tag(ABC):
         """
         Gets the IDs of devices seen by the tag. This must never return duplicated elements. 
 
-        Args: 
-            discovery_type: String specifying what type of device to return
+        ARGS: 
+            - discovery_type: String specifying what type of device to return
         
-        Returns:
-            Set of corresponding device IDs (ints) 
+        RETURNS:
+            - Set of corresponding device IDs (ints) 
         """
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
@@ -120,12 +119,12 @@ class Tag(ABC):
         """
         Transmits data from the tag to a destination. 
 
-        Args:
-            destination: destination id (int)
-            payload: data to send (bytes)
+        ARGS:
+            - destination: destination id (int)
+            - payload: data to send (bytes)
 
-        Returns:
-            Bool on whether it succeeded
+        RETURNS:
+            - Bool on whether it succeeded
         """
     
     @abstractmethod
@@ -133,8 +132,8 @@ class Tag(ABC):
         """
         Reads data received by the tag. 
 
-        Returns: 
-            tuple[sender_id (int), data (bytes)]
+        RETURNS: 
+            - tuple[sender_id (int), data (bytes)]
         """
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
@@ -167,8 +166,8 @@ class Tag(ABC):
         Should be called with the total number of anchors that are currently available. We can then use them all or a more efficient subset. 
         Only used in task.py: it's updated if there's more than 3 available anchors
 
-        Args:
-            number_of_anchors: int specifying how many anchors are available for positioning
+        ARGS:
+            - number_of_anchors: int specifying how many anchors are available for positioning
         """
     
     @abstractmethod
@@ -177,8 +176,8 @@ class Tag(ABC):
         Positions the tag in space with UWB ranging. 
         This function computes and stores the position in the tag's memory. 
 
-        Returns:
-            Coordinates object with the position or None
+        RETURNS:
+            - Coordinates object with the position or None
         """
 
     @abstractmethod
@@ -186,9 +185,9 @@ class Tag(ABC):
         """
         Calculates a UWB range measurement between the tag and another device. 
         
-        Args:
-            target_id: ID of the target device (int) 
+        ARGS:
+            - target_id: ID of the target device (int) 
         
-        Returns:
-            Coordinates object with the position or None
+        RETURNS:
+            - Coordinates object with the position or None
         """
