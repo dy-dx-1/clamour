@@ -26,7 +26,7 @@ class TDMANode:
             State.SYNCHRONIZATION: Synchronization(neighborhood, slot_assignment, self.timing, messenger,
                                                    tag_id, multiprocess_communication_queue),
             State.SCHEDULING: Scheduling(neighborhood, slot_assignment, self.timing, tag_id, messenger),
-            State.TASK: Task(self.timing, anchors, neighborhood, tag_id, shared_tag, shared_tag_lock, messenger,
+            State.TASK: Task(self.timing, anchors, neighborhood, shared_tag, shared_tag_lock, messenger,
                              slot_assignment),
             State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
 

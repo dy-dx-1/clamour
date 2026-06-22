@@ -19,12 +19,11 @@ from .tdmaState import TDMAState
 
 
 class Task(TDMAState):
-    def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood,
-                 id: int, shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
+    def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood, 
+                 shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
                  slot_assignment: SlotAssignment):
         self.timing = timing
         self.anchors = anchors
-        self.id = id
         self.localize = self.ranging
         self.tag = shared_tag
         self.tag_lock = shared_tag_lock
