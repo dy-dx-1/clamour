@@ -38,10 +38,10 @@ class BitcrazeTag(Tag):
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
 
-        self._active_tags = {}      # keeps track of nearby tags and when they were last seen 
+        self._active_tags = {}       # keeps track of nearby tags and when they were last seen 
         self._available_anchors = {} # keeps track of currently in-range anchors 
-        self.pos = Coordinates()    # Tag position 
-        self.orientation = Angles() 
+        self._pos = Coordinates()    # Tag position 
+        self._orientation = Angles() 
 
         print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
         print(f"TAG ID: {self._id}", 'ok', 'device')
@@ -190,14 +190,17 @@ class BitcrazeTag(Tag):
             number_of_anchors: int specifying how many anchors are available for positioning
         """
 
-    def setCoordinates(self, coord_list:list[int]) -> None:
-        self.pos.load(coord_list)
+    @property
+    def coordinates(self)->Coordinates: 
+        return self._pos
+    
+    @coordinates.setter 
+    def coordinates(self, new_coords:Coordinates): 
+        self._pos = new_coords 
 
-    def getCoordinates(self) -> Coordinates: 
-        return self.pos 
-
-    def getOrientation(self) -> Angles: 
-        return self.orientation
+    @property
+    def orientation(self):
+        return self._orientation
 
     def doPositioning(self) -> Coordinates | None:
         """

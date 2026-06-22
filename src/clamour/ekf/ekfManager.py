@@ -93,7 +93,7 @@ class EKFManager:
 
             try:
                 with self.tag_lock:
-                    self.tag.setCoordinates([int(self.ekf.get_position().x), int(self.ekf.get_position().y), int(self.ekf.get_position().z)])
+                    self.tag.coordinates = self.ekf.get_position()
             except StructError as s:
                 print(f"EKFManager.process_latest_state_info(): {str(s)}", 'error' 'loc')
 

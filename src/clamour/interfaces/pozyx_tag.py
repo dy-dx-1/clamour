@@ -190,15 +190,8 @@ class PozyxTag(Tag):
         return sender_id, data 
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
-    def configureAnchorSelection(self, number_of_anchors):
-        # With pypozyx, we use automatic anchor selection: https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
-        # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
-        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=number_of_anchors)
-    
-    def setCoordinates(self, coord_list):
-        self._pozyx_serial.setCoordinates(coord_list)
-
-    def getCoordinates(self): 
+    @property
+    def coordinates(self):
         # Not sure why pypozyx seems to only get the X position with this function. 
         # If precision is way off in the future, look into this. 
         coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
@@ -210,18 +203,29 @@ class PozyxTag(Tag):
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
         return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
 
-    def getOrientation(self): 
+    @coordinates.setter
+    def coordinates(self, new_coords:Coordinates): 
+        pozyx_coords = pozyxCoordinates(new_coords.x, new_coords.y, new_coords.z)
+        self._pozyx_serial.setCoordinates(pozyx_coords)
+    
+    @property
+    def orientation(self):
         angles = EulerAngles() # pozyx object 
         try:
             status = self._pozyx_serial.getEulerAngles_deg(angles)
         except struct.error as s: 
             status = 0
-            print(f"PozyxTag.getOrientation: {str(s)}", 'error', 'loc') 
+            print(f"PozyxTag.getEulerAngles_deg: {str(s)}", 'error', 'loc') 
         
         if status == POZYX_SUCCESS: 
             return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
         else: 
             return None
+
+    def configureAnchorSelection(self, number_of_anchors):
+        # With pypozyx, we use automatic anchor selection: https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
+        # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
+        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=number_of_anchors)
 
     def doPositioning(self):
         pos = pozyxCoordinates() 

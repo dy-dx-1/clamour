@@ -139,6 +139,27 @@ class Tag(ABC):
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
 
+    @property
+    @abstractmethod
+    def coordinates(self) -> Coordinates: 
+        """
+        The last-known position of the tag. 
+        """
+
+    @coordinates.setter 
+    @abstractmethod
+    def coordinates(self, new_coords:Coordinates) -> None: 
+        pass
+
+    @property
+    def orientation(self) -> Angles: 
+        """ 
+        Gets the current orientation of the tag in degrees. 
+        
+        RETURNS: 
+            - Angles object of the current orientation (heading, roll, pitch)
+        """
+
     @abstractmethod
     def configureAnchorSelection(self, number_of_anchors:int) -> None:
         """
@@ -150,34 +171,6 @@ class Tag(ABC):
             number_of_anchors: int specifying how many anchors are available for positioning
         """
     
-    @abstractmethod
-    def setCoordinates(self, coord_list:list[int]) -> None:
-        """
-        Manually sets the position of the tag. 
-
-        Args:
-            coord_list: List of ints [x, y, z] representing the position of the tag
-        """
-
-    @abstractmethod
-    def getCoordinates(self) -> Coordinates | None: 
-        """
-        Gets the coordinates of the device. 
-        Does not trigger positioning, only retrieves last known coordinates. 
-
-        Returns:
-            Coordinates object of the last known position 
-        """
-
-    @abstractmethod
-    def getOrientation(self) -> Angles | None: 
-        """ 
-        Gets the current orientation of the tag in degrees. 
-        
-        Returns:
-            Angles object of the current orientation (heading, roll, pitch)
-        """
-
     @abstractmethod
     def doPositioning(self) -> Coordinates | None:
         """

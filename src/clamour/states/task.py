@@ -87,7 +87,7 @@ class Task(TDMAState):
         with self.tag_lock:
             print(f"Task.positioning(): Attempting positioning with anchors: {self.anchors.anchors_dict}", 'info', 'loc')
             position = self.tag.doPositioning()
-            angles = self.tag.getOrientation() 
+            angles = self.tag.orientation
 
         if (position is not None) and (angles is not None): 
             print(f"Task.positioning(): Successful positioning", 'ok', 'loc')
@@ -95,7 +95,7 @@ class Task(TDMAState):
             if position is None: 
                 self.handle_error("Tag.doPositioning()")
             if angles is None:
-                self.handle_error("Tag.getOrientation()")
+                self.handle_error("Tag.orientation was None")
 
         if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
@@ -111,12 +111,12 @@ class Task(TDMAState):
         if ranging_target_id is not None:
             with self.tag_lock: 
                 if ranging_target_id not in self.anchors.anchors_dict:
-                    ref_coordinates = self.tag.getCoordinates()
+                    ref_coordinates = self.tag.coordinates
                 else:
                     ref_coordinates = self.anchors.anchors_dict[ranging_target_id]
 
                 measured_position = self.tag.doRanging(ranging_target_id) 
-                angles = self.tag.getOrientation() 
+                angles = self.tag.orientation
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
