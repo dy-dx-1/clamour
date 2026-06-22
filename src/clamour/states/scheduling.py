@@ -1,15 +1,15 @@
 from typing import TYPE_CHECKING
 from random import sample, randint
 
+from .constants import State, TAG_ID_MASK
+from .tdmaState import TDMAState 
+
 from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..interfaces.timing import NB_NODES, SYNCHRONIZATION_PERIOD, SCHEDULING_SLOT_DURATION, NB_TASK_SLOTS
+from ..interfaces.timing import NB_NODES, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
 from ..custom_terminal import print 
 
 if TYPE_CHECKING:
     from ..messenger import Messenger
-
-from .constants import State, TAG_ID_MASK
-from .tdmaState import TDMAState 
 
 class Scheduling(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
@@ -17,7 +17,7 @@ class Scheduling(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.timing = timing
-        self.id = id
+        self.id = tag_id
         self.messenger = messenger
         self.first_scheduling_execution = True
         self.should_go_back_to_sync = False
@@ -77,5 +77,3 @@ class Scheduling(TDMAState):
         self.slot_assignment.pure_send_list = [x for x in range(len(self.slot_assignment.send_list))
                                                if self.slot_assignment.send_list[x] not in [-1, -2]
                                                and self.slot_assignment.receive_list[x] == -1]
-
-

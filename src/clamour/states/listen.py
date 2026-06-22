@@ -1,14 +1,13 @@
 from typing import TYPE_CHECKING
 
+from .constants import State
+from .tdmaState import TDMAState
+
 from ..interfaces import SlotAssignment, Timing, Neighborhood
 from ..custom_terminal import print 
 
 if TYPE_CHECKING:
     from ..messenger import Messenger
-
-from .constants import State
-from .tdmaState import TDMAState
-
 
 class Listen(TDMAState):
     def __init__(self, slot_assignment: SlotAssignment, timing: Timing, 

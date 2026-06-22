@@ -20,8 +20,8 @@ class TDMANode:
         self.timing = Timing()
         self.loop_start_time = time()
 
-        self.states = self.states = {
-            State.INITIALIZATION: Initialization(neighborhood, anchors, tag_id, shared_tag, messenger,
+        self.states = self.states = { # TODO NOTE!! why is there 2 equals? i think this is a code hallucination, to check - 22june 
+            State.INITIALIZATION: Initialization(neighborhood, anchors, shared_tag, messenger,
                                                  multiprocess_communication_queue, shared_tag_lock),
             State.SYNCHRONIZATION: Synchronization(neighborhood, slot_assignment, self.timing, messenger,
                                                    tag_id, multiprocess_communication_queue),

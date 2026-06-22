@@ -1,9 +1,11 @@
 import random
+import struct
+from time import sleep
 from multiprocessing.synchronize import Lock
 from typing import TYPE_CHECKING
 
-import struct
-from time import sleep
+from .constants import State
+from .tdmaState import TDMAState
 
 from ..custom_terminal import print 
 from ..interfaces import Tag, Anchors, Neighborhood
@@ -11,17 +13,12 @@ from ..interfaces import Tag, Anchors, Neighborhood
 if TYPE_CHECKING:
     from ..messenger import Messenger
 
-from .constants import State
-from .tdmaState import TDMAState
-
-
 class Initialization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, anchors: Anchors, 
-                 id: int, tag: Tag, messenger: "Messenger",
+                 tag: Tag, messenger: "Messenger",
                  multiprocess_communication_queue, shared_tag_lock: Lock):
         self.neighborhood = neighborhood
         self.anchors = anchors
-        self.id = id
         self.tag = tag
         self.tag_lock = shared_tag_lock
         self.messenger = messenger
@@ -37,10 +34,10 @@ class Initialization(TDMAState):
         return State.SYNCHRONIZATION
 
     def clear_tag_buffer(self):
-        if self.tag.sendData(destination=self.id, payload= struct.pack('<i', 0)):
-            print(f"Initialization.clear_tag_buffer(): sendData to {self.id=} was a success!", 'info', 'tdma')
+        if self.tag.sendData(destination=self.tag.tag_id, payload= struct.pack('<i', 0)):
+            print(f"Initialization.clear_tag_buffer(): sendData to {self.tag.tag_id=} was a success!", 'info', 'tdma')
         else:
-            print(f"Initialization.clear_tag_buffer(): sendData to {self.id=} FAILED", 'info', 'tdma')
+            print(f"Initialization.clear_tag_buffer(): sendData to {self.tag.tag_id=} FAILED", 'info', 'tdma')
         sleep(0.25)
         with self.tag_lock: 
             for _ in range(50):
