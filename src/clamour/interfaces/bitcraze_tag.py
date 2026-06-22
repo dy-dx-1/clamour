@@ -181,14 +181,12 @@ class BitcrazeTag(Tag):
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     def configureAnchorSelection(self, number_of_anchors:int) -> None:
-        """
-        Configures how many and which anchors are used for positioning the tag.
-        Should be called with the total number of anchors that are currently available. We can then use them all or a more efficient subset. 
-        Only used in task.py: it's updated if there's more than 3 available anchors
-
-        Args:
-            number_of_anchors: int specifying how many anchors are available for positioning
-        """
+        # Currently don't have a specific way to determine which anchors to use 
+        # Pypozyx already had an algo for this, which is why the function exists 
+        # TODO: for now, simply using all available anchors. Implement somthing in future. 
+        
+        # NOTE: this could even simply be inside positioning method to simplify things 
+        pass 
 
     @property
     def coordinates(self)->Coordinates: 
