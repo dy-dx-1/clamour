@@ -1,12 +1,15 @@
 import random
 from multiprocessing.synchronize import Lock
+from typing import TYPE_CHECKING
 
 import struct
 from time import sleep
 
 from ..custom_terminal import print 
 from ..interfaces import Tag, Anchors, Neighborhood
-from ..messenger import Messenger
+
+if TYPE_CHECKING:
+    from ..messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -14,7 +17,7 @@ from .tdmaState import TDMAState
 
 class Initialization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, anchors: Anchors, 
-                 id: int, tag: Tag, messenger: Messenger,
+                 id: int, tag: Tag, messenger: "Messenger",
                  multiprocess_communication_queue, shared_tag_lock: Lock):
         self.neighborhood = neighborhood
         self.anchors = anchors

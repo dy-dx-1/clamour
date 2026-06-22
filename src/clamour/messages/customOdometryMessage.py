@@ -1,4 +1,4 @@
-from . import PoseMessage
+from .poseMessage import PoseMessage
 from .types import UpdateType
 
 class CustomOdometryMessage:

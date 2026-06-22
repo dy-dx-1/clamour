@@ -8,7 +8,7 @@ class RoomLoader:
     @staticmethod
     def load_rooms_from_csv() -> list:
         print("RoomLoader.load_rooms_from_csv: loading rooms with sys.path", 'info', 'gen') 
-        with open(sys.path[0]+'/rooms/chambord_rooms.csv') as r:
+        with open(sys.path[0]+'/clamour/rooms/chambord_rooms.csv') as r:
             reader = csv.reader(r, delimiter=',')
             next(reader)  # We don't want to read the header, so we skip it
             return [RoomLoader.create_room(room) for room in reader]

@@ -1,5 +1,5 @@
 import time
-from ..messages import PoseMessage
+from ..messages.poseMessage import PoseMessage
 
 class CustomOdometry:
     def __init__(self, R):

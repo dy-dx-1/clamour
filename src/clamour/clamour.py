@@ -1,17 +1,17 @@
-#!/usr/bin/python3
-
 from multiprocessing import Lock, Queue
 
 from .ekf import EKFManager, CustomOdometry
 from .tdmaNode import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
-from .pedometer import Pedometer
-from .messages import PoseMessage, CustomOdometryMessage
+#from .pedometer import Pedometer
+from .messages.poseMessage import PoseMessage
+from .messages.customOdometryMessage import CustomOdometryMessage
 from .runnableProcess import RunnableProcess
 #from .soundmanager import SoundManager
-from .interfaces import PozyxTag, BitcrazeTag
-from .custom_terminal import print 
+from .interfaces.bitcraze_tag import BitcrazeTag
+from .interfaces.pozyx_tag import PozyxTag
+from .custom_terminal import print
 
 #################################################### CONFIG PARAMETERS
 from .config import (TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS, 

@@ -39,7 +39,7 @@ class BitcrazeTag(Tag):
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
 
         self._active_tags = {}      # keeps track of nearby tags and when they were last seen 
-        self.available_anchors = {} # keeps track of currently in-range anchors 
+        self._available_anchors = {} # keeps track of currently in-range anchors 
         self.pos = Coordinates()    # Tag position 
         self.orientation = Angles() 
 
@@ -61,6 +61,10 @@ class BitcrazeTag(Tag):
     def active_tags(self)->set[int]:
         now = time.perf_counter() 
         return {tag_id for tag_id, last_seen in self._active_tags.items() if (now-last_seen)<DISCOVERY_TIMEOUT}
+    
+    @property
+    def available_anchors(self):
+        return self._available_anchors 
     
     @property
     def TWR_seq(self)->int: 
@@ -110,10 +114,10 @@ class BitcrazeTag(Tag):
         self._active_tags[tag_id] = time.perf_counter() 
 
     def addAnchor(self, anchor_id:int)->None:
-        self.available_anchors.add(anchor_id)
+        self._available_anchors.add(anchor_id)
 
     def clearAnchors(self) -> None:
-        self.available_anchors.clear() 
+        self._available_anchors.clear() 
 
     def resetSystem(self) -> None:
         self._dw.soft_reset() 

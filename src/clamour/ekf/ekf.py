@@ -4,7 +4,7 @@ from numpy import array, asarray, ndarray, dot, eye, linalg
 
 from ..interfaces import Coordinates
 from .customOdometry import CustomOdometry
-from ..messages import PoseMessage
+from ..messages.poseMessage import PoseMessage
 
 DT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
 

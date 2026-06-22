@@ -2,19 +2,24 @@ from numpy import mean
 from ctypes import c_int32 as int32
 from time import time, sleep
 import random
+from typing import TYPE_CHECKING
 
 from ..custom_terminal import print 
 from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..messages import (MessageFactory, SynchronizationMessage, UWBSynchronizationMessage)
-from ..messenger import Messenger
 from ..interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
+from ..messages.messageFactory import MessageFactory
+from ..messages.synchronizationMessage import SynchronizationMessage
+from ..messages.uwbMessage import UWBSynchronizationMessage
+
+if TYPE_CHECKING:
+    from ..messenger import Messenger
 
 from .constants import *
 from .tdmaState import TDMAState
 
 class Synchronization(TDMAState):
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
-                 timing: Timing, messenger: Messenger, id: int, multiprocess_communication_queue):
+                 timing: Timing, messenger: "Messenger", id: int, multiprocess_communication_queue):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.timing = timing

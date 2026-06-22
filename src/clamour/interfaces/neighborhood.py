@@ -1,6 +1,9 @@
 from time import perf_counter
+from typing import TYPE_CHECKING
 from ..custom_terminal import print 
-from ..states.constants import State
+
+if TYPE_CHECKING:
+    from ..states.constants import State
 
 OBSOLESCENCE_DELAY = 20  # nb of seconds beyond which a neighbor becomes irrelevant
 
@@ -16,7 +19,7 @@ class Neighborhood:
         for id in [id for id, data in self.current_neighbors.items() if data[1] < perf_counter() - delay]:
             del self.current_neighbors[id]
 
-    def is_alone_in_state(self, state: State) -> bool:
+    def is_alone_in_state(self, state: "State") -> bool:
         if len(self.current_neighbors) == 0:
             print("No neighbors detected", 'info', 'tdma')
 

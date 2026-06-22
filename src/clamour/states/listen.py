@@ -1,14 +1,18 @@
+from typing import TYPE_CHECKING
+
 from ..interfaces import SlotAssignment, Timing, Neighborhood
-from ..interfaces.timing import Timing
-from ..messenger import Messenger
 from ..custom_terminal import print 
+
+if TYPE_CHECKING:
+    from ..messenger import Messenger
+
 from .constants import State
 from .tdmaState import TDMAState
 
 
 class Listen(TDMAState):
     def __init__(self, slot_assignment: SlotAssignment, timing: Timing, 
-                 messenger: Messenger, neighborhood: Neighborhood):
+                 messenger: "Messenger", neighborhood: Neighborhood):
         self.timing = timing
         self.messenger = messenger
         self.neighborhood = neighborhood

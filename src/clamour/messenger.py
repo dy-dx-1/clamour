@@ -1,18 +1,18 @@
 from .custom_terminal import print 
 import random
-from multiprocessing.synchronize import Lock # multiprocessing.Lock
+from multiprocessing.synchronize import Lock
 from time import perf_counter, time
-
 import struct
-from .interfaces import Tag
-from .interfaces import Coordinates
 
-from .contextManagedQueue import ContextManagedQueue
-from .interfaces import Neighborhood, SlotAssignment, State
+from .interfaces import Tag, Coordinates, Neighborhood, SlotAssignment
 from .interfaces.timing import NB_TASK_SLOTS
-from .messages import (MessageBox, MessageFactory, UWBSynchronizationMessage, UWBTDMAMessage,
-                      UWBTopologyMessage, UpdateMessage, UpdateType)
-from .messages.messageFactory import CUSTOM_MESSAGE_SIGNATURE
+from .contextManagedQueue import ContextManagedQueue
+from .states.constants import State
+from .messages.messageBox import MessageBox
+from .messages.messageFactory import MessageFactory, CUSTOM_MESSAGE_SIGNATURE
+from .messages.uwbMessage import UWBSynchronizationMessage, UWBTDMAMessage, UWBTopologyMessage
+from .messages.updateMessage import UpdateMessage
+from .messages.types import UpdateType
 
 class Messenger:
     def __init__(self, id: int, shared_tag: Tag, neighborhood: Neighborhood,

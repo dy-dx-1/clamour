@@ -1,7 +1,8 @@
 import numpy as np
 from math import sqrt, sin, cos
-from ..interfaces import Coordinates
 from typing import Union
+
+from ..interfaces import Coordinates
 
 
 class Room:

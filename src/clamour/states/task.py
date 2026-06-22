@@ -1,14 +1,18 @@
 import random
-from multiprocessing.synchronize import Lock # multiprocessing.Lock
+from multiprocessing.synchronize import Lock
 from time import perf_counter
+from typing import TYPE_CHECKING
 
 from numpy import array, atleast_2d
 import struct
 
 from ..custom_terminal import print 
 from ..interfaces import Tag, Coordinates, Anchors, Neighborhood, Timing, SlotAssignment
-from ..messages import UpdateMessage, UpdateType
-from ..messenger import Messenger
+from ..messages.updateMessage import UpdateMessage
+from ..messages.types import UpdateType
+
+if TYPE_CHECKING:
+    from ..messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState
@@ -16,7 +20,7 @@ from .tdmaState import TDMAState
 
 class Task(TDMAState):
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood,
-                 id: int, shared_tag: Tag, shared_tag_lock: Lock, messenger: Messenger,
+                 id: int, shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
                  slot_assignment: SlotAssignment):
         self.timing = timing
         self.anchors = anchors
