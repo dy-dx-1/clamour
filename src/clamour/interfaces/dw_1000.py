@@ -4,6 +4,8 @@ import spidev
 import time 
 from typing import Literal
 
+TX_TIME_UNIT = 1.5650040064102565e-11 
+
 # Channel-specific UWB configuration values
 # Maps channel -> {register_name: [values]}
 _CHANNEL_RF_CONFIG = {
@@ -220,7 +222,7 @@ class DW1000:
         self.prep_device_for_use() 
         print("Soft reset of DW1000 completed.", 'info', 'device')
 
-    def transmit(self, data:list, ranging:bool, timeout:float=0.05)->bool: 
+    def transmit(self, data:list, ranging:bool, timeout:float=0.05)->tuple[bool, bytes|None]: 
         """
         Transmits a message with the DW1000. Returns bool on whether was successfully sent. 
 
@@ -228,7 +230,11 @@ class DW1000:
             - data: List of bytes to send (LSB first) 
             - ranging: Bool indicating if ranging type of message
             - timeout: Max amount of time [s] to wait for confirmed send of message 
+        RETURNS: 
+            - bool indicating if operation successful 
+            - If ranging True, also returns TX timestamp (reg 0x17) IN CLK TICKS (raw 40bit value) 
         """
+        tx_timestamp = None
         ### Writing data to TX buffer 
         self.write_register([0x89], data)
         ### Setting frame length in Transmit Frame Control 
@@ -248,6 +254,10 @@ class DW1000:
         while (time.perf_counter()-t1)<timeout: 
             txfrs = self.read_register([0x0F], 1, return_ints=True)[0] >> 7  
             if txfrs: 
+                if ranging: ## If TX OK & ranging, return TX_TIME too 
+                    tx_time = self.read_register([0x17], 5, return_ints=True)
+                    tx_timestamp = tx_time[0] | tx_time[1]<<8 | tx_time[2]<<16 | tx_time[3]<<24 | tx_time[4]<<32
+                    return bool(txfrs), tx_timestamp
                 break # DW1000 will return to IDLE automatically 
         else: 
             # TODO Can add more in depth inspection of error bits in future 

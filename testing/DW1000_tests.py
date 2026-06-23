@@ -37,8 +37,7 @@ with DW1000(bus=0, cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, pr
         0x66
     ]
 
-    tx = dw.transmit(data=tosend, ranging=False) 
-    
-    msg = dw.listen(timeout=5, return_ints=False)
-    print(f"{tx=}") 
-    print(msg) 
+    tx, clock = dw.transmit(data=tosend, ranging=True) 
+    print(tx)
+    print(clock) 
+
