@@ -70,6 +70,7 @@ class DW1000:
     IMPORTANT: Use a context manager to ensure that the connection is properly closed. 
     """
     TIME_UNIT = 1.5650040064102565e-11  # seconds / tick for the DW1000
+    DW_LISTEN_TIMEOUT = 0.015           # Delay used to wait during RX 
 
     def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int): 
         self.spi = spidev.SpiDev() 
@@ -265,15 +266,15 @@ class DW1000:
             self.write_register([0x8D], [0x40]) # Force return to IDLE 
         return bool(txfrs) 
 
-    def listen(self, timeout:float, return_ints=True, ranging=False)->None|list|tuple[list, int|None]: 
+    def listen(self, ranging:bool=False, timeout:float=DW_LISTEN_TIMEOUT, return_ints:bool=True)->None|list|tuple[list, int|None]: 
         """
         Sets the DW1000 to RX mode and listens for messages. 
         Returns the first message found, if any, and closes the connection. 
         
         ARGS: 
+            - ranging: If we are ranging, will return the RX timestamp too (reg 0x15)
             - timeout: Max amount of time [s] to stay listening 
             - return_ints: Whether to return in hex string format or pure ints
-            - ranging: If we are ranging, will return the RX timestamp too (reg 0x15)
         RETURNS: 
             - The data received in a list of bytes 
             - If ranging, the RX timestamp in CLK TICKS (raw 40bit value) 
