@@ -4,8 +4,6 @@ import spidev
 import time 
 from typing import Literal
 
-TX_TIME_UNIT = 1.5650040064102565e-11 
-
 # Channel-specific UWB configuration values
 # Maps channel -> {register_name: [values]}
 _CHANNEL_RF_CONFIG = {
@@ -71,6 +69,8 @@ class DW1000:
     
     IMPORTANT: Use a context manager to ensure that the connection is properly closed. 
     """
+    TIME_UNIT = 1.5650040064102565e-11  # seconds / tick for the DW1000
+
     def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int): 
         self.spi = spidev.SpiDev() 
         self.spi.open(bus, cs) 
@@ -222,7 +222,7 @@ class DW1000:
         self.prep_device_for_use() 
         print("Soft reset of DW1000 completed.", 'info', 'device')
 
-    def transmit(self, data:list, ranging:bool, timeout:float=0.05)->tuple[bool, bytes|None]: 
+    def transmit(self, data:list, ranging:bool, timeout:float=0.05)->bool|tuple[bool, int|None]: 
         """
         Transmits a message with the DW1000. Returns bool on whether was successfully sent. 
 
@@ -265,7 +265,7 @@ class DW1000:
             self.write_register([0x8D], [0x40]) # Force return to IDLE 
         return bool(txfrs) 
 
-    def listen(self, timeout:float, return_ints=True): 
+    def listen(self, timeout:float, return_ints=True, ranging=False)->None|list|tuple[list, int|None]: 
         """
         Sets the DW1000 to RX mode and listens for messages. 
         Returns the first message found, if any, and closes the connection. 
@@ -273,16 +273,24 @@ class DW1000:
         ARGS: 
             - timeout: Max amount of time [s] to stay listening 
             - return_ints: Whether to return in hex string format or pure ints
+            - ranging: If we are ranging, will return the RX timestamp too (reg 0x15)
+        RETURNS: 
+            - The data received in a list of bytes 
+            - If ranging, the RX timestamp in CLK TICKS (raw 40bit value) 
         """
+        SOFT_RESET = False 
         data = None 
         self.write_register([0x8D], [0, 1]) # enable RX at reg. SYS_CTRL 0x0D
         start = time.perf_counter() 
         while (time.perf_counter()-start)<timeout: 
             # Listen in reg. SYS_STATUS 0x0F 
             status = self.read_register([0x0F], 5, return_ints=True) 
-            bits8_23 = status[1] | (status[2]<<8) 
+            bits8_23 = status[1] | status[2]<<8 # putting it into 16bit format for ease of comparison 
             # Good frames have: RXFCG, RXDFR, RXPHD, LDEDONE, RXSFDD and RXPRD set  
             if (bits8_23 & 0x006F)==0x006F: # Good frame 
+                if ranging: 
+                    rx_time = self.read_register([0x15], 5, return_ints=True) 
+                    rx_stamp = rx_time[0] | rx_time[1]<<8 | rx_time[2]<<16 | rx_time[3]<<24 | rx_time[4]<<32
                 # Checking RXFINFO for frame length 
                 rx_finfo = self.read_register([0x10], 4, return_ints=True)
                 rxfle_rxflen = (rx_finfo[0] | (rx_finfo[1]<<8)) & 0x3FF
@@ -295,13 +303,20 @@ class DW1000:
                 break 
             else: 
                 # Either received a bad frame or nothing 
-                # NOTE, TODO: In the future, would be interesting to add more debugging info 
-                # (Checking individually error bits) 
-                # When doing that, also clearing latched bits during iter to make sure checks are properly done 
-                pass 
-        # Disabling RX, this will automatically clear latched bits related to it 
+                # Bottom of p.31 in manual indicates we should reset RX after error or timeout event 
+                # If any of RXPHE, RXFCE, RXRFSL, RXRFTO, LDEERR, RXSFDTO, , RXPTO are true, we soft reset RX and exit 
+                err_or_to_mask = 0x04<<24 | 0x27<<16 | 0x90<<8 # aforedmentionned error/TO bits 
+                bits8_31 = status[1]<<8 | status[2]<<16 | status[3]<<24
+                if (bits8_31 & err_or_to_mask)!=0: # If any of these bits are 1, there's a problem 
+                    print("RX timeout or error during DW1000.listen(), aborting RX and soft-resetting it", 'error', 'gen')
+                    SOFT_RESET = True 
+                    break 
+        # Disabling RX, automatically clears latched bits related to it ON NEXT RX ENABLE 
         self.write_register([0x8D], [0x40])
-        return data 
+        if SOFT_RESET: 
+            self.soft_reset(rx_only=True) 
+
+        return (data, rx_stamp) if ranging else data 
     
     @staticmethod
     def check_valid_uwb_config(channel:int, PRF:int, bitrate:float, preamble_length:int, preamble_code:int)->bool: 
