@@ -17,8 +17,8 @@ def compute_clock_delta(t2, t1):
 
 with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, preamble_code=9) as bc: 
     dists = []
-    for _ in range(20):
-        T1, T2, T3, R1, R2, R3, T_r1, T_rp1, T_rp2, T_r2, tof_ticks, distance = bc.compute_range(5) 
+    for _ in range(30):
+        T1, T2, T3, R1, R2, R3, T_r1, T_rp1, T_rp2, T_r2, tof_ticks, distance = bc.compute_range(4) 
         #print("TAG stuff")
         #print("T1 =", T1)
         #print("R2 =", R2)
@@ -35,5 +35,5 @@ with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrat
         #print("tof_ticks =", tof_ticks)
         print(f"{distance=}") 
         dists.append(distance)
-        time.sleep(0.2) 
+        time.sleep(0.1) 
     print(f"avg: {sum(dists)/len(dists)}")

@@ -181,6 +181,31 @@ class BitcrazeTag(Tag):
             tuple[sender_id (int), data (bytes)]
         """
 
+    def listen_for_message(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|None: 
+        """
+        Listens until it hears a specific BC message or timeout. 
+        Checks the expected source and destination addresses, the message type and the TWR_SEQ. 
+
+        RETURNS ( (None, None) if it failed):
+            - List of received data 
+            - Received timestamp (always listens in ranging mode) 
+        """
+        tstart = time.perf_counter() 
+        while (time.perf_counter()-tstart)<timeout: 
+            message, timestamp = self._dw.listen(ranging=True)
+
+            exp_src =  [exp_src >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
+            exp_dest = [exp_dest>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
+            
+            dest_addr = message[5:13]
+            source_addr = message[13:21]
+            msg_type = message[21]
+            twr_seq = message[22]
+
+            if exp_dest==dest_addr and exp_src==source_addr and exp_msg_type==msg_type and exp_twr_seq==twr_seq:
+                return message, timestamp 
+        return None, None 
+    
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     def configureAnchorSelection(self, number_of_anchors:int) -> None:
         # Currently don't have a specific way to determine which anchors to use 
@@ -210,20 +235,6 @@ class BitcrazeTag(Tag):
             ### Calculates difference in clock ticks considering DW1000 clock is 40bit
             TICK_DELTA_MASK = (1 << 40) - 1
             return (t2-t1) & TICK_DELTA_MASK
-        
-        def validate_msg(message:list, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int): 
-            # Given a standard BC message, verifies if it has the expected source/dest addresses
-            # as well as message_type and TWR_SEQ 
-            exp_src = [exp_src>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
-            exp_dest = [exp_dest  >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
-            
-            dest_addr = message[5:13]
-            source_addr = message[13:21]
-            msg_type = message[21]
-            twr_seq = message[22]
-            if exp_dest==dest_addr and exp_src==source_addr and exp_msg_type==msg_type and exp_twr_seq==twr_seq:
-                return True
-            return False 
 
         twr_seq = self.TWR_seq # for this entire ranging transaction 
         if self.is_anchor(target_id): 
@@ -233,23 +244,10 @@ class BitcrazeTag(Tag):
             final = self.gen_message_header(target_id, 'FINAL', twr_seq)
             # Transaction with anchor 
             _, T1 = self._dw.transmit(poll, ranging=True) 
-            tstart = time.perf_counter() 
-            while (time.perf_counter()-tstart)<self._dw.DW_LISTEN_TIMEOUT: 
-                answer, R2 = self._dw.listen(ranging=True)
-                if validate_msg(answer, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq):
-                    break 
-            else: 
-                return None 
-            
+            _, R2 = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq)            
             _, T3 = self._dw.transmit(final, ranging=True) 
-            tstart = time.perf_counter() 
-            while (time.perf_counter()-tstart)<self._dw.DW_LISTEN_TIMEOUT: 
-                report = self._dw.listen()
-                if validate_msg(answer, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq):
-                    break 
-            else:
-                return None 
-
+            report, _ = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_REPORT, exp_twr_seq=twr_seq)
+            # Calculating TOF 
             timing_info = report[23:38] # the rest is pressure related info, don't care
             R1, T2, R3 = struct.unpack('<5s5s5s', bytes(timing_info))
             T_r1 =  compute_clock_delta(R2, T1)
@@ -257,6 +255,7 @@ class BitcrazeTag(Tag):
             T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
+            # adjusted_tof_ticks = tof_ticks + ANTENNA_TICK_DELAY_ANCHORS
             distance = tof_ticks * self._dw.TIME_UNIT * SPEED_OF_LIGHT
         else: 
             # TODO implement tag 
