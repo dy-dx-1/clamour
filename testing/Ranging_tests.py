@@ -18,11 +18,15 @@ def compute_clock_delta(t2, t1):
 with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8, preamble_length=128, preamble_code=9) as bc: 
     dists = []
     ticks = [] 
-    for _ in range(50): 
+    while True:  
         distance = bc.compute_range(5) 
 
-        print(f"{distance=}") 
+        
         if distance: 
+            print(f"{distance:.2f}") 
             dists.append(distance)
-        time.sleep(0.5) 
+        else: 
+            print(f"{distance=}")
+        time.sleep(0.1) 
+   
     print(f"avg dist: {sum(dists)/len(dists)}")
