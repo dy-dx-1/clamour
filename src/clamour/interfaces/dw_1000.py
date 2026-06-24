@@ -126,6 +126,7 @@ class DW1000:
         self.spi.max_speed_hz = 20_000_000 # In IDLE state, can operate at 20MHz 
     
     def close(self, verbose=True): 
+        self.write_register([0x8D], [0x40]) # turning off all RX 
         self.spi.close() 
         if verbose: 
             print("DW1000 connection closed", 'info', 'gen')
