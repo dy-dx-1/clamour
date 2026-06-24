@@ -182,18 +182,21 @@ class BitcrazeTag(Tag):
             tuple[sender_id (int), data (bytes)]
         """
 
-    def listen_for_message(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|None: 
+    def listen_for_message(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|tuple[None,None]: 
         """
         Listens until it hears a specific BC message or timeout. 
         Checks the expected source and destination addresses, the message type and the TWR_SEQ. 
 
-        RETURNS ( (None, None) if it failed):
+        RETURNS (None, None) if fails:
             - List of received data 
             - Received timestamp (always listens in ranging mode) 
         """
         tstart = time.perf_counter() 
         while (time.perf_counter()-tstart)<timeout: 
             message, timestamp = self._dw.listen(ranging=True)
+
+            if not message: # If dw1000 listen timed-out but we still have time, continue 
+                continue 
 
             exp_src =  [exp_src >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
             exp_dest = [exp_dest>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
@@ -230,7 +233,9 @@ class BitcrazeTag(Tag):
     
     def compute_range(self, target_id:int)->int|None: 
         """
-        Computes the distance in meters between the tag and another device 
+        Computes the distance in meters between the tag and another device. 
+        Returns None if the transaction is unsuccessful.  
+        TODO: a more thorough testing of timeouts, maybe even adding timeout param to arg of this function is needed 
         """
         def compute_clock_delta(t2, t1): 
             ### Calculates difference in clock ticks considering DW1000 clock is 40bit
@@ -250,15 +255,16 @@ class BitcrazeTag(Tag):
             _, R2     = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq)            
             _, T3     = self._dw.transmit(final, ranging=True) 
             report, _ = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_REPORT, exp_twr_seq=twr_seq)
-            # Calculating TOF 
-            timing_info = report[23:38] # the rest is pressure related info, don't care
-            R1, T2, R3 = struct.unpack('<5s5s5s', bytes(timing_info))
-            T_r1  = compute_clock_delta(R2, T1)
-            T_r2  = compute_clock_delta(int.from_bytes(R3, byteorder='little'), int.from_bytes(T2, byteorder='little'))
-            T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
-            T_rp2 = compute_clock_delta(T3, R2)
-            tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
-            distance = (tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT
+            if report: # If any of these fail, full transaction won't work, so will get None report 
+                # Calculating TOF 
+                timing_info = report[23:38] # the rest is pressure related info, don't care
+                R1, T2, R3 = struct.unpack('<5s5s5s', bytes(timing_info))
+                T_r1  = compute_clock_delta(R2, T1)
+                T_r2  = compute_clock_delta(int.from_bytes(R3, byteorder='little'), int.from_bytes(T2, byteorder='little'))
+                T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
+                T_rp2 = compute_clock_delta(T3, R2)
+                tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
+                distance = (tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT
         else: 
             # TODO implement tag 
             pass 

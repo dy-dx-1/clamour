@@ -279,8 +279,9 @@ class DW1000:
             - The data received in a list of bytes 
             - If ranging, the RX timestamp in CLK TICKS (raw 40bit value) 
         """
-        SOFT_RESET = False 
         data = None 
+        rx_stamp = None 
+
         self.write_register([0x8D], [0, 1]) # enable RX at reg. SYS_CTRL 0x0D
         start = time.perf_counter() 
         while (time.perf_counter()-start)<timeout: 
@@ -290,7 +291,7 @@ class DW1000:
             # Good frames have: RXFCG, RXDFR, RXPHD, LDEDONE, RXSFDD and RXPRD set  
             if (bits8_23 & 0x006F)==0x006F: # Good frame 
                 if ranging: 
-                    rx_time = self.read_register([0x15], 5, return_ints=True) 
+                    rx_time = self.read_register([0x15], 5, return_ints=True)
                     rx_stamp = rx_time[0] | rx_time[1]<<8 | rx_time[2]<<16 | rx_time[3]<<24 | rx_time[4]<<32
                 # Checking RXFINFO for frame length 
                 rx_finfo = self.read_register([0x10], 4, return_ints=True)
@@ -309,14 +310,13 @@ class DW1000:
                 err_or_to_mask = 0x04<<24 | 0x27<<16 | 0x90<<8 # aforedmentionned error/TO bits 
                 bits8_31 = status[1]<<8 | status[2]<<16 | status[3]<<24
                 if (bits8_31 & err_or_to_mask)!=0: # If any of these bits are 1, there's a problem 
-                    print("RX timeout or error during DW1000.listen(), aborting RX and soft-resetting it", 'error', 'gen')
-                    SOFT_RESET = True 
-                    break 
+                    print("RX timeout or error during DW1000.listen(), soft-resetting it", 'error', 'gen')
+                    self.write_register([0x8D], [0x40]) # disable RX 
+                    self.soft_reset(rx_only=True)
+                    # Re-enableing RX again, we'll keep looping if there's time left 
+                    self.write_register([0x8D], [0, 1]) 
         # Disabling RX, automatically clears latched bits related to it ON NEXT RX ENABLE 
         self.write_register([0x8D], [0x40])
-        if SOFT_RESET: 
-            self.soft_reset(rx_only=True) 
-
         return (data, rx_stamp) if ranging else data 
     
     @staticmethod
