@@ -10,6 +10,7 @@ import time
 import struct
 
 SPEED_OF_LIGHT = 299_792_458
+ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
 
 TWR_POLL   = 0x01
 TWR_ANSWER = 0x02 
@@ -236,31 +237,32 @@ class BitcrazeTag(Tag):
             TICK_DELTA_MASK = (1 << 40) - 1
             return (t2-t1) & TICK_DELTA_MASK
 
-        twr_seq = self.TWR_seq # for this entire ranging transaction 
+        distance = None 
+        twr_seq = self.TWR_seq # for this entire ranging transaction
+         
         if self.is_anchor(target_id): 
             # based on https://www.bitcraze.io/documentation/repository/lps-node-firmware/master/protocols/twr-protocol/
             # Messages to send by us
             poll = self.gen_message_header(target_id, 'POLL', twr_seq) 
             final = self.gen_message_header(target_id, 'FINAL', twr_seq)
             # Transaction with anchor 
-            _, T1 = self._dw.transmit(poll, ranging=True) 
-            _, R2 = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq)            
-            _, T3 = self._dw.transmit(final, ranging=True) 
+            _, T1     = self._dw.transmit(poll, ranging=True) 
+            _, R2     = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq)            
+            _, T3     = self._dw.transmit(final, ranging=True) 
             report, _ = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_REPORT, exp_twr_seq=twr_seq)
             # Calculating TOF 
             timing_info = report[23:38] # the rest is pressure related info, don't care
             R1, T2, R3 = struct.unpack('<5s5s5s', bytes(timing_info))
-            T_r1 =  compute_clock_delta(R2, T1)
-            T_r2 =  compute_clock_delta(int.from_bytes(R3, byteorder='little'), int.from_bytes(T2, byteorder='little'))
+            T_r1  = compute_clock_delta(R2, T1)
+            T_r2  = compute_clock_delta(int.from_bytes(R3, byteorder='little'), int.from_bytes(T2, byteorder='little'))
             T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
-            # adjusted_tof_ticks = tof_ticks + ANTENNA_TICK_DELAY_ANCHORS
-            distance = tof_ticks * self._dw.TIME_UNIT * SPEED_OF_LIGHT
+            distance = (tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT
         else: 
             # TODO implement tag 
             pass 
-        return T1, T2, T3, R1, R2, R3, T_r1, T_rp1, T_rp2, T_r2, tof_ticks, distance
+        return distance
 
     def doPositioning(self) -> Coordinates | None:
         """
