@@ -115,13 +115,13 @@ class Tag(ABC):
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     @abstractmethod
-    def sendData(self, destination:int, payload:bytes) -> bool: 
+    def sendData(self, destination:int, payload:list) -> bool: 
         """
         Transmits data from the tag to a destination. 
 
         ARGS:
             - destination: destination id (int)
-            - payload: data to send (bytes)
+            - payload: list of bytes to send in LSB format 
 
         RETURNS:
             - Bool on whether it succeeded

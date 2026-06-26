@@ -34,7 +34,7 @@ class Initialization(TDMAState):
         return State.SYNCHRONIZATION
 
     def clear_tag_buffer(self):
-        if self.tag.sendData(destination=self.tag.tag_id, payload= struct.pack('<i', 0)):
+        if self.tag.sendData(destination=self.tag.tag_id, payload= [0x00, 0x00, 0x00, 0x00]):
             print(f"Initialization.clear_tag_buffer(): sendData to {self.tag.tag_id=} was a success!", 'info', 'tdma')
         else:
             print(f"Initialization.clear_tag_buffer(): sendData to {self.tag.tag_id=} FAILED", 'info', 'tdma')

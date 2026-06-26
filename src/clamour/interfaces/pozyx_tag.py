@@ -161,9 +161,7 @@ class PozyxTag(Tag):
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     def sendData(self, destination, payload): 
-        values = list(payload)
-        data_to_send = Data(values, 'B'*len(values)) # converting the bytes into a pozyx Data object
-        status = self._pozyx_serial.sendData(destination=destination, data=data_to_send)
+        status = self._pozyx_serial.sendData(destination=destination, data=Data(payload))
         if status == POZYX_SUCCESS: 
             return True
         else:

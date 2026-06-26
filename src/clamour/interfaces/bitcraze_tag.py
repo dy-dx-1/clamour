@@ -163,16 +163,11 @@ class BitcrazeTag(Tag):
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
     def sendData(self, destination:int, payload:bytes) -> bool: 
-        """
-        Transmits data from the tag to a destination. 
-
-        Args:
-            destination: destination id (int)
-            payload: data to send (bytes)
-
-        Returns:
-            Bool on whether it succeeded
-        """
+        # never used for ranging messages, only in task.py, messenger.py and initilization.py 
+        # TODO: confirm use of destination. 
+        # It's only used as '0' in all calls of this function. 
+        # Check how it's used (specifically how messages are received) and if we should use it as part of our payload 
+        return self._dw.transmit(data=payload, ranging=False)
     
     def receiveData(self) -> tuple[int, bytes]:
         """
