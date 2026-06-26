@@ -267,6 +267,68 @@ class DW1000:
             self.write_register([0x8D], [0x40]) # Force return to IDLE 
         return bool(txfrs) 
 
+    def disable_rx_tx(self): 
+        """ Disables all TX and RX activity (SYS_CTRL 0x0D), forcing return to IDLE """ 
+        self.write_register([0x8D], [0x40])
+
+    def enable_rx(self): 
+        """ Enable RX (SYS_CTRL 0x0D) """ 
+        self.write_register([0x8D], [0, 1]) 
+
+    def packet_available(self)->bool: 
+        """
+        Checks if the DW1000 received a valid message. 
+       
+        RETURNS: 
+        - True if we did 
+        - False if we didn't 
+            - NOTE: DW1000 stays in RX mode in this case. Will soft-reset if an error occured and re-enable RX. 
+        """
+        status = self.read_register([0x0F], 5, return_ints=True) # SYS_STATUS 0x0F 
+        bits8_23 = status[1] | status[2]<<8 # putting it into 16bit format for ease of comparison 
+        # Good frames have: RXFCG, RXDFR, RXPHD, LDEDONE, RXSFDD and RXPRD set  
+        if (bits8_23 & 0x006F)==0x006F: # Good frame 
+            return True 
+        # Either received a bad frame or nothing 
+        else: 
+            # Bottom of p.31 in manual indicates we should reset RX after error or timeout event 
+            # If any of RXPHE, RXFCE, RXRFSL, RXRFTO, LDEERR, RXSFDTO, , RXPTO are true, we soft reset RX and exit 
+            err_or_to_mask = 0x04<<24 | 0x27<<16 | 0x90<<8 # aforementioned error/TO bits 
+            bits8_31 = status[1]<<8 | status[2]<<16 | status[3]<<24
+            if (bits8_31 & err_or_to_mask)!=0: # If any of these bits are 1, there's a problem 
+                print("RX timeout or error during DW1000.listen(), soft-resetting it", 'error', 'gen')
+                self.write_register([0x8D], [0x40]) # disable RX 
+                self.soft_reset(rx_only=True)
+                # Re-enableing RX again, we'll keep looping if there's time left 
+                self.enable_rx() 
+            # If we didn't get anything, DW1000 stays in RX mode 
+            return False 
+
+    def receive_packet(self, return_ints:bool=True)->tuple[list, int]: 
+        """ 
+        Reads the RX buffer. This should only be called if the packet_available() method returns True. 
+
+        ARGS:
+        - return_ints: List data format in ints or in hex strings 
+
+        RETURNS: 
+        - List of data found in RX buffer
+        - Timestamp of RX reception in clock ticks (int of raw 40 bit value) 
+        """
+        # Getting RX timestamp 
+        rx_time = self.read_register([0x15], 5, return_ints=True)
+        rx_stamp = rx_time[0] | rx_time[1]<<8 | rx_time[2]<<16 | rx_time[3]<<24 | rx_time[4]<<32
+        # Checking RXFINFO for frame length 
+        rx_finfo = self.read_register([0x10], 4, return_ints=True)
+        rxfle_rxflen = (rx_finfo[0] | (rx_finfo[1]<<8)) & 0x3FF
+        # NOTE: currently not supporting non std operation, so RXFLE should be 0 
+        if rxfle_rxflen>0x7F: # Currently, messages should be <= 127bytes 
+            print("[WARNING] in DW1000.receive_packet(), received extended data frame (RXFLE!=0). Currently not supporting this, check the message?", 'info', 'device')
+        # Now reading buffer with frame length 
+        rxfle_rxflen-=2 # throwing away FCS at the end 
+        data = self.read_register([0x11], rxfle_rxflen, return_ints=return_ints)  
+        return data, rx_stamp
+
     def listen(self, ranging:bool=False, timeout:float=DW_LISTEN_TIMEOUT, return_ints:bool=True)->None|list|tuple[list, int|None]: 
         """
         Sets the DW1000 to RX mode and listens for messages. 
@@ -283,41 +345,13 @@ class DW1000:
         data = None 
         rx_stamp = None 
 
-        self.write_register([0x8D], [0, 1]) # enable RX at reg. SYS_CTRL 0x0D
+        self.enable_rx()  # automatically clears any past latched receive bits 
         start = time.perf_counter() 
         while (time.perf_counter()-start)<timeout: 
-            # Listen in reg. SYS_STATUS 0x0F 
-            status = self.read_register([0x0F], 5, return_ints=True) 
-            bits8_23 = status[1] | status[2]<<8 # putting it into 16bit format for ease of comparison 
-            # Good frames have: RXFCG, RXDFR, RXPHD, LDEDONE, RXSFDD and RXPRD set  
-            if (bits8_23 & 0x006F)==0x006F: # Good frame 
-                if ranging: 
-                    rx_time = self.read_register([0x15], 5, return_ints=True)
-                    rx_stamp = rx_time[0] | rx_time[1]<<8 | rx_time[2]<<16 | rx_time[3]<<24 | rx_time[4]<<32
-                # Checking RXFINFO for frame length 
-                rx_finfo = self.read_register([0x10], 4, return_ints=True)
-                rxfle_rxflen = (rx_finfo[0] | (rx_finfo[1]<<8)) & 0x3FF
-                # NOTE: currently not supporting non std operation, so RXFLE should be 0 
-                if rxfle_rxflen>0x7F: # Currently, messages should be <= 127bytes 
-                    print("[WARNING] in DW1000.listen(), received extended data frame (RXFLE!=0). Currently not supporting this, check the message?", 'info', 'device')
-                # Now reading buffer with frame length 
-                rxfle_rxflen-=2 # throwing away FCS at the end 
-                data = self.read_register([0x11], rxfle_rxflen, return_ints=return_ints)  
+            if self.packet_available(): 
+                data, rx_stamp = self.receive_packet(return_ints=return_ints) 
                 break 
-            else: 
-                # Either received a bad frame or nothing 
-                # Bottom of p.31 in manual indicates we should reset RX after error or timeout event 
-                # If any of RXPHE, RXFCE, RXRFSL, RXRFTO, LDEERR, RXSFDTO, , RXPTO are true, we soft reset RX and exit 
-                err_or_to_mask = 0x04<<24 | 0x27<<16 | 0x90<<8 # aforedmentionned error/TO bits 
-                bits8_31 = status[1]<<8 | status[2]<<16 | status[3]<<24
-                if (bits8_31 & err_or_to_mask)!=0: # If any of these bits are 1, there's a problem 
-                    print("RX timeout or error during DW1000.listen(), soft-resetting it", 'error', 'gen')
-                    self.write_register([0x8D], [0x40]) # disable RX 
-                    self.soft_reset(rx_only=True)
-                    # Re-enableing RX again, we'll keep looping if there's time left 
-                    self.write_register([0x8D], [0, 1]) 
-        # Disabling RX, automatically clears latched bits related to it ON NEXT RX ENABLE 
-        self.write_register([0x8D], [0x40])
+        self.disable_rx_tx()  
         return (data, rx_stamp) if ranging else data 
     
     @staticmethod
