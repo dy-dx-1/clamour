@@ -19,7 +19,7 @@ with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrat
     dists = []
     ticks = [] 
     while True:  
-        distance = bc.compute_range(5) 
+        distance = bc.compute_range(4) 
 
         
         if distance: 

@@ -255,8 +255,8 @@ class BitcrazeTag(Tag):
             _, R2     = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq)            
             _, T3     = self._dw.transmit(final, ranging=True) 
             report, _ = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_REPORT, exp_twr_seq=twr_seq)
-            if report and R2: # Ensures transaction happened TODO figure out why R2 is needed here (I tested), seems to me like we shouldn't get report if R2 failed... 
-                             # NOTE: ohhh i think might be because the anchor did send out a R2 message it just wasn't caught (the timeout didn't print error so tag just didn't hear anything) thats why it does still get FINAL and responds with REPORT
+            if report and R2: # Ensures transaction happened 
+                # NOTE: I also check R2 as it might have returned None if the tag didn't hear it, but it was still sent. Since we send T3 anyways, the transaction might complete even if we didn't get R2. 
                 # Calculating TOF 
                 timing_info = report[23:38] # the rest is pressure related info, don't care
                 R1, T2, R3 = struct.unpack('<5s5s5s', bytes(timing_info))
