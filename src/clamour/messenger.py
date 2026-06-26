@@ -173,7 +173,7 @@ class Messenger:
         with self.tag_lock: 
             sender_id, data = self.tag.receiveData()
 
-        if sender_id != 0 and data!=b"":
+        if sender_id != 0 and data:
             print(f"Raw received: {data}", 'info', 'tdma')
 
         if sender_id != 0 and len(data)>0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
