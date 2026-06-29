@@ -47,7 +47,7 @@ class Messenger:
         # Now message.data is a 32bit integer value 
         # we send a message with our custom type as header and a 4 byte body that is the integer
         with self.tag_lock:
-            self.tag.sendData(destination=0, payload=list(struct.pack('<BI', CUSTOM_MESSAGE_SIGNATURE, message.data)))
+            self.tag.broadcast(payload=list(struct.pack('<BI', CUSTOM_MESSAGE_SIGNATURE, message.data)))
 
     def broadcast_control_message(self) -> None:
         if self.message_box.empty():
@@ -74,7 +74,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(destination=0, payload=list(struct.pack('<BI', CUSTOM_MESSAGE_SIGNATURE, message.data)))
+            self.tag.broadcast(payload=list(struct.pack('<BI', CUSTOM_MESSAGE_SIGNATURE, message.data)))
         
     def should_chose_from_non_block(self) -> bool:
         return len(self.slot_assignment.pure_send_list) < \
@@ -95,7 +95,7 @@ class Messenger:
         message.encode()
 
         with self.tag_lock:
-            self.tag.sendData(0, list(struct.pack('<BI', CUSTOM_MESSAGE_SIGNATURE, message.data)))
+            self.tag.broadcast(list(struct.pack('<BI', CUSTOM_MESSAGE_SIGNATURE, message.data)))
 
     def receive_message(self, state: State) -> bool:
         """

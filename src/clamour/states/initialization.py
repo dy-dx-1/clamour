@@ -33,17 +33,6 @@ class Initialization(TDMAState):
         print("Initialization.next(): Entering synchronization...", 'info', 'tdma')
         return State.SYNCHRONIZATION
 
-    def clear_tag_buffer(self):
-        if self.tag.sendData(destination=self.tag.tag_id, payload= [0x00, 0x00, 0x00, 0x00]):
-            print(f"Initialization.clear_tag_buffer(): sendData to {self.tag.tag_id=} was a success!", 'info', 'tdma')
-        else:
-            print(f"Initialization.clear_tag_buffer(): sendData to {self.tag.tag_id=} FAILED", 'info', 'tdma')
-        sleep(0.25)
-        with self.tag_lock: 
-            for _ in range(50):
-                print(f"{self.tag.receiveData()=}", 'info', 'tdma')
-                sleep(0.05)
-
     def discover_neighbors(self):
         self.clear_known_devices()
         with self.tag_lock:

@@ -64,12 +64,12 @@ class Task(TDMAState):
         if self.timing.current_slot_id == 0:
             tosend[-1] = (0 if tosend[-1]==255 else tosend[-1])
             with self.tag_lock:
-                self.tag.sendData(destination=0, payload=tosend) # NOTE: previously there were 9 B's, but I don't think it matches format of tosend (26June26)
+                self.tag.broadcast(payload=tosend) # NOTE: previously there were 9 B's, but I don't think it matches format of tosend (26June26)
         else:
             tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
             print(f"Task.testTDMA(): tosend: {tosend}", 'info', 'tdma')
             with self.tag_lock:
-                self.tag.sendData(destination=0, payload=tosend)
+                self.tag.broadcast(payload=tosend)
         print(f"Task.testTDMA(): {self.timing.frame_id} {self.timing.current_slot_id} {self.timing.get_full_cycle_duration()} {self.timing.current_time_in_cycle}", 'info', 'tdma')
 
     def next(self) -> State:

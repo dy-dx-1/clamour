@@ -160,8 +160,9 @@ class PozyxTag(Tag):
         return set(devices) 
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
-    def sendData(self, destination, payload): 
-        status = self._pozyx_serial.sendData(destination=destination, data=Data(payload))
+    def broadcast(self, payload): 
+        # ID 0 means pozyx will transmit to all available devices 
+        status = self._pozyx_serial.sendData(destination=0, data=Data(payload))
         if status == POZYX_SUCCESS: 
             return True
         else:

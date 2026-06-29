@@ -175,12 +175,9 @@ class BitcrazeTag(Tag):
         return device_list 
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
-    def sendData(self, destination:int, payload:list) -> bool: 
-        # never used for ranging messages, only in task.py, messenger.py and initilization.py 
-        # TODO: confirm use of destination. 
-        # It's only used as '0' in all calls of this function. 
-        # Check how it's used (specifically how messages are received) 
-        message = self.gen_comm_msg_header(target_id=destination) + payload   
+    def broadcast(self, payload:list) -> bool: 
+        # Using a proper header for clarity, but the destination ID is 0 because this is intended for all devices in range. 
+        message = self.gen_comm_msg_header(target_id=0) + payload   
         return self._dw.transmit(data=message, ranging=False)
     
     def receiveData(self) -> tuple[int, bytes]:
@@ -190,7 +187,7 @@ class BitcrazeTag(Tag):
         # Checking message is part of our network 
         if msg[:5] != INTER_TAG_BC_HEADER: 
             return None, b'' 
-        # Extracting sender ID and data  # TODO add check for receive ID? requires checking why they're always using 0 in sendData
+        # Extracting sender ID and data  # TODO add check for receive ID?
         sender_id = msg[7] | (msg[8]<<8)
         data = msg[9:] 
         return sender_id, bytes(data) 
