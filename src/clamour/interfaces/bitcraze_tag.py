@@ -12,6 +12,9 @@ import struct
 SPEED_OF_LIGHT = 299_792_458
 ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
 
+ANCHOR_TAG_BC_HEADER = [0x41, 0xDC, 0x00, 0xCF, 0xBC]  # format expected by BC anchors. Used to generate TWR messages to them. 
+INTER_TAG_BC_HEADER =  [0x41, 0x98, 0x00, 0xCF, 0xBC]  # for our internal communication, based on default tag-anchor message, but with 16bit addresses 
+
 TWR_POLL   = 0x01
 TWR_ANSWER = 0x02 
 TWR_FINAL  = 0x03 
@@ -79,9 +82,9 @@ class BitcrazeTag(Tag):
         self._twr_seq = (self._twr_seq + 1) & 0xFF  # Go from 0 to 255 and then restart 
         return self._twr_seq 
 
-    def gen_message_header(self, target_id:int, msg_type:Literal['POLL', 'ANSWER', 'FINAL', 'REPORT'], TWR_seq:int)->list: 
+    def gen_twr_msg_header(self, target_id:int, msg_type:Literal['POLL', 'ANSWER', 'FINAL', 'REPORT'], TWR_seq:int)->list: 
         """ 
-        Generates the first 7 sections needed for a message from this tag to another BC device.
+        Generates the first 7 sections needed for a message from this tag to a BC anchor.
 
         These are: [Frame Control (2 bytes), SEQ (1byte), PAN ID (2bytes), Destination Addr (8bytes), Source Addr (8bytes), Msg Type (1 byte), TWR SEQ (1 byte)].
 
@@ -89,7 +92,7 @@ class BitcrazeTag(Tag):
 
         Returns None if unsupported args are passed. 
         """
-        BC_MESSAGE_HEADER = [0x41, 0xDC, 0x00, 0xCF, 0xBC] 
+        BC_MESSAGE_HEADER = ANCHOR_TAG_BC_HEADER  
         SOURCE_ADDR =      [self.tag_id>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
         DESTINATION_ADDR = [target_id  >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
         if msg_type == 'POLL': 
@@ -105,6 +108,16 @@ class BitcrazeTag(Tag):
         if TWR_seq>0xFF: 
             return None 
         return BC_MESSAGE_HEADER + DESTINATION_ADDR + SOURCE_ADDR + MSG_TYPE + [TWR_seq]
+    
+    def gen_comm_msg_header(self, target_id:int): 
+        """
+        Generates a header for inter-tag communication messages. 
+        TODO add ID value check in init and config file to prevent overflow 
+        """
+        HEADER = INTER_TAG_BC_HEADER  
+        SOURCE_ADDR = [(self.tag_id & 0xFF), (self.tag_id>>8 & 0xFF)]
+        DEST_ADDR =   [(target_id   & 0xFF), (self.tag_id>>8 & 0xFF)]
+        return HEADER + DEST_ADDR + SOURCE_ADDR
 
     ### -------------------------------------------- DEVICE MANAGEMENT --------------------------------------------
     @staticmethod
@@ -142,7 +155,7 @@ class BitcrazeTag(Tag):
         twr_seq = self.TWR_seq 
         if discovery_type == "all" or discovery_type == "anchor": 
             for anchor in ANCHORS: 
-                poll_msg = self.gen_message_header(target_id=anchor['id'], msg_type='POLL', TWR_seq=twr_seq)
+                poll_msg = self.gen_twr_msg_header(target_id=anchor['id'], msg_type='POLL', TWR_seq=twr_seq)
                 self._dw.transmit(data=poll_msg, ranging=False) 
                 resp = self._dw.listen() 
                 if resp:
@@ -162,20 +175,28 @@ class BitcrazeTag(Tag):
         return device_list 
 
     ### -------------------------------------------- INTER-TAG COMMUNICATION --------------------------------------------
-    def sendData(self, destination:int, payload:bytes) -> bool: 
+    def sendData(self, destination:int, payload:list) -> bool: 
         # never used for ranging messages, only in task.py, messenger.py and initilization.py 
         # TODO: confirm use of destination. 
         # It's only used as '0' in all calls of this function. 
-        # Check how it's used (specifically how messages are received) and if we should use it as part of our payload 
-        return self._dw.transmit(data=payload, ranging=False)
+        # Check how it's used (specifically how messages are received) 
+        message = self.gen_comm_msg_header(target_id=destination) + payload   
+        return self._dw.transmit(data=message, ranging=False)
     
     def receiveData(self) -> tuple[int, bytes]:
         """
-        Reads data received by the tag. 
-
-        Returns: 
-            tuple[sender_id (int), data (bytes)]
+        Return tuple[sender_id (int), data (bytes)]
         """
+        msg = self._dw.listen(timeout=60, return_ints=True) # TODO Remove timeout / replace listen 
+        if not msg: 
+            return None, None 
+        # Checking message is part of our network 
+        if msg[:5] != INTER_TAG_BC_HEADER: 
+            return None, None 
+        # Extracting sender ID and data  # TODO add check for receive ID? requires checking why they're always using 0 in sendData
+        sender_id = msg[7] | (msg[8]<<8)
+        data = msg[9:] 
+        return sender_id, bytes(data) 
 
     def listen_for_message(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|tuple[None,None]: 
         """
@@ -243,8 +264,8 @@ class BitcrazeTag(Tag):
         if self.is_anchor(target_id): 
             # based on https://www.bitcraze.io/documentation/repository/lps-node-firmware/master/protocols/twr-protocol/
             # Messages to send by us
-            poll = self.gen_message_header(target_id, 'POLL', twr_seq) 
-            final = self.gen_message_header(target_id, 'FINAL', twr_seq)
+            poll = self.gen_twr_msg_header(target_id, 'POLL', twr_seq) 
+            final = self.gen_twr_msg_header(target_id, 'FINAL', twr_seq)
             # Transaction with anchor 
             _, T1     = self._dw.transmit(poll, ranging=True) 
             _, R2     = self.listen_for_message(self._dw.DW_LISTEN_TIMEOUT, exp_src=target_id, exp_dest=self.tag_id, exp_msg_type=TWR_ANSWER, exp_twr_seq=twr_seq)            
