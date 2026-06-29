@@ -226,13 +226,13 @@ class PozyxTag(Tag):
         # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
         self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=number_of_anchors)
 
-    def doPositioning(self):
+    def trilaterate_position(self):
         pos = pozyxCoordinates() 
         try: 
             status = self._pozyx_serial.doPositioning(position=pos, dimension=POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
         except struct.error as s: 
             status = 0
-            print(f"PozyxTag.doPositioning: {str(s)}", 'error', 'loc')
+            print(f"PozyxTag.trilaterate_position: {str(s)}", 'error', 'loc')
 
         if status == POZYX_SUCCESS: 
             return Coordinates(pos.x, pos.y, pos.z)

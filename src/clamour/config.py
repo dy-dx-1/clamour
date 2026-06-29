@@ -27,7 +27,9 @@ LOC_MSGS    = True     # Turn off/on localization-related terminal output
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be <=10. Coordinates are in mm. 
-ANCHORS = ({'id': 4, 'level': 0, 'x': 2950, 'y': 3240, 'z': 530}, 
+# temp NOTE A2 with broken usb is ID 2 
+ANCHORS = ({'id': 2, 'level': 0, 'x': 3000, 'y': 2700, 'z': 530}, 
+           {'id': 4, 'level': 0, 'x': 2950, 'y': 3240, 'z': 530}, 
            {'id': 5, 'level': 0, 'x': 150, 'y': 2880, 'z': 1080},
            {'id': 27182, 'level': 0, 'x': 0, 'y': 0, 'z': 900},
            {'id': 27199, 'level': 0, 'x': 3640, 'y': 1260, 'z': 920})

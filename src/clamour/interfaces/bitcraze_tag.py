@@ -9,6 +9,9 @@ from typing import Literal
 import time  
 import struct
 
+import numpy as np 
+from scipy.optimize import least_squares
+
 SPEED_OF_LIGHT = 299_792_458
 ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
 
@@ -44,8 +47,8 @@ class BitcrazeTag(Tag):
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
 
-        self._active_tags = {}       # keeps track of nearby tags and when they were last seen 
-        self._available_anchors = {} # keeps track of currently in-range anchors 
+        self._active_tags = set()       # keeps track of nearby tags and when they were last seen 
+        self._available_anchors = set() # keeps track of currently in-range anchors 
         self._pos = Coordinates()    # Tag position 
         self._orientation = Angles() 
 
@@ -69,7 +72,7 @@ class BitcrazeTag(Tag):
         return {tag_id for tag_id, last_seen in self._active_tags.items() if (now-last_seen)<DISCOVERY_TIMEOUT}
     
     @property
-    def available_anchors(self):
+    def available_anchors(self)->set[int]:
         return self._available_anchors 
     
     @property
@@ -280,14 +283,29 @@ class BitcrazeTag(Tag):
             pass 
         return distance
 
-    def doPositioning(self) -> Coordinates | None:
-        """
-        Positions the tag in space with UWB ranging. 
-        This function computes and stores the position in the tag's memory. 
-
-        Returns:
-            Coordinates object with the position or None
-        """
+    def trilaterate_position(self) -> Coordinates | None:
+        anchors = [] 
+        distances = [] 
+        for anchor in ANCHORS: # TODO: change to something more efficient. Store anchor coords internally to avoid looping on ref? 
+            if anchor['id'] in self.available_anchors: 
+                dist = self.compute_range(anchor['id']) 
+                if dist: 
+                    anchors.append([anchor['x'], anchor['y'], anchor['z']])
+                    distances.append(dist)
+        if len(anchors)<3: 
+            return None # Could not get the minimum amount of range measurements needed 
+        # Residual function (Error = Calculated Distance - Measured Distance)
+        def equations(position):
+            calculated_distances = np.linalg.norm(anchors - position, axis=1)
+            return calculated_distances - distances
+        # Solving with Non-linear Least Squares (Levenberg-Marquardt or Trust Region Reflective)
+        initial_guess = np.array(self.coordinates.data)  # using last known position as guess
+        result = least_squares(equations, initial_guess, method='lm')  
+        
+        if not result.success:
+            print("[WARNING] trilaterate_position() did not converge perfectly!", 'info', 'loc')
+            
+        return result.x
 
     def doRanging(self, target_id:int) -> Coordinates | None: 
         """
