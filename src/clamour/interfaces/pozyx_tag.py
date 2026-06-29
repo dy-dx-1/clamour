@@ -168,12 +168,12 @@ class PozyxTag(Tag):
         else:
             return False
         
-    def receiveData(self): 
+    def receive_data(self): 
         metadata = RXInfo() 
         try: 
             self._pozyx_serial.getRxInfo(metadata) 
         except struct.error as s: 
-            print(f"PozyxTag.receiveData, RxInfo crashes: {str(s)}", 'error', 'tdma')
+            print(f"PozyxTag.receive_data, RxInfo crashes: {str(s)}", 'error', 'tdma')
             return None, b''
         sender_id, message_byte_size = metadata[0], metadata[1] 
 

@@ -112,7 +112,6 @@ class BitcrazeTag(Tag):
     def gen_comm_msg_header(self, target_id:int): 
         """
         Generates a header for inter-tag communication messages. 
-        TODO add ID value check in init and config file to prevent overflow 
         """
         HEADER = INTER_TAG_BC_HEADER  
         SOURCE_ADDR = [(self.tag_id & 0xFF), (self.tag_id>>8 & 0xFF)]
@@ -180,7 +179,7 @@ class BitcrazeTag(Tag):
         message = self.gen_comm_msg_header(target_id=0) + payload   
         return self._dw.transmit(data=message, ranging=False)
     
-    def receiveData(self) -> tuple[int, bytes]:
+    def receive_data(self) -> tuple[int, bytes]:
         msg = self._dw.listen() # TODO Eval if replace listen 
         if not msg: 
             return None, b'' 

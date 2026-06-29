@@ -128,7 +128,7 @@ class Tag(ABC):
         """
     
     @abstractmethod
-    def receiveData(self) -> tuple[int, bytes]:
+    def receive_data(self) -> tuple[int, bytes]:
         """
         Reads data received by the tag. 
 

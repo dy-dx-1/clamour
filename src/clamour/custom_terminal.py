@@ -66,7 +66,7 @@ if __name__ == "__main__":
     # For testing the print outputs 
     print("Clamour.keep_alive(): A process that needs to be kept alive died and will be restarted. Error: Test", "error", "gen")
     print("Process completed without exception", "ok", "gen") 
-    print("This is error in PozyxTag.receiveData, RxInfo crashes: hello", "error", "loc") 
+    print("This is error in PozyxTag.receive_data, RxInfo crashes: hello", "error", "loc") 
     print("This is an information message", "info", "tdma")
     print("This is a loc message", "info", "loc")
     print("This is a devicemanaget message", "info", "device")

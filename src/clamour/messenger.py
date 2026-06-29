@@ -172,11 +172,11 @@ class Messenger:
         is_new_message = False
 
         with self.tag_lock: 
-            sender_id, data = self.tag.receiveData()
+            sender_id, data = self.tag.receive_data()
 
         if sender_id != 0 and data:
             print(f"Raw received: {data}", 'info', 'tdma')
-
+        # TODO remove len(data) check, it wasn't there before and I'm pretty sure not needed cause data[0] check takes care of it 
         if sender_id != 0 and len(data)>0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
             self.tag.addNeighborTag(sender_id) # Received valid message, update our neighbor info 
             received_message = MessageFactory.create(sender_id, data)
