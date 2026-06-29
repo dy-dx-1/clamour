@@ -184,15 +184,12 @@ class BitcrazeTag(Tag):
         return self._dw.transmit(data=message, ranging=False)
     
     def receiveData(self) -> tuple[int, bytes]:
-        """
-        Return tuple[sender_id (int), data (bytes)]
-        """
-        msg = self._dw.listen(timeout=60, return_ints=True) # TODO Remove timeout / replace listen 
+        msg = self._dw.listen() # TODO Eval if replace listen 
         if not msg: 
-            return None, None 
+            return None, b'' 
         # Checking message is part of our network 
         if msg[:5] != INTER_TAG_BC_HEADER: 
-            return None, None 
+            return None, b'' 
         # Extracting sender ID and data  # TODO add check for receive ID? requires checking why they're always using 0 in sendData
         sender_id = msg[7] | (msg[8]<<8)
         data = msg[9:] 
