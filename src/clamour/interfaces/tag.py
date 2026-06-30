@@ -169,10 +169,11 @@ class Tag(ABC):
     def doRanging(self, target_id:int) -> Coordinates | None: 
         """
         Calculates a UWB range measurement between the tag and another device. 
+        Measurement must be in mm. 
         
         ARGS:
             - target_id: ID of the target device (int) 
         
         RETURNS:
-            - Coordinates object with the position or None
+            - Coordinates(x=distance_to_device, y=0, z=0) or None
         """

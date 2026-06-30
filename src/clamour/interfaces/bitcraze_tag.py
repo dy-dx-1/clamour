@@ -239,7 +239,7 @@ class BitcrazeTag(Tag):
     
     def compute_range(self, target_id:int)->int|None: 
         """
-        Computes the distance in meters between the tag and another device. 
+        Computes the distance in mm between the tag and another device. 
         Returns None if the transaction is unsuccessful.  
         TODO: a more thorough testing of timeouts, maybe even adding timeout param to arg of this function is needed 
         """
@@ -271,7 +271,7 @@ class BitcrazeTag(Tag):
                 T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
                 T_rp2 = compute_clock_delta(T3, R2)
                 tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
-                distance = (tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT
+                distance = (tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000 # in mm 
         else: 
             # TODO implement tag 
             pass 
@@ -301,12 +301,7 @@ class BitcrazeTag(Tag):
         return result.x
 
     def doRanging(self, target_id:int) -> Coordinates | None: 
-        """
-        Calculates a UWB range measurement between the tag and another device. 
-        
-        Args:
-            target_id: ID of the target device (int) 
-        
-        Returns:
-            Coordinates object with the position or None
-        """ 
+        distance = self.compute_range(target_id) 
+        if distance: 
+            return Coordinates(x=distance, y=0, z=0) 
+        return None 
