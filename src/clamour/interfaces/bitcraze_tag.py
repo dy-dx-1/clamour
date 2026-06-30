@@ -49,7 +49,7 @@ class BitcrazeTag(Tag):
 
         self._active_tags = set()       # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 
-        self._pos = Coordinates()    # Tag position 
+        self._pos = Coordinates()       # Tag position 
         self._orientation = Angles() 
 
         print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
@@ -168,10 +168,13 @@ class BitcrazeTag(Tag):
                     expected_msg = poll_msg[:5] + poll_msg[13:21] + poll_msg[5:13] + [TWR_ANSWER] + [twr_seq]
                     if resp == expected_msg: 
                         device_list.add(anchor['id'])
+                        self._available_anchors.add(anchor['id']) # also updating our internal list 
                 # Adding a little pause to make sure the DW properly resets. Else, we miss anchors. 
                 time.sleep(DW_PAUSE_DELAY)
 
         if discovery_type == "all" or discovery_type == "tag":
+            # For BC tags, the discovery is done every time we receive a message, which updates the internal list.
+            # Accessing the set through the property automatically filters old tags out. 
             device_list = device_list.union(self.active_tags)
 
         return device_list 

@@ -95,21 +95,7 @@ class PozyxTag(Tag):
         Also don't need to maintain internal dictionary like in BitcrazeTag
         """
         pass 
-    
-    def addAnchor(self, anchor_id): 
-        # Only used in task.py
-        # Coordinates is our general version, needs to be formatted to pypozyx version 
-        # TODO: ik this is a horrible fix
-        # In the future, I should have a better way to do this. Either removing anchors.py and importing from config 
-        # or shift anchors into clamour dir and use it everywhere cleanly? 
-        for anchor_dict in ANCHORS:
-            if anchor_dict['id']==anchor_id: 
-                x = anchor_dict['x']
-                y = anchor_dict['y']
-                z = anchor_dict['z']
-        pozyx_obj = pozyxDeviceCoordinates(network_id=anchor_id, flag=1, pos = pozyxCoordinates(x, y, z) )
-        self._pozyx_serial.addDevice(pozyx_obj)
-    
+     
     def clearAnchors(self):
         self._pozyx_serial.clearDevices() 
 
@@ -152,6 +138,18 @@ class PozyxTag(Tag):
             devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]
         elif discovery_type == "anchor":
             devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
+            # Coordinates is our general version, needs to be formatted to pypozyx version 
+            # TODO: ik this is a horrible fix
+            # In the future, I should have a better way to do this. Either removing anchors.py and importing from config 
+            # or shift anchors into clamour dir and use it everywhere cleanly? 
+            for id in devices: 
+                for anchor_dict in ANCHORS:
+                    if anchor_dict['id']==id: 
+                        x = anchor_dict['x']
+                        y = anchor_dict['y']
+                        z = anchor_dict['z']
+                pozyx_obj = pozyxDeviceCoordinates(network_id=id, flag=1, pos = pozyxCoordinates(x, y, z) )
+                self._pozyx_serial.addDevice(pozyx_obj)
         elif discovery_type == "all": 
             devices = [device_id for device_id in devices] 
         else: 

@@ -144,8 +144,6 @@ class Task(TDMAState):
         for device in devices:
             if self.tag.is_anchor(device):
                 print(f"Task.discover_devices(): Found device: {device}, it's an ANCHOR!", 'info', 'tdma')
-                with self.tag_lock: 
-                    self.tag.addAnchor(device)
             else:
                 print(f"Task.discover_devices(): Found device: {device}, it's a TAG!", 'info', 'tdma')
                 new_tags.append(device)

@@ -72,12 +72,6 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def addAnchor(self, anchor_id: int) -> None:
-        """
-        Adds an anchor to the tag's list of available anchors.
-        """
-
-    @abstractmethod
     def clearAnchors(self) -> None:
         """
         Clears the list of available anchors. 
@@ -104,7 +98,8 @@ class Tag(ABC):
     @abstractmethod
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> set[int]:
         """
-        Gets the IDs of devices seen by the tag. This must never return duplicated elements. 
+        Updates the internal sets of available anchors and tags and returns a list of their IDs. 
+        This must never return duplicated elements. 
 
         ARGS: 
             - discovery_type: String specifying what type of device to return
