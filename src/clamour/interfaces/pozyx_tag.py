@@ -199,7 +199,7 @@ class PozyxTag(Tag):
 
     @coordinates.setter
     def coordinates(self, new_coords:Coordinates): 
-        pozyx_coords = pozyxCoordinates(new_coords.x, new_coords.y, new_coords.z)
+        pozyx_coords = pozyxCoordinates(int(new_coords.x), int(new_coords.y), int(new_coords.z))
         self._pozyx_serial.setCoordinates(pozyx_coords)
     
     @property

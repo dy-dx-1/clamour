@@ -28,6 +28,6 @@ LOC_MSGS    = True     # Turn off/on localization-related terminal output
 # Anchor IDs are expected to be <=10. Coordinates are in mm. 
 # temp NOTE A2 with broken usb is ID 2 
 ANCHORS = ({'id': 5, 'level': 0, 'x': 0, 'y': 0, 'z': 1490}, 
-           {'id': 4, 'level': 0, 'x': 90, 'y': 1070, 'z': 1060}, 
-           {'id': 27199, 'level': 0, 'x': 2460, 'y': 1670, 'z': 800},
+           {'id': 27199, 'level': 0, 'x': 90, 'y': 1070, 'z': 1060}, 
+           {'id': 4, 'level': 0, 'x': 2460, 'y': 1670, 'z': 800},
            {'id': 27182, 'level': 0, 'x': 1350, 'y': 0, 'z': 690})
