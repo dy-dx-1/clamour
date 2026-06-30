@@ -16,3 +16,4 @@ class Anchors:
             #                  flag = 1, 
             #                  pos = Coordinates(anc_dict['x'], anc_dict['y'], anc_dict['z']) ) ) 
             anchor_dict[anc_dict['id']] = Coordinates(anc_dict['x'], anc_dict['y'], anc_dict['z']) 
+        return anchor_dict

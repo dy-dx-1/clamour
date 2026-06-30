@@ -3,7 +3,7 @@ from ..custom_terminal import print
 from .tag import Tag
 from .containers import Coordinates, Angles
 from .dw_1000 import DW1000
-from ..config import ANCHORS
+from .anchors import Anchors
 
 from typing import Literal
 import time  
@@ -11,6 +11,8 @@ import struct
 
 import numpy as np 
 from scipy.optimize import least_squares
+
+ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known anchors 
 
 SPEED_OF_LIGHT = 299_792_458
 ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
@@ -47,7 +49,7 @@ class BitcrazeTag(Tag):
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code)
 
-        self._active_tags = set()       # keeps track of nearby tags and when they were last seen 
+        self._active_tags = dict()      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 
         self._pos = Coordinates()       # Tag position 
         self._orientation = Angles() 
@@ -131,9 +133,6 @@ class BitcrazeTag(Tag):
     def addNeighborTag(self, tag_id:int)->None: 
         self._active_tags[tag_id] = time.perf_counter() 
 
-    def addAnchor(self, anchor_id:int)->None:
-        self._available_anchors.add(anchor_id)
-
     def clearAnchors(self) -> None:
         self._available_anchors.clear() 
 
@@ -153,11 +152,11 @@ class BitcrazeTag(Tag):
     
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> set[int]: 
         device_list = set() 
-        # Iterating through known (config.py) anchors and checking who responds 
+        # Iterating through known anchors and checking who responds 
         twr_seq = self.TWR_seq 
         if discovery_type == "all" or discovery_type == "anchor": 
-            for anchor in ANCHORS: 
-                poll_msg = self.gen_twr_msg_header(target_id=anchor['id'], msg_type='POLL', TWR_seq=twr_seq)
+            for anc_id in ALL_ANCHORS: 
+                poll_msg = self.gen_twr_msg_header(target_id=anc_id, msg_type='POLL', TWR_seq=twr_seq)
                 self._dw.transmit(data=poll_msg, ranging=False) 
                 resp = self._dw.listen() 
                 if resp:
@@ -167,8 +166,8 @@ class BitcrazeTag(Tag):
                     # source address and destination address swapped & with msg_type answer 
                     expected_msg = poll_msg[:5] + poll_msg[13:21] + poll_msg[5:13] + [TWR_ANSWER] + [twr_seq]
                     if resp == expected_msg: 
-                        device_list.add(anchor['id'])
-                        self._available_anchors.add(anchor['id']) # also updating our internal list 
+                        device_list.add(anc_id)
+                        self._available_anchors.add(anc_id) # also updating our internal list 
                 # Adding a little pause to make sure the DW properly resets. Else, we miss anchors. 
                 time.sleep(DW_PAUSE_DELAY)
 
@@ -289,12 +288,11 @@ class BitcrazeTag(Tag):
     def trilaterate_position(self) -> Coordinates | None:
         anchors = [] 
         distances = [] 
-        for anchor in ANCHORS: # TODO: change to something more efficient. Store anchor coords internally to avoid looping on ref? 
-            if anchor['id'] in self.available_anchors: 
-                dist = self.compute_range(anchor['id']) 
-                if dist: 
-                    anchors.append([anchor['x'], anchor['y'], anchor['z']])
-                    distances.append(dist)
+        for anchor_id in self.available_anchors:  
+            dist = self.compute_range(anchor_id) 
+            if dist: 
+                anchors.append([ALL_ANCHORS[anchor_id].x, ALL_ANCHORS[anchor_id].y, ALL_ANCHORS[anchor_id].z])
+                distances.append(dist)
         if len(anchors)<3: 
             return None # Could not get the minimum amount of range measurements needed 
         # Residual function (Error = Calculated Distance - Measured Distance)

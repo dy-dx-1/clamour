@@ -1,6 +1,6 @@
 from .tag import Tag
 from .containers import Coordinates, Angles
-from ..config import ANCHORS
+from .anchors import Anchors
 from ..custom_terminal import print 
 import struct 
 
@@ -13,6 +13,8 @@ from pypozyx import Coordinates as pozyxCoordinates
 from pypozyx import DeviceCoordinates as pozyxDeviceCoordinates 
 from pypozyx import DeviceList as pozyxDeviceList
 from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
+
+ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known anchors 
 
 def get_pozyx_id(pozyx:PozyxSerial) -> int:
     """
@@ -139,15 +141,10 @@ class PozyxTag(Tag):
         elif discovery_type == "anchor":
             devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
             # Coordinates is our general version, needs to be formatted to pypozyx version 
-            # TODO: ik this is a horrible fix
-            # In the future, I should have a better way to do this. Either removing anchors.py and importing from config 
-            # or shift anchors into clamour dir and use it everywhere cleanly? 
             for id in devices: 
-                for anchor_dict in ANCHORS:
-                    if anchor_dict['id']==id: 
-                        x = anchor_dict['x']
-                        y = anchor_dict['y']
-                        z = anchor_dict['z']
+                x = ALL_ANCHORS[id].x
+                y = ALL_ANCHORS[id].y
+                z = ALL_ANCHORS[id].z
                 pozyx_obj = pozyxDeviceCoordinates(network_id=id, flag=1, pos = pozyxCoordinates(x, y, z) )
                 self._pozyx_serial.addDevice(pozyx_obj)
         elif discovery_type == "all": 
