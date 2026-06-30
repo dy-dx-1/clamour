@@ -6,9 +6,8 @@ Defines all configuration parameters for Clamour.
 - Anchor definition 
 """
 ### Tag type and ID 
-TAG_TYPE = "Bitcraze" # Manufacturer of the tag. Bitcraze or Pozyx
-TAG_ID = 11           # Tag IDs must be >10. This will overwrite any hardware-defined ID if it exists.  
-
+TAG_TYPE = "Pozyx" # Manufacturer of the tag. Bitcraze or Pozyx
+TAG_ID = 11                # Tag IDs must be >10. This ONLY applies for BC tags. Pozyx breaks ranging when enforcing IDs, dk why, already wasted 4h+ on it. 
 ### DW1000 and UWB config - only applicable for Bitcraze Tags
 DW1000_BUS =  0            # SPI bus where the deck is connected 
 DW1000_CS  =  0            # Chip select # where  the deck is connected 
@@ -28,8 +27,7 @@ LOC_MSGS    = True     # Turn off/on localization-related terminal output
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be <=10. Coordinates are in mm. 
 # temp NOTE A2 with broken usb is ID 2 
-ANCHORS = ({'id': 2, 'level': 0, 'x': 3000, 'y': 2700, 'z': 530}, 
-           {'id': 4, 'level': 0, 'x': 2950, 'y': 3240, 'z': 530}, 
-           {'id': 5, 'level': 0, 'x': 150, 'y': 2880, 'z': 1080},
-           {'id': 27182, 'level': 0, 'x': 0, 'y': 0, 'z': 900},
-           {'id': 27199, 'level': 0, 'x': 3640, 'y': 1260, 'z': 920})
+ANCHORS = ({'id': 5, 'level': 0, 'x': 0, 'y': 0, 'z': 1490}, 
+           {'id': 4, 'level': 0, 'x': 90, 'y': 1070, 'z': 1060}, 
+           {'id': 27199, 'level': 0, 'x': 2460, 'y': 1670, 'z': 800},
+           {'id': 27182, 'level': 0, 'x': 1350, 'y': 0, 'z': 690})

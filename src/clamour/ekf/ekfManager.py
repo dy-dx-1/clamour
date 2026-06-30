@@ -95,7 +95,7 @@ class EKFManager:
                 with self.tag_lock:
                     self.tag.coordinates = self.ekf.get_position()
             except StructError as s:
-                print(f"EKFManager.process_latest_state_info(): {str(s)}", 'error' 'loc')
+                print(f"EKFManager.process_latest_state_info(): {str(s)}", 'error', 'loc')
 
             coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
             self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)

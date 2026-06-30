@@ -82,15 +82,15 @@ class Task(TDMAState):
 
     def positioning(self) -> None:
         with self.tag_lock:
-            print(f"Task.positioning(): Attempting positioning with anchors: {self.anchors.anchors_dict}", 'info', 'loc')
-            position = self.tag.doPositioning()
+            print(f"Task.positioning(): Attempting positioning with anchors: {self.anchors.anchors_dict.keys()}", 'info', 'loc')
+            position = self.tag.trilaterate_position()
             angles = self.tag.orientation
 
         if (position is not None) and (angles is not None): 
-            print(f"Task.positioning(): Successful positioning", 'ok', 'loc')
+            pass 
         else: 
             if position is None: 
-                self.handle_error("Tag.doPositioning()")
+                self.handle_error("Tag.trilaterate_position()")
             if angles is None:
                 self.handle_error("Tag.orientation was None")
 

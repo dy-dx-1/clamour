@@ -28,7 +28,7 @@ match TAG_TYPE:
                                           preamble_length=UWB_PREAMBLE_LENGTH,
                                           preamble_code=UWB_PREAMBLE_CODE)
     case "Pozyx": 
-        TAG_FACTORY = lambda: PozyxTag(id=TAG_ID) 
+        TAG_FACTORY = lambda: PozyxTag() 
     case _: 
         raise ValueError(f"Invalid tag type: {TAG_TYPE}. Check your config file.")
 

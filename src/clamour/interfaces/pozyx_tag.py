@@ -45,14 +45,14 @@ class PozyxTag(Tag):
     Methods are adapted from abstractclass Tag. 
     Refer to Tag class for typehints and docstrings, except when overwritten for clarity. 
     """
-    def __init__(self, id:int):
+    def __init__(self):
         serial_port = get_first_pozyx_serial_port()
         if serial_port is None:
             raise Exception("No Pozyx connected. Check your USB cable or your driver.")
         self._pozyx_serial = PozyxSerial(serial_port)
-        self._id = id 
-        if self._id != get_pozyx_id(self._pozyx_serial): 
-            self._pozyx_serial.setNetworkId(id)
+        self._id = get_pozyx_id(self._pozyx_serial)
+        #if self._id != get_pozyx_id(self._pozyx_serial): # NOTE removed this because using setNetworkId breaks ranging for some reason. Dk why and it's not relevant rn. 
+        #    self._pozyx_serial.setNetworkId(id)
         print(f"Successfully initialized pozyx tag on port {serial_port} with id: {self._id}", 'ok', 'device')
         print(f"This ID means that the constant NB_NODES in timing.py must >{self._id & 0xFF} for the node to do slot proposals.", 'info', 'device')
 
@@ -62,7 +62,7 @@ class PozyxTag(Tag):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.clearAnchors() 
         self.resetSystem()
-        print("PozyxTag.__exit__() completed.", 'info', 'ok')
+        print("PozyxTag.__exit__() completed.", 'ok', 'gen')
 
     @property
     def tag_id(self):
@@ -219,7 +219,7 @@ class PozyxTag(Tag):
     def trilaterate_position(self):
         # With pypozyx, we use automatic anchor selection: https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
         # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
-        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=self.available_anchors)
+        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=len(self.available_anchors))
         
         pos = pozyxCoordinates() 
         try: 
