@@ -30,7 +30,6 @@ class Task(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
-        self.set_manually_measured_anchors()
         self.frame_id_done_discover = -1
         self.neighborUpdateFrequency = 5 # every five frames, do discovery and update neighbor information
 
@@ -40,7 +39,6 @@ class Task(TDMAState):
             self.discover_devices()
             self.neighborhood.collect_garbage()
             self.select_localization_method()
-            self.set_manually_measured_anchors()
 
         if self.timing.enough_time_left():
             self.localize()
@@ -156,11 +154,6 @@ class Task(TDMAState):
             for tag in new_tags:
                 self.neighborhood.add_neighbor(tag, perf_counter(), State.TASK)
                 self.neighborhood.changed = True
-
-    def set_manually_measured_anchors(self) -> None:
-        if len(self.tag.available_anchors) > 3:
-            with self.tag_lock:
-                self.tag.configureAnchorSelection(number_of_anchors = len(self.tag.available_anchors))
 
     def handle_error(self, function_name: str) -> None: 
         """

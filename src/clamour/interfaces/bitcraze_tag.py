@@ -225,14 +225,6 @@ class BitcrazeTag(Tag):
         return None, None 
     
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
-    def configureAnchorSelection(self, number_of_anchors:int) -> None:
-        # Currently don't have a specific way to determine which anchors to use 
-        # Pypozyx already had an algo for this, which is why the function exists 
-        # TODO: for now, simply using all available anchors. Implement somthing in future. 
-        
-        # NOTE: this could even simply be inside positioning method to simplify things 
-        pass 
-
     @property
     def coordinates(self)->Coordinates: 
         return self._pos

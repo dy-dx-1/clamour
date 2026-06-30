@@ -153,17 +153,6 @@ class Tag(ABC):
         RETURNS: 
             - Angles object of the current orientation (heading, roll, pitch)
         """
-
-    @abstractmethod
-    def configureAnchorSelection(self, number_of_anchors:int) -> None:
-        """
-        Configures how many and which anchors are used for positioning the tag.
-        Should be called with the total number of anchors that are currently available. We can then use them all or a more efficient subset. 
-        Only used in task.py: it's updated if there's more than 3 available anchors
-
-        ARGS:
-            - number_of_anchors: int specifying how many anchors are available for positioning
-        """
     
     @abstractmethod
     def trilaterate_position(self) -> Coordinates | None:

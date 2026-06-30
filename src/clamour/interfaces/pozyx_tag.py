@@ -216,12 +216,11 @@ class PozyxTag(Tag):
         else: 
             return None
 
-    def configureAnchorSelection(self, number_of_anchors):
+    def trilaterate_position(self):
         # With pypozyx, we use automatic anchor selection: https://ardupozyx.readthedocs.io/en/latest/api/pozyx_functions.html#group__positioning__functions_1ga41fc706bd9ffba1d8483cdbeb01d1a75
         # We tell the device how many anchors are available, and it automatically chooses from them to balance precision and performance
-        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=number_of_anchors)
-
-    def trilaterate_position(self):
+        self._pozyx_serial.setSelectionOfAnchors(mode=POZYX_ANCHOR_SEL_AUTO, number_of_anchors=self.available_anchors)
+        
         pos = pozyxCoordinates() 
         try: 
             status = self._pozyx_serial.doPositioning(position=pos, dimension=POZYX_3D, algorithm=POZYX_POS_ALG_UWB_ONLY)
