@@ -242,6 +242,6 @@ class PozyxTag(Tag):
             print(f"PozyxTag.doRanging: {str(s)}", 'error', 'loc') 
 
         if status == POZYX_SUCCESS: 
-            return Coordinates(range_measure.data[1], 0, 0) # idk why only along X 
+            return Coordinates(range_measure.distance, 0, 0) # Only along X cause simple ranging measurement. NOTE: distance in mm 
         else: 
             return None
