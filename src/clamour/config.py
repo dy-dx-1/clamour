@@ -20,8 +20,8 @@ UWB_PREAMBLE_CODE = 9
 ### Terminal output control 
 GEN_MSGS    = True     # Turn off/on general terminal output 
 DEVICE_MSGS = True     # Turn off/on device management-related terminal output  
-TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
-LOC_MSGS    = True     # Turn off/on localization-related terminal output  
+TDMA_MSGS   = False     # Turn off/on TDMA-related terminal output  
+LOC_MSGS    = False     # Turn off/on localization-related terminal output  
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 

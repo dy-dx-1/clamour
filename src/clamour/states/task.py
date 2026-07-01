@@ -127,7 +127,7 @@ class Task(TDMAState):
         Anchors are prioritized because of their lower uncertainty."""
 
         if len(self.tag.available_anchors) > 0:
-            return random.choice(self.tag.available_anchors)
+            return random.choice(list(self.tag.available_anchors))
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
