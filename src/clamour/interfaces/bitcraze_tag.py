@@ -211,16 +211,22 @@ class BitcrazeTag(Tag):
 
             if not message: # If dw1000 listen timed-out but we still have time, continue 
                 continue 
-
-            exp_src =  [exp_src >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
-            exp_dest = [exp_dest>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
             
+        
+            exp_src_addr =  [exp_src >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
+            exp_dest_addr = [exp_dest>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
+
             dest_addr = message[5:13]
             source_addr = message[13:21]
-            msg_type = message[21]
-            twr_seq = message[22]
+            try: 
+                msg_type = message[21]
+                twr_seq = message[22]
+            except IndexError: 
+                # If these indexes don't exist, we caught a message from a tag
+                # these mesages (often TDMA) don't carry msg_type 
+                continue 
 
-            if exp_dest==dest_addr and exp_src==source_addr and exp_msg_type==msg_type and exp_twr_seq==twr_seq:
+            if exp_dest_addr==dest_addr and exp_src_addr==source_addr and exp_msg_type==msg_type and exp_twr_seq==twr_seq:
                 return message, timestamp 
         return None, None 
     
