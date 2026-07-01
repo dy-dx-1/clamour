@@ -1,4 +1,5 @@
 from multiprocessing import Lock, Queue
+from time import sleep
 
 from .ekf import EKFManager, CustomOdometry
 from .tdmaNode import TDMANode
@@ -39,6 +40,7 @@ def keep_alive(process: RunnableProcess) -> None:
             process.run()
         except Exception as e:
             print(f"Clamour.keep_alive(): A process that needs to be kept alive died and will be restarted. Error:{str(e)}", status='error', type='gen')
+            sleep(0.001)
 
 class Clamour:
     def __init__(self, custom_odometries):

@@ -263,7 +263,7 @@ class DW1000:
         else: 
             # TODO Can add more in depth inspection of error bits in future 
             print("Transmit timeout in DW1000.transmit(), returning to IDLE", 'error', 'device')
-            self.write_register([0x8D], [0x40]) # Force return to IDLE 
+            self.disable_rx_tx() # Force return to IDLE 
 
         return (bool(txfrs), tx_timestamp) if ranging else bool(txfrs)
 
