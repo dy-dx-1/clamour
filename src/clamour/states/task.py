@@ -90,7 +90,7 @@ class Task(TDMAState):
             pass 
         else: 
             if position is None: 
-                self.handle_error("Tag.trilaterate_position()")
+                print("Trilateration failed", 'info', 'loc')
             if angles is None:
                 self.handle_error("Tag.orientation was None")
 
