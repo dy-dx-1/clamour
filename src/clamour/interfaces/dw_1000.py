@@ -259,13 +259,13 @@ class DW1000:
                 if ranging: ## If TX OK & ranging, return TX_TIME too 
                     tx_time = self.read_register([0x17], 5, return_ints=True)
                     tx_timestamp = tx_time[0] | tx_time[1]<<8 | tx_time[2]<<16 | tx_time[3]<<24 | tx_time[4]<<32
-                    return bool(txfrs), tx_timestamp
                 break # DW1000 will return to IDLE automatically 
         else: 
             # TODO Can add more in depth inspection of error bits in future 
             print("Transmit timeout in DW1000.transmit(), returning to IDLE", 'error', 'device')
             self.write_register([0x8D], [0x40]) # Force return to IDLE 
-        return bool(txfrs) 
+
+        return (bool(txfrs), tx_timestamp) if ranging else bool(txfrs)
 
     def disable_rx_tx(self): 
         """ Disables all TX and RX activity (SYS_CTRL 0x0D), forcing return to IDLE """ 
