@@ -298,7 +298,7 @@ class BitcrazeTag(Tag):
         if not result.success:
             print("[WARNING] trilaterate_position() did not converge perfectly!", 'info', 'loc')
             
-        return result.x
+        return Coordinates(result.x[0], result.x[1], result.x[2])
 
     def doRanging(self, target_id:int) -> Coordinates | None: 
         distance = self.compute_range(target_id) 
