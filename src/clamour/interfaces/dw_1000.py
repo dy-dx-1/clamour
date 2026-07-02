@@ -53,7 +53,18 @@ _CHANNEL_RF_CONFIG = {
 
 # TX power configuration: channel -> {PRF: [values]}
 # Used for register 0x1E
-_TX_POWER_CONFIG = {
+# these are if smart TX power is disabled 
+_NO_SMART_TX_POWER_CONFIG = {  
+    1: {16: [0x75, 0x75, 0x75, 0x75], 64: [0x67, 0x67, 0x67, 0x67]},
+    2: {16: [0x75, 0x75, 0x75, 0x75], 64: [0x67, 0x67, 0x67, 0x67]},
+    3: {16: [0x6F, 0x6F, 0x6F, 0x6F], 64: [0x8B, 0x8B, 0x8B, 0x8B]},
+    4: {16: [0x5F, 0x5F, 0x5F, 0x5F], 64: [0x9A, 0x9A, 0x9A, 0x9A]},
+    5: {16: [0x48, 0x48, 0x48, 0x48], 64: [0x85, 0x85, 0x85, 0x85]},
+    7: {16: [0x92, 0x92, 0x92, 0x92], 64: [0xD1, 0xD1, 0xD1, 0xD1]},
+}
+
+# these are if smart TX power is enabled 
+_SMART_TX_POWER_CONFIG = {
     1: {16: [0x75, 0x55, 0x35, 0x15], 64: [0x67, 0x47, 0x27, 0x07]},
     2: {16: [0x75, 0x55, 0x35, 0x15], 64: [0x67, 0x47, 0x27, 0x07]},
     3: {16: [0x6F, 0x4F, 0x2F, 0x0F], 64: [0x8B, 0x6B, 0x4B, 0x2B]},
@@ -72,7 +83,9 @@ class DW1000:
     TIME_UNIT = 1.5650040064102565e-11  # seconds / tick for the DW1000
     DW_LISTEN_TIMEOUT = 0.015           # Delay used to wait during RX 
 
-    def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int): 
+    def __init__(self, bus:int, cs:int, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7],
+                 preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int, 
+                 smart_tx_power:bool, tx_power_settings:int|None=None): 
         self.spi = spidev.SpiDev() 
         self.spi.open(bus, cs) 
         
@@ -80,7 +93,8 @@ class DW1000:
         self.spi.mode = 0b00              # GPIO 5 and 6 dictate the mode, should be untouched 
         
         self.prep_device_for_use()        # Checks that device initialized properly and sets clock to 20MHz
-        self.config_uwb_settings(channel, PRF, bitrate, preamble_length, preamble_code) # Checks validity of settings and applies them 
+        self.config_uwb_settings(channel, PRF, bitrate, preamble_length, preamble_code, smart_tx_power, tx_power_settings) # Checks validity of settings and applies them 
+        # TODO: confirm uwb settings persist after soft/hard reset 
         print("DW1000 DEVICE READY", 'ok', 'gen')
     
     def prep_device_for_use(self): 
@@ -355,7 +369,7 @@ class DW1000:
         return (data, rx_stamp) if ranging else data 
     
     @staticmethod
-    def check_valid_uwb_config(channel:int, PRF:int, bitrate:float, preamble_length:int, preamble_code:int)->bool: 
+    def check_valid_uwb_config(channel:int, PRF:int, bitrate:float, preamble_length:int, preamble_code:int, smart_tx_power:bool)->bool: 
         """ 
         Checks if a specific UWB configuration is valid based on the DW1000 user manual. 
         """
@@ -396,10 +410,16 @@ class DW1000:
         else: 
             print("Invalid bitrate-preamble config for DRX_TUNE1b", 'error', 'device')
             return False 
+        ## Smart TX Power can only be used with 6.8 bitrate
+        if smart_tx_power: 
+            if bitrate not in [6.8, 6, 7]: 
+                return False 
         ## If all passed, everything ok 
         return True 
 
-    def config_uwb_settings(self, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int)->None: 
+    def config_uwb_settings(self, channel:Literal[1,2,3,4,5,7], PRF:Literal[16,64], bitrate:Literal[110,850,6,7], 
+                            preamble_length:Literal[64,128,256,512,1024,1536,2048,4096], preamble_code:int,
+                            smart_tx_power:bool, tx_power_settings:list[int]|None=None)->None: 
         """
         Configures the DW1000's UWB settings. Validates the settings before applying them. 
         
@@ -409,6 +429,8 @@ class DW1000:
             - preamble_code: Code associated to PRF, see user manual. 
             - bitrate: Bitrate, 110kps, 850kps or 6.8Mbps (latter can be passed as 6, 7 or 6.8, all correspond to 6.8)
             - preamble_length: in symbols
+            - smart_tx_power: bool (whether to use it or not), can only be used with 6.8Mbps bitrate
+            - tx_power_settings: ONLY USE IF SURE! 4 bytes in LSB order of 0x1E register, leave at None for default. 
 
         Modifies the following registers:
             - 0x1F    - Channel Control
@@ -426,8 +448,9 @@ class DW1000:
             - 0x23:0C - AGC_TUNE2
             - 0x23:12 - AGC_TUNE3
             - 0x1E    - TX Power
+            - 0x04    - System Configuration
         """
-        if not self.check_valid_uwb_config(channel, PRF, bitrate, preamble_length, preamble_code):
+        if not self.check_valid_uwb_config(channel, PRF, bitrate, preamble_length, preamble_code, smart_tx_power):
             # This ensures that the combination of values is valid 
             # and simplifies following if/elses 
             print("Unsupported UWB config for DW1000, check DW1000.config_uwb_settings()", 'error', 'device')
@@ -616,13 +639,31 @@ class DW1000:
             new_cfg = [0x07, 0x06] 
         if lde!=new_cfg:
             self.write_register([0xEE, 0x86, 0x30], new_cfg)
+        ###################### 0x04 ######################
+        sys_cfg = self.read_register([0x04], 4, return_ints=True) 
+        sys_cfg = sys_cfg[0] | sys_cfg[1]<<8 | sys_cfg[2]<<16 | sys_cfg[3]<<24
+        curr_DIS_STXP = (sys_cfg >> 18) & 1 
+        if smart_tx_power: 
+            new_DIS_STXP = 0 
+        else: 
+            new_DIS_STXP = 1 
+        if curr_DIS_STXP!=new_DIS_STXP: 
+            sys_cfg &= ~(1 << 18) # clear only bit 18 
+            sys_cfg |= (new_DIS_STXP << 18)
+            new_cfg = [sys_cfg & 0xFF, (sys_cfg>>8) & 0xFF, (sys_cfg>>16) & 0xFF, (sys_cfg>>24) & 0xFF]
+            self.write_register([0x84], new_cfg)
         ###################### 0x1E ######################
-        # NOTE 0x1E: 2026-06-10, only supporting smart TX power rn 
-        # in future, check if useful to add manual power 
         tx_power = self.read_register([0x1E], 4, return_ints=True)
-        new_cfg = _TX_POWER_CONFIG[channel][PRF]
+        if tx_power_settings: 
+            # tx power settings must be a list in LSB order of the 4 bytes to write to 0x1E 
+            new_cfg = tx_power_settings 
+        else: 
+            if smart_tx_power: 
+                new_cfg = _SMART_TX_POWER_CONFIG[channel][PRF]
+            else: 
+                new_cfg = _NO_SMART_TX_POWER_CONFIG[channel][PRF]
         if tx_power != new_cfg: 
-            self.write_register([0x1E], new_cfg)
+            self.write_register([0x9E], new_cfg)
         ###################### DONE! ######################
         to_print = f"""
         --- DW 1000 UWB settings configured. ---
@@ -632,5 +673,7 @@ class DW1000:
         Preamble length: {preamble_length}
         Preamble code: {preamble_code}
         PAC size: {PAC_size}
-        **NOTE**: Settings currently only support smart TX power and standard SFD.""" 
+        Smart TX Power: {smart_tx_power} 
+        TX Power Settings (LSB first): {[hex(_) for _ in new_cfg]}
+        **NOTE**: Settings currently only support standard SFD.""" 
         print(to_print, 'ok', 'device')
