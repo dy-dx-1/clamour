@@ -16,7 +16,8 @@ from .custom_terminal import print
 
 #################################################### CONFIG PARAMETERS
 from .config import (TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS, 
-                     UWB_CHANNEL, UWB_BITRATE, UWB_PRF, UWB_PREAMBLE_CODE, UWB_PREAMBLE_LENGTH)
+                     UWB_CHANNEL, UWB_BITRATE, UWB_PRF, UWB_PREAMBLE_CODE, UWB_PREAMBLE_LENGTH,
+                     SMART_TX_POWER, TX_POWER_CONFIG)
 
 match TAG_TYPE:
     case "Bitcraze": 
@@ -27,7 +28,9 @@ match TAG_TYPE:
                                           PRF=UWB_PRF,
                                           bitrate=UWB_BITRATE,
                                           preamble_length=UWB_PREAMBLE_LENGTH,
-                                          preamble_code=UWB_PREAMBLE_CODE)
+                                          preamble_code=UWB_PREAMBLE_CODE,
+                                          smart_tx_power=SMART_TX_POWER,
+                                          tx_power_settings=TX_POWER_CONFIG)
     case "Pozyx": 
         TAG_FACTORY = lambda: PozyxTag() 
     case _: 
