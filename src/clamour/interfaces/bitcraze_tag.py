@@ -280,7 +280,7 @@ class BitcrazeTag(Tag):
                 T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
                 T_rp2 = compute_clock_delta(T3, R2)
                 tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
-                distance = (tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000 # in mm 
+                distance = int((tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
         else: 
             # TODO implement tag 
             pass 

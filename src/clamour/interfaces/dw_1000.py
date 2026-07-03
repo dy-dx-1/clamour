@@ -656,6 +656,7 @@ class DW1000:
         tx_power = self.read_register([0x1E], 4, return_ints=True)
         if tx_power_settings: 
             # tx power settings must be a list in LSB order of the 4 bytes to write to 0x1E 
+            # NOTE: ex: NOT 0x67676767 but [0x67, 0x67, 0x67, 0x67]
             new_cfg = tx_power_settings 
         else: 
             if smart_tx_power: 
