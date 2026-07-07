@@ -11,7 +11,8 @@ if parent_dir not in sys.path:
 
 from src.clamour.interfaces.bitcraze_tag import BitcrazeTag
 
-ANCHOR_ID = 4 
+ANCHOR_ID = 4
+
 SMART_TX_POWER = False 
 
 power_lvls = [ [0x67, 0x67, 0x67, 0x67], [0x60,0x60,0x60,0x60], [0x58,0x58,0x58,0x58], [0x50,0x50,0x50,0x50], [0x48,0x48,0x48,0x48], [0x40,0x40,0x40,0x40], [0x30,0x30,0x30,0x30], [0x20,0x20,0x20,0x20], [0x10,0x10,0x10,0x10], [0x08,0x08,0x08,0x08], [0x00,0x00,0x00,0x00] ] 
@@ -35,12 +36,18 @@ def get_range_measurements(smart_tx, power_cfg): # IN CM
 for pwr_lvl in power_lvls: 
     # Computing stats
     ranges = get_range_measurements(SMART_TX_POWER, pwr_lvl)
-    mean = round(np.mean(ranges)) 
-    std_dev = round(np.std(ranges))
-    print(f"--- At power level: {relative_power}% ({pwr_lvl}) ---")
-    print(f"Success rate: {len(ranges)}%")
-    print(f"Mean range: {mean}cm")          # Used to compute error 
-    print(f"STD dev of range: {std_dev}cm") # 68% of measures within this range and 95% within double 
+    if len(ranges) != 0: 
+        mean = round(np.mean(ranges)) 
+        std_dev = round(np.std(ranges))
+    else: 
+        mean = None 
+        std_dev = None
+    #print(f"--- At power level: {relative_power}% ({pwr_lvl}) ---")
+    #print(f"Success rate: {len(ranges)}%")
+    #print(f"Mean range: {mean}cm")          # Used to compute error 
+    #print(f"STD dev of range: {std_dev}cm") # 68% of measures within this range and 95% within double 
     results[relative_power] = (len(ranges), mean, std_dev)
     relative_power -= 10 
-    time.sleep(1) 
+    time.sleep(0.1) 
+
+print(results) 

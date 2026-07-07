@@ -38,12 +38,15 @@ class SoundManager(object):
         print(len(self.xyz_files))
 
     def build_file_name(self, coordinates: Coordinates) -> str:
+        # return "X838_Y-2156_Z1959.flac" for testing sound 
         return self.xyz_files.get(self.convert_coordinates_to_indexes(coordinates), "")
 
     def sound_player(self, track):
         # loop trough the channel to find an available one and use it to play the track
         the_path = PATH + track
+        #the_path = "sound_garage-cat-meow-8-fx-306184.flac" for testing sound 
         if track != self.last_sound:
+        #if True: 
             self.last_sound = track
 
             for index, channel_tuple in enumerate(self.channels):
@@ -71,14 +74,14 @@ class SoundManager(object):
         """This function switches the different stats and call the sound that must be played."""
 
         while pygame.mixer.get_busy():  # wait for the last instance to finish
-            print('waiting for channel to be ready')
+            #print('waiting for channel to be ready')
             sleep(0.01) # NOTE: added to reduce CPU load, confirm
 
         self.sound_player(self.pattern_chord)
 
     def cyclic_call(self, position: Coordinates):
         self.pattern_chord = self.build_file_name(position)
-
+    
         if (position.x != 0 or position.y != 0 or position.z != 0) and self.pattern_chord:
             self.build_play_list()
         else:
