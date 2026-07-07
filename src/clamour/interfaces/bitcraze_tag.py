@@ -214,8 +214,7 @@ class BitcrazeTag(Tag):
 
             if not message: # If dw1000 listen timed-out but we still have time, continue 
                 continue 
-            
-        
+
             exp_src_addr =  [exp_src >>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC] 
             exp_dest_addr = [exp_dest>>(shift*8) & 0xFF for shift in range(6)] + [0xCF, 0xBC]
 
@@ -311,6 +310,4 @@ class BitcrazeTag(Tag):
 
     def doRanging(self, target_id:int) -> Coordinates | None: 
         distance = self.compute_range(target_id) 
-        if distance: 
-            return Coordinates(x=distance, y=0, z=0) 
-        return None 
+        return Coordinates(x=distance, y=0, z=0) if distance else None 
