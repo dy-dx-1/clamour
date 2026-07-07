@@ -30,8 +30,14 @@ SAVE_TO_CSV = False     # Save EKF data to csv or not
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
-# Anchor IDs are expected to be <=10. Coordinates are in mm. 
+# Anchor IDs are expected to be >0 and <=10. Coordinates are in mm. 
 # temp NOTE A2 with broken usb is ID 2 
 ANCHORS = ({'id': 2, 'level': 0, 'x': 0, 'y': 0, 'z': 850}, 
            {'id': 3, 'level': 0, 'x': 2130, 'y': 2280, 'z': 1060},
            {'id': 4, 'level': 0, 'x': 1950, 'y': 0, 'z': 840})
+
+
+### ----------------------- VALIDATION CHECKS ----------------------- ### 
+assert TAG_TYPE in ("Bitcraze", "Pozyx") 
+assert 10<TAG_ID<0xFFFF
+assert all([1<=anc['id']<=10 for anc in ANCHORS]) # 0 is unsupported because reserved in the code for general broadcasts 

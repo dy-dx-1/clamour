@@ -45,9 +45,7 @@ class BitcrazeTag(Tag):
                  channel:int, PRF:int, bitrate:int, 
                  preamble_length:int, preamble_code:int,
                  smart_tx_power:bool, tx_power_settings:list[int]|None=None):
-        if not tag_id>10: 
-            raise Exception("Invalid tag_id for BitcrazeTag. Tag ID must > 10. Check your config file.")
-        
+
         self._id = tag_id 
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
         self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code, smart_tx_power, tx_power_settings)
