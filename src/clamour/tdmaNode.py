@@ -53,8 +53,13 @@ class TDMANode:
         frequency = 60.0  # Hz
         period = 1.0 / frequency
 
-        while (time() - start_time) <= period:
-            sleep(0.00000001)
+        elapsed = time() - start_time
+        remaining = period - elapsed
+        if remaining > 0:
+            sleep(remaining)
+        # previously was 
+        #while (time() - start_time) <= period:
+        #    sleep(0.00000001)
 
     @staticmethod
     def clear_devices(tag: Tag, tag_lock: Lock) -> None:
