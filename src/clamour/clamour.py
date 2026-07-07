@@ -9,7 +9,7 @@ from .contextManagedProcess import ContextManagedProcess
 from .messages.poseMessage import PoseMessage
 from .messages.customOdometryMessage import CustomOdometryMessage
 from .runnableProcess import RunnableProcess
-#from .soundmanager import SoundManager
+from .soundmanager import SoundManager
 from .interfaces.bitcraze_tag import BitcrazeTag
 from .interfaces.pozyx_tag import PozyxTag
 from .custom_terminal import print
@@ -58,8 +58,8 @@ class Clamour:
                 ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_tag, shared_tag_lock, tag_id, sound)
                 #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
                 tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
-                #if sound:
-                #    sound_player = SoundManager(sound_queue)
+                if sound:
+                    sound_player = SoundManager(sound_queue)
                 with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
                     ekf_manager_process.start()
                     with ContextManagedProcess(target=tdma_node.run) as tdma_process:
@@ -67,8 +67,10 @@ class Clamour:
                         #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
                             #pedometer_process.start()
 
-                        #    if sound:
+                        #    if sound:  was like this before, indented under pedometer, just couldn'T run it yet
                         #        keep_alive(sound_player)
+                        if sound: 
+                            keep_alive(sound_player)
 
     def start_non_blocking(self, sound: bool, pose_callback):
         self.communication_queue = Queue()
