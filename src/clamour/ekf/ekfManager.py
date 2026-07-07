@@ -36,6 +36,8 @@ class EKFManager:
 
     @staticmethod
     def initialize_csv():
+        if not SAVE_TO_CSV: 
+            return None, None 
         filepath = 'broadcast_state.csv'
         is_new_file = os.path.exists(filepath)
         fieldnames = ['tag_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
@@ -109,8 +111,7 @@ class EKFManager:
 
             coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
             
-            if SAVE_TO_CSV: 
-                self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
+            self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
 
             poseMsg = PoseMessage(coordinates.x, coordinates.y, coordinates.z, yaw)
             self.pose_callback(poseMsg)
@@ -173,6 +174,8 @@ class EKFManager:
         self.last_know_neighbors = neighbors
 
     def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
+        if not SAVE_TO_CSV: 
+            return 
         if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:
             csv_data = {
                 'tag_id': self.tag_id,
