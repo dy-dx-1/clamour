@@ -4,9 +4,10 @@ import csv
 from multiprocessing.synchronize import Lock
 from numpy import linalg
 from struct import error as StructError
-from time import time
+from time import sleep, time
 
 from ..custom_terminal import print 
+from ..config import SAVE_TO_CSV
 from ..interfaces import Tag, Coordinates
 from .ekf import CustomEKF, DT_THRESHOLD
 from ..contextManagedQueue import ContextManagedQueue
@@ -49,9 +50,16 @@ class EKFManager:
         return state_csv, writer
 
     def run(self) -> None:
-        self.initialize_ekf()
-        while True:
-            self.process_latest_state_info()
+        try:
+            self.initialize_ekf()
+            while True:
+                self.process_latest_state_info()
+        except Exception as e:
+                import traceback
+                # Force it to print directly
+                print(f"Child process crashed: {str(e)}\n", 'error', 'device')
+                traceback.print_exc()
+                raise e
 
     def initialize_ekf(self) -> None:
         while self.ekf is None:
@@ -66,6 +74,8 @@ class EKFManager:
                     self.save_to_csv(message.timestamp, message, self.ekf.get_position(), self.ekf.get_yaw())
                     poseMsg = PoseMessage(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, self.ekf.get_yaw())
                     self.pose_callback(poseMsg)
+            else:
+                sleep(0.001)
 
         print("EKF INITIALIZING DONE", 'ok', 'loc')
 
@@ -98,7 +108,9 @@ class EKFManager:
                 print(f"EKFManager.process_latest_state_info(): {str(s)}", 'error', 'loc')
 
             coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
-            self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
+            
+            if SAVE_TO_CSV: 
+                self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
 
             poseMsg = PoseMessage(coordinates.x, coordinates.y, coordinates.z, yaw)
             self.pose_callback(poseMsg)
@@ -109,6 +121,8 @@ class EKFManager:
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
             update_functions[UpdateType.ZERO_MOVEMENT](*self.generate_zero_update_info(self.ekf.last_measurement_time + DT_THRESHOLD))
+        else:
+            sleep(0.001)
 
     def extract_update_info(self, msg: UpdateMessage) -> tuple:
         if msg.update_type == UpdateType.PEDOMETER:
