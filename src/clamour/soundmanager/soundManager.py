@@ -70,8 +70,9 @@ class SoundManager(object):
     def build_play_list(self):
         """This function switches the different stats and call the sound that must be played."""
 
-        while pygame.mixer.get_busy == 1:  # wait for the last instance to finish
+        while pygame.mixer.get_busy():  # wait for the last instance to finish
             print('waiting for channel to be ready')
+            sleep(0.01) # NOTE: added to reduce CPU load, confirm
 
         self.sound_player(self.pattern_chord)
 
@@ -95,6 +96,8 @@ class SoundManager(object):
                                               message.coordinates.y / 10,
                                               min(message.coordinates.z / 10, 2250))
                 self.cyclic_call(scaled_position)
+            else:
+                sleep(0.01) # NOTE: added to reduce CPU load, confirm
 
     def main(self):
         for posX in range(-2000, 2000, 40):
