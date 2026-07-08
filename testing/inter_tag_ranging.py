@@ -1,0 +1,44 @@
+import sys
+from pathlib import Path
+from rich import print
+import time 
+import numpy as np 
+
+# Add parent directory to sys.path
+parent_dir = str(Path(__file__).resolve().parent.parent)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+from src.clamour.interfaces.bitcraze_tag import BitcrazeTag
+
+id = sys.argv[1] 
+try: 
+    if int(id)==11: 
+        TAG_ID = 11 
+    elif int(id)==15: 
+        TAG_ID = 15 
+    else: 
+        raise ValueError() 
+except: 
+    print("invalid arg")
+    quit() 
+
+if TAG_ID == 11: 
+    with BitcrazeTag(tag_id=TAG_ID, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8,
+                preamble_length=128, preamble_code=9,
+                smart_tx_power=True, tx_power_settings=None) as bc: 
+        ### Sender tag 
+        range = bc.compute_range(15)
+        print(f"calculated range: {range}")
+
+elif TAG_ID == 15: 
+    with BitcrazeTag(tag_id=TAG_ID, dw1000_bus=1, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8,
+            preamble_length=128, preamble_code=9,
+            smart_tx_power=True, tx_power_settings=None) as bc: 
+        ### Receiver tag 
+        while True: 
+            s_id, data = bc.receive_data() 
+            if s_id: 
+                print("ATTEMPTING RANGING! -------------------")  
+            time.sleep(0.008) # if refresh is high enough, pretty much always get messages, timout on other side don't matter, only if we are listening 
+        
