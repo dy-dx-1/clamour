@@ -174,13 +174,13 @@ class Messenger:
         with self.tag_lock: 
             sender_id, data = self.tag.receive_data()
 
-        #if sender_id != 0 and data:
-            #print(f"Raw received: {data}", 'info', 'tdma')
+        if sender_id: 
+            self.tag.addNeighborTag(sender_id) 
+
         if data == b'':
-            pass 
+            pass # prevents index error on elif check 
          
-        elif sender_id != 0 and data[0] == CUSTOM_MESSAGE_SIGNATURE:
-            self.tag.addNeighborTag(sender_id) # Received valid message, update our neighbor info 
+        elif data[0] == CUSTOM_MESSAGE_SIGNATURE:
             received_message = MessageFactory.create(sender_id, data)
             if received_message is None:  # NOTE: from 2026-05-03 TDMA testing after decoupling, may not be right 
                 print(f"[WARNING] Dropped unknown message: {data}", 'info', 'tdma')
