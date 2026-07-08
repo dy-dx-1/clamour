@@ -16,6 +16,7 @@ ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known 
 
 SPEED_OF_LIGHT = 299_792_458
 ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
+ANTENNA_TICK_DELAY_TAGS = -32873    # Antenna delay for tag range measurements. Very very very roughly calibrated 2026-07-08 on my desk. TODO NEEDS PROPER CALIBRATION (didn't have other rpi on hand at the time) 
 
 RANGING_BC_HEADER =    [0x41, 0xDC, 0x00, 0xCF, 0xBC]  # format expected by BC anchors. Used to generate TWR messages to them. Also use this type of header for inter-tag ranging exchanges, but just for convenience. 
 INTER_TAG_HEADER =     [0x41, 0x98, 0x00, 0xCF, 0xBC]  # for our internal communication, based on default ranging messages, but uses 16bit addresses, as these are the ones we enforce in config.py
@@ -27,7 +28,7 @@ TWR_REPORT = 0x04
 
 DW_PAUSE_DELAY = 0.005    # Delay used to give some time for the DW to reset between loops 
 
-DISCOVERY_TIMEOUT = 5     # If we don't hear from another tag after this time, we consider it inactive 
+DISCOVERY_TIMEOUT = 15     # If we don't hear from another tag after this time, we consider it inactive 
 
 class BitcrazeTag(Tag):
     """
@@ -277,6 +278,11 @@ class BitcrazeTag(Tag):
         Returns None if the transaction is unsuccessful.  
         TODO: a more thorough testing of timeouts to actually figure out what is a good reliable value  
         """
+        if self.is_anchor(target_id): 
+            ANTENNA_TICK_DELAY = ANTENNA_TICK_DELAY_ANCHORS
+        else: 
+            ANTENNA_TICK_DELAY = ANTENNA_TICK_DELAY_TAGS
+
         def compute_clock_delta(t2, t1): 
             ### Calculates difference in clock ticks considering DW1000 clock is 40bit
             TICK_DELTA_MASK = (1 << 40) - 1
@@ -305,7 +311,7 @@ class BitcrazeTag(Tag):
             T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
-            distance = int((tof_ticks + ANTENNA_TICK_DELAY_ANCHORS) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
+            distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
         return distance
 
     def trilaterate_position(self) -> Coordinates | None:
