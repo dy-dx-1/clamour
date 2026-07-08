@@ -41,3 +41,8 @@ ANCHORS = ({'id': 2, 'level': 0, 'x': 0, 'y': 0, 'z': 850},
 assert TAG_TYPE in ("Bitcraze", "Pozyx") 
 assert 10<TAG_ID<0xFFFF
 assert all([1<=anc['id']<=10 for anc in ANCHORS]) # 0 is unsupported because reserved in the code for general broadcasts 
+
+if TX_POWER_CONFIG: # If specified, TX POWER CONFIG must be list in LSB order of bytes for 0x1E register
+    assert type(TX_POWER_CONFIG) == list 
+    assert len(TX_POWER_CONFIG) == 4 
+    assert type(TX_POWER_CONFIG[0])== int 
