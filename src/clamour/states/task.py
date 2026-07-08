@@ -125,9 +125,14 @@ class Task(TDMAState):
     def select_ranging_target(self) -> int:
         """We select a target for doing a range measurement.
         Anchors are prioritized because of their lower uncertainty."""
-
+        # TODO: add mechanism to force variety in selection, we don't want to always use the same anchor
+        # keep a dict of how many times used each? always pick lowest used? 
         if len(self.tag.available_anchors) > 0:
             return random.choice(list(self.tag.available_anchors))
+        elif len(self.tag.active_tags) > 0: 
+            return random.choice(list(self.tag.active_tags))
+        else:
+            return None 
 
     def discover_devices(self):
         """Discovers the devices available for localization/ranging.
