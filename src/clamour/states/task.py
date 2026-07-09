@@ -93,7 +93,7 @@ class Task(TDMAState):
             if position is None: 
                 print("Trilateration failed", 'info', 'loc')
             if angles is None:
-                self.handle_error("Tag.orientation was None")
+                print("Could not retrieve orientation", 'info', 'loc')
 
         if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
@@ -169,10 +169,3 @@ class Task(TDMAState):
             for tag in new_tags:
                 self.neighborhood.add_neighbor(tag, perf_counter(), State.TASK)
                 self.neighborhood.changed = True
-
-    def handle_error(self, function_name: str) -> None: 
-        """
-        Prints the current error on the device with the function where it happened
-        """
-        with self.tag_lock: 
-            self.tag.printCurrentError(function_name) 

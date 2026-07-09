@@ -82,18 +82,6 @@ class Tag(ABC):
         """
         Resets the tag. 
         """
-
-    @abstractmethod
-    def printCurrentError(self, function_name:str) -> bool:
-        """
-        Checks if the tag experienced an error and retrieves it. 
-        If there was an error, prints it to the terminal & the function name where it happened.
-        
-        ARGS:
-            - function_name: String indicating the function name where this was checked
-        RETURNS: 
-            - bool on whether there was really an error or not 
-        """
     
     @abstractmethod
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> set[int]:

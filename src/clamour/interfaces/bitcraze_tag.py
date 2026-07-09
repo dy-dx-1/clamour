@@ -142,16 +142,6 @@ class BitcrazeTag(Tag):
     def resetSystem(self) -> None:
         self._dw.soft_reset() 
         print("BitcrazeTag was reset", 'info', 'device')
-
-    def printCurrentError(self, function_name:str) -> bool:
-        # NOTE: This function cannot be used in the same way as originally intended with Pozyx
-        # as bitcraze does not allow for the same functionality in collecting errors through the firmware
-        # To avoid modifying the rest of the code and altering pozyx compatibility, I'm keeping 
-        # this function as a simple formatter that outputs the function name where the error occurred. 
-        # Since we can't check if there was really an error, I assume this function is only called when there is one 
-        # and so the function always returns True. 
-        print(f"There was an error in the function: {function_name}", 'error', 'gen')
-        return True 
     
     def get_device_list(self, discovery_type:Literal["all", "anchor", "tag"]) -> set[int]: 
         device_list = set() 

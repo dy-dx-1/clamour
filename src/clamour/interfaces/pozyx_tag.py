@@ -105,6 +105,15 @@ class PozyxTag(Tag):
         self._pozyx_serial.resetSystem()
     
     def printCurrentError(self, function_name): 
+        """
+        Checks if the tag experienced an error and retrieves it. 
+        If there was an error, prints it to the terminal & the function name where it happened.
+        
+        ARGS:
+            - function_name: String indicating the function name where this was checked
+        RETURNS: 
+            - bool on whether there was really an error or not 
+        """
         returned_error = False
         try: 
             error_code = SingleRegister() 
@@ -214,6 +223,7 @@ class PozyxTag(Tag):
         if status == POZYX_SUCCESS: 
             return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
         else: 
+            self.printCurrentError('PozyxTag.orientation')
             return None
 
     def trilaterate_position(self):
