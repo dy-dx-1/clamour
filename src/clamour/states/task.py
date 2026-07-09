@@ -32,6 +32,7 @@ class Task(TDMAState):
         self.messenger = messenger
         self.frame_id_done_discover = -1
         self.neighborUpdateFrequency = 5 # every five frames, do discovery and update neighbor information
+        self.ranging_references = {'anchors':{}, 'tags':{}}     # Keeps track of what anchors/tags we previously used for ranging to allow variety in selection 
 
     def execute(self) -> State:
         if self.frame_id_done_discover != self.timing.frame_id and not self.timing.frame_id % self.neighborUpdateFrequency: # do discovery at first slot of every $neighborUpdateFrequency frames
@@ -105,7 +106,7 @@ class Task(TDMAState):
     def ranging(self) -> None:
         ranging_target_id = self.select_ranging_target()
 
-        if ranging_target_id is not None:
+        if ranging_target_id:
             with self.tag_lock: 
                 if self.tag.is_anchor(ranging_target_id):
                     ref_coordinates = self.anchors.anchors_dict[ranging_target_id]
@@ -117,20 +118,29 @@ class Task(TDMAState):
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
 
-            if not ((measured_position is None) or (angles is None)): # These will be None if there were errors when getting the ranging/angles 
+            if measured_position is not None and angles is not None: # These will be None if there were errors when getting the ranging/angles 
                 self.messenger.send_ekf_update(UpdateType.RANGING, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
                                                measured_position, angles.heading, neighbors=atleast_2d(neighbor_position),
                                                topology=self.neighborhood.current_neighbors)
 
-    def select_ranging_target(self) -> int:
-        """We select a target for doing a range measurement.
-        Anchors are prioritized because of their lower uncertainty."""
-        # TODO: add mechanism to force variety in selection, we don't want to always use the same anchor
-        # keep a dict of how many times used each? always pick lowest used? 
+    def select_ranging_target(self) -> int|None:
+        """Selects a target for doing a range measurement.
+        Anchors are prioritized because of their lower uncertainty.
+        When multiple devices are available, we always select the 
+        least used to reduce overall uncertainty.""" 
         if len(self.tag.available_anchors) > 0:
-            return random.choice(list(self.tag.available_anchors))
+            # Amongs all available anchors, pick the one who has the lowest use in the dict of ranging references 
+            anchor_refs = self.ranging_references['anchors']
+            selected_anchor = min(self.tag.available_anchors, 
+                             key=lambda id: anchor_refs.get(id, 0))
+            anchor_refs[selected_anchor] = anchor_refs.get(selected_anchor, 0) + 1 
+            return selected_anchor
         elif len(self.tag.active_tags) > 0: 
-            return random.choice(list(self.tag.active_tags))
+            tag_refs = self.ranging_references['tags']
+            selected_tag = min(self.tag.active_tags, 
+                             key=lambda id: tag_refs.get(id, 0))
+            tag_refs[selected_tag] = tag_refs.get(selected_tag, 0) + 1 
+            return selected_tag
         else:
             return None 
 
