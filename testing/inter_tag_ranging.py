@@ -23,18 +23,20 @@ except:
     print("invalid arg")
     quit() 
 
+
 if TAG_ID == 11: 
     with BitcrazeTag(tag_id=TAG_ID, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8,
                 preamble_length=128, preamble_code=9,
-                smart_tx_power=True, tx_power_settings=None) as bc: 
+                smart_tx_power=False, tx_power_settings=[0x10, 0x10, 0x10, 0x10]) as bc: 
         ### Sender tag 
-        range = bc.compute_range(15)
-        print(f"calculated range: {range}")
+        for _ in range(10): 
+            d = bc.compute_range(15) 
+            print(f"Range measured: {d}mm")
 
 elif TAG_ID == 15: 
     with BitcrazeTag(tag_id=TAG_ID, dw1000_bus=1, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8,
             preamble_length=128, preamble_code=9,
-            smart_tx_power=True, tx_power_settings=None) as bc: 
+            smart_tx_power=False, tx_power_settings=[0x10, 0x10, 0x10, 0x10]) as bc: 
         ### Receiver tag 
         while True: 
             s_id, data = bc.receive_data() 
