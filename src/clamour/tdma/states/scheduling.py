@@ -4,12 +4,13 @@ from random import sample, randint
 from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState 
 
-from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..interfaces.timing import SCHEDULING_SLOT_COUNT, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
-from ..custom_terminal import print 
+from ..neighborhood import Neighborhood
+from ..slot_assignment import SlotAssignment
+from ..timing import Timing, SCHEDULING_SLOT_COUNT, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
+from ...custom_terminal import print 
 
 if TYPE_CHECKING:
-    from ..messenger import Messenger
+    from ...messenger import Messenger
 
 class Scheduling(TDMAState):
     """

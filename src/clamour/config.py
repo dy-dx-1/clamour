@@ -41,7 +41,7 @@ ANCHORS = ({'id': 2, 'level': 0, 'x': 0, 'y': 0, 'z': 850},
 assert TAG_TYPE in ("Bitcraze", "Pozyx") 
 assert 10<TAG_ID<0xFFFF
 
-from .interfaces.timing import SCHEDULING_SLOT_COUNT
+from .tdma.timing import SCHEDULING_SLOT_COUNT 
 assert (TAG_ID & 0xFF) < SCHEDULING_SLOT_COUNT, (
     f"TAG_ID low byte {TAG_ID & 0xFF} must be smaller than SCHEDULING_SLOT_COUNT {SCHEDULING_SLOT_COUNT}"
 )

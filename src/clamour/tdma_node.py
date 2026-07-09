@@ -1,9 +1,10 @@
 from multiprocessing.synchronize import Lock
 from time import sleep, time
 
-from .interfaces import Anchors, Neighborhood, SlotAssignment, Timing, Tag
+from .interfaces import Anchors, Tag
+from .tdma import Neighborhood, SlotAssignment, Timing
 from .messenger import Messenger
-from .states import TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task
+from .tdma.states import TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task
 
 class TDMANode:
     def __init__(self, multiprocess_communication_queue, shared_tag: Tag,

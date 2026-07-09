@@ -5,9 +5,9 @@ from time import perf_counter, time
 import struct
 
 from .interfaces import Tag, Coordinates, Neighborhood, SlotAssignment
-from .interfaces.timing import NB_TASK_SLOTS
+from .tdma.timing import NB_TASK_SLOTS
 from .contextManagedQueue import ContextManagedQueue
-from .states.constants import State
+from .tdma.states.constants import State
 from .messages.messageBox import MessageBox
 from .messages.messageFactory import MessageFactory, CUSTOM_MESSAGE_SIGNATURE
 from .messages.uwbMessage import UWBSynchronizationMessage, UWBTDMAMessage, UWBTopologyMessage

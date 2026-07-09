@@ -2,7 +2,7 @@ from multiprocessing import Lock, Queue
 from time import sleep
 
 from .ekf import EKFManager, CustomOdometry
-from .tdmaNode import TDMANode
+from .tdma_node import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
 #from .pedometer import Pedometer

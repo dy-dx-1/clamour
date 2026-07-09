@@ -1,17 +1,17 @@
 import random
-import struct
 from time import sleep
 from multiprocessing.synchronize import Lock
 from typing import TYPE_CHECKING
 
 from .constants import State
 from .tdmaState import TDMAState
+from ..neighborhood import Neighborhood
 
-from ..custom_terminal import print 
-from ..interfaces import Tag, Anchors, Neighborhood
+from ...custom_terminal import print 
+from ...interfaces import Tag, Anchors
 
 if TYPE_CHECKING:
-    from ..messenger import Messenger
+    from ...messenger import Messenger
 
 class Initialization(TDMAState):
     """

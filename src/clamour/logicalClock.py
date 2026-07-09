@@ -1,4 +1,3 @@
-from .custom_terminal import print
 from time import perf_counter
 
 class LogicalClock:
@@ -13,7 +12,6 @@ class LogicalClock:
         self.last_hardware_time = perf_counter()
 
     def correct_logical_offset(self, correction: int) -> None:
-        print(f"LogicalClock.correct_logical_offset(): Correction:{correction}", 'info', 'gen')
         self.clock += -self.clock if self.clock + correction < 0 else correction
 
     def reset_logical_rate(self) -> None:

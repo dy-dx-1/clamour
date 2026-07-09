@@ -3,11 +3,14 @@ from typing import TYPE_CHECKING
 from .constants import State
 from .tdmaState import TDMAState
 
-from ..interfaces import SlotAssignment, Timing, Neighborhood
-from ..custom_terminal import print 
+from ...interfaces import Tag
+from ..slot_assignment import SlotAssignment
+from ..timing import Timing
+from ..neighborhood import Neighborhood
+from ...custom_terminal import print 
 
 if TYPE_CHECKING:
-    from ..messenger import Messenger
+    from ...messenger import Messenger
 
 class Listen(TDMAState):
     """

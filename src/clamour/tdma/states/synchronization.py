@@ -4,15 +4,16 @@ from time import time, sleep
 import random
 from typing import TYPE_CHECKING
 
-from ..custom_terminal import print 
-from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..interfaces.timing import COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
-from ..messages.messageFactory import MessageFactory
-from ..messages.synchronizationMessage import SynchronizationMessage
-from ..messages.uwbMessage import UWBSynchronizationMessage
+from ...custom_terminal import print 
+from ..neighborhood import Neighborhood
+from ..slot_assignment import SlotAssignment
+from ..timing import Timing, COMMUNICATION_DELAY, THRESHOLD_SYNCTIME, SYNCHRONIZATION_PERIOD
+from ...messages.messageFactory import MessageFactory
+from ...messages.synchronizationMessage import SynchronizationMessage
+from ...messages.uwbMessage import UWBSynchronizationMessage
 
 if TYPE_CHECKING:
-    from ..messenger import Messenger
+    from ...messenger import Messenger
 
 from .constants import *
 from .tdmaState import TDMAState

@@ -6,13 +6,16 @@ from typing import TYPE_CHECKING
 from numpy import array, atleast_2d
 import struct
 
-from ..custom_terminal import print 
-from ..interfaces import Tag, Coordinates, Anchors, Neighborhood, Timing, SlotAssignment
-from ..messages.updateMessage import UpdateMessage
-from ..messages.types import UpdateType
+from ...custom_terminal import print 
+from ...interfaces import Tag, Coordinates, Anchors
+from ..neighborhood import Neighborhood
+from ..slot_assignment import SlotAssignment
+from ..timing import Timing
+from ...messages.updateMessage import UpdateMessage
+from ...messages.types import UpdateType
 
 if TYPE_CHECKING:
-    from ..messenger import Messenger
+    from ...messenger import Messenger
 
 from .constants import State
 from .tdmaState import TDMAState
