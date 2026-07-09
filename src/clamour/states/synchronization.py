@@ -18,6 +18,19 @@ from .constants import *
 from .tdmaState import TDMAState
 
 class Synchronization(TDMAState):
+    """
+    During this state, we exchange SYNC messages to align clocks and get all tags into a shared logical timebase. 
+    - Receive and process SYNC messages from neighbors 
+    - Update local logical clock with offset correction 
+    - Periodically broadcast own SYNC message 
+    - If enough neighbors synced OR sync period expires, move on. 
+
+    Relevant timing constants: 
+    SYNCHRONIZATION_PERIOD controls how long this phase lasts.
+    THRESHOLD_SYNCTIME decides whether the node considers itself synchronized.
+    COMMUNICATION_DELAY is added when computing offsets.
+    SYNCHRONIZATION_PERIOD / 3 is used as an early guard before the node can leave this state.
+    """
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
                  timing: Timing, messenger: "Messenger", id: int, multiprocess_communication_queue):
         self.neighborhood = neighborhood

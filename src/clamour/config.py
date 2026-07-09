@@ -7,9 +7,9 @@ Defines all configuration parameters for Clamour.
 """
 ### Tag type and ID 
 TAG_TYPE = "Bitcraze"      # Manufacturer of the tag. Bitcraze or Pozyx
-TAG_ID = 15                # Tag IDs must be >10. This ONLY applies for BC tags. Pozyx breaks ranging when enforcing IDs, dk why, already wasted 4h+ on it. 
+TAG_ID = 11                # Tag IDs must be >10. This ONLY applies for BC tags. Pozyx breaks ranging when enforcing IDs, dk why, already wasted 4h+ on it. 
 ### DW1000 and UWB config - only applicable for Bitcraze Tags
-DW1000_BUS =  1            # SPI bus where the deck is connected 
+DW1000_BUS =  0            # SPI bus where the deck is connected 
 DW1000_CS  =  0            # Chip select # where  the deck is connected 
 UWB_CHANNEL = 2            # Any in [1,2,3,4,5,7]
 UWB_PRF = 64               # 16 or 64 MHz
@@ -40,6 +40,12 @@ ANCHORS = ({'id': 2, 'level': 0, 'x': 0, 'y': 0, 'z': 850},
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 
 assert TAG_TYPE in ("Bitcraze", "Pozyx") 
 assert 10<TAG_ID<0xFFFF
+
+from .interfaces.timing import SCHEDULING_SLOT_COUNT
+assert (TAG_ID & 0xFF) < SCHEDULING_SLOT_COUNT, (
+    f"TAG_ID low byte {TAG_ID & 0xFF} must be smaller than SCHEDULING_SLOT_COUNT {SCHEDULING_SLOT_COUNT}"
+)
+
 assert all([1<=anc['id']<=10 for anc in ANCHORS]) # 0 is unsupported because reserved in the code for general broadcasts 
 
 if TX_POWER_CONFIG: # If specified, TX POWER CONFIG must be list in LSB order of bytes for 0x1E register

@@ -10,6 +10,19 @@ if TYPE_CHECKING:
     from ..messenger import Messenger
 
 class Listen(TDMAState):
+    """
+    Passive state where the tag waits for it's task slot to become active: 
+    - Checks whether current time is still inside task cycle
+    - If current timeslot is for us, move to TASK. Else, stay in listen. 
+    
+    Relevant timing constants: 
+    in_cycle() uses the logical clock and the task cycle timing.
+    in_taskslot() checks whether the current task slot belongs to this node.
+    SLOT_FOR_RESET is used in the cycle limit logic to stop the cycle early enough to reset.
+
+    NOTES:
+    - All tags enter at roughly the same time, but only tags whose assigned slot match current slot will become active. 
+    """
     def __init__(self, slot_assignment: SlotAssignment, timing: Timing, 
                  messenger: "Messenger", neighborhood: Neighborhood):
         self.timing = timing

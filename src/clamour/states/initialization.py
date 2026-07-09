@@ -14,6 +14,11 @@ if TYPE_CHECKING:
     from ..messenger import Messenger
 
 class Initialization(TDMAState):
+    """
+    Initial state, only runs once to: 
+    - Discover nearby devices and build initial neighborhood 
+    - Move straight into SYNC 
+    """
     def __init__(self, neighborhood: Neighborhood, anchors: Anchors, 
                  tag: Tag, messenger: "Messenger",
                  multiprocess_communication_queue, shared_tag_lock: Lock):

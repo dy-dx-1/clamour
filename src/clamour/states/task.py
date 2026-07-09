@@ -19,6 +19,19 @@ from .tdmaState import TDMAState
 
 
 class Task(TDMAState):
+    """
+    Performs actual localization/ranging work 
+    - If current slot is for this tag, position it 
+    - May also discover neighbors and broadcast topology updates 
+    - Uses enough_time_left() to avoid running out of time 
+
+    Relevant timing constants: 
+    TASK_SLOT_DURATION is the length of each task slot.
+    NB_TASK_SLOTS is the number of task slots in a frame.
+    FRAME_DURATION is the total length of one task frame.
+    NB_FULL_CYCLES defines how many task frames are included in the full cycle.
+    MAX_RANGING_DELAY limits how late into a slot the node will still do work.
+    """
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood, 
                  shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
                  slot_assignment: SlotAssignment):
@@ -83,7 +96,6 @@ class Task(TDMAState):
 
     def positioning(self) -> None:
         with self.tag_lock:
-            print(f"Task.positioning(): Attempting positioning with anchors: {self.anchors.anchors_dict.keys()}", 'info', 'loc')
             position = self.tag.trilaterate_position()
             angles = self.tag.orientation
 
@@ -145,9 +157,7 @@ class Task(TDMAState):
             return None 
 
     def discover_devices(self):
-        """Discovers the devices available for localization/ranging.
-        Prioritizes the anchors because of their smaller measurement uncertainty.
-        If there aren't enough anchors, will use tags as well."""
+        """Discovers the devices available for localization/ranging."""
 
         with self.tag_lock:
             self.tag.clearAnchors() # Internal tag list automatically discards old tags 

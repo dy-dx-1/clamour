@@ -9,7 +9,7 @@ SLOT_FOR_RESET = 30
 THRESHOLD_SYNCTIME = 15
 
 SYNCHRONIZATION_PERIOD = 5000
-NB_NODES = 40 # The number should bigger than the maximum ID sequence (not the practical amount of nodes involved. eg. ID 8228 (10000000100100 & 0xFF) UWB tag send message on slot 36. So the number should bigger than 36.)
+SCHEDULING_SLOT_COUNT = 40     # Number of scheduling slots in the TDMA proposal round. Each node uses its low-byte ID as a slot index (id & 0xFF), so this must be greater than the highest expected low-byte ID.
 SCHEDULING_SLOT_DURATION = 30
 NB_SCHEDULING_CYCLES = 200
 
@@ -20,7 +20,7 @@ NB_FULL_CYCLES = 20
 # |<---------------------------------FULL_CYCLE_DURATION------------------------------------->|
 # |<----------TASK_START_TIME------>|  + |-------FRAME_DURATION * NB_FULL_CYCLES------------->|
 
-TASK_START_TIME = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * NB_NODES * NB_SCHEDULING_CYCLES
+TASK_START_TIME = SYNCHRONIZATION_PERIOD + SCHEDULING_SLOT_DURATION * SCHEDULING_SLOT_COUNT * NB_SCHEDULING_CYCLES
 FRAME_DURATION = TASK_SLOT_DURATION * NB_TASK_SLOTS
 FULL_CYCLE_DURATION = TASK_START_TIME + FRAME_DURATION * NB_FULL_CYCLES
 

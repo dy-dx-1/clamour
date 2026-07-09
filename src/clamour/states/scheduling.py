@@ -5,13 +5,29 @@ from .constants import State, TAG_ID_MASK
 from .tdmaState import TDMAState 
 
 from ..interfaces import Neighborhood, SlotAssignment, Timing
-from ..interfaces.timing import NB_NODES, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
+from ..interfaces.timing import SCHEDULING_SLOT_COUNT, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
 from ..custom_terminal import print 
 
 if TYPE_CHECKING:
     from ..messenger import Messenger
 
 class Scheduling(TDMAState):
+    """
+    This state builds the TDMA slot assignement for the TASK phase. 
+    - Each node proposes or accepts slot assignments 
+    - Only broadcast control message during own scheduling slot 
+        - Scheduler uses node ID to decide when allowed to broadcast 
+    
+    Relevant timing constants: 
+    SCHEDULING_SLOT_COUNT is the number of scheduling slots in the round.
+    SCHEDULING_SLOT_DURATION is the length of each scheduling slot.
+    NB_SCHEDULING_CYCLES influences the total scheduling window.
+    TASK_START_TIME is derived from these and determines when the task phase should begin.
+    
+    NOTES: 
+    - Only one node is expected to broadcast control messages at a time 
+    - Others still execute scheduling logic, but mostly listening and processing 
+    """
     def __init__(self, neighborhood: Neighborhood, slot_assignment: SlotAssignment,
                  timing: Timing, tag_id: int, messenger: "Messenger"):
         self.neighborhood = neighborhood
@@ -69,8 +85,8 @@ class Scheduling(TDMAState):
         self.slot_assignment.pure_send_list = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
 
     def is_broadcast_slot(self) -> bool: 
-        # NOTE: careful, NB_NODES must match highest ID to allow for slot proposal to be reached. See comment in definition of NB_NODES
-        return int(((self.timing.logical_clock.clock - self.timing.sync_timestamp) % (NB_NODES * SCHEDULING_SLOT_DURATION))
+        # NOTE: SCHEDULING_SLOT_COUNT must be > highest low byte ID of the tags to allow it to reach it's broadcasting slot
+        return int(((self.timing.logical_clock.clock - self.timing.sync_timestamp) % (SCHEDULING_SLOT_COUNT * SCHEDULING_SLOT_DURATION))
                 / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
 
     def update_pure_send_list(self):
