@@ -1,8 +1,6 @@
 from math import floor
 from ..logicalClock import LogicalClock
 
-SECONDS_TO_MILLISECONDS = 1000
-
 COMMUNICATION_DELAY = 5
 MAX_RANGING_DELAY = 15
 SLOT_FOR_RESET = 30

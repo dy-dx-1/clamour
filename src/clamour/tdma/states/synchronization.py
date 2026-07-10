@@ -15,7 +15,7 @@ from ...messages.uwbMessage import UWBSynchronizationMessage
 if TYPE_CHECKING:
     from ...messenger import Messenger
 
-from .constants import *
+from .constants import State, SECONDS_TO_MILLISECONDS, RANDOM_DELAY_MEAN, RANDOM_DELAY_VARIANCE, NB_SAMPLES_OFFSET, TRANSMISSION_SCALING, SAFE_THRESHOLD, JUMP_THRESHOLD
 from .tdmaState import TDMAState
 
 class Synchronization(TDMAState):
