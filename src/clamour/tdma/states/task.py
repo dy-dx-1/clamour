@@ -128,7 +128,7 @@ class Task(TDMAState):
                 else:
                     ref_coordinates = self.tag.coordinates
 
-                measured_position = self.tag.doRanging(ranging_target_id) 
+                measured_position = self.tag.ranging(ranging_target_id) 
                 angles = self.tag.orientation
 
             neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
@@ -163,7 +163,7 @@ class Task(TDMAState):
         """Discovers the devices available for localization/ranging."""
 
         with self.tag_lock:
-            self.tag.clearAnchors() # Internal tag list automatically discards old tags 
+            self.tag.clear_anchors() # Internal tag list automatically discards old tags 
             devices = self.tag.get_device_list("all")
 
         new_tags = []

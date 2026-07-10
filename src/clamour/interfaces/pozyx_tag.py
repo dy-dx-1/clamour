@@ -60,8 +60,8 @@ class PozyxTag(Tag):
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        self.clearAnchors() 
-        self.resetSystem()
+        self.clear_anchors() 
+        self.reset()
         print("PozyxTag.__exit__() completed.", 'ok', 'gen')
 
     @property
@@ -91,17 +91,17 @@ class PozyxTag(Tag):
             return True 
         return device_id < 0x500
     
-    def addNeighborTag(tag_id):
+    def add_neighbor(tag_id):
         """
-        Since pozyx offers network discovery, no need for a timeout here. 
+        Since pozyx offers network discovery this function is unused. 
         Also don't need to maintain internal dictionary like in BitcrazeTag
         """
         pass 
      
-    def clearAnchors(self):
+    def clear_anchors(self):
         self._pozyx_serial.clearDevices() 
 
-    def resetSystem(self): 
+    def reset(self): 
         self._pozyx_serial.resetSystem()
     
     def printCurrentError(self, function_name): 
@@ -243,7 +243,7 @@ class PozyxTag(Tag):
         else: 
             return None 
 
-    def doRanging(self, target_id): 
+    def ranging(self, target_id): 
         range_measure = DeviceRange() 
         try: 
             status = self._pozyx_serial.doRanging(target_id, range_measure)

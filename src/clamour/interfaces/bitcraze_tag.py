@@ -133,13 +133,13 @@ class BitcrazeTag(Tag):
         # Tags must have any other IDs. 
         return device_id<=10 
     
-    def addNeighborTag(self, tag_id:int)->None: 
+    def add_neighbor(self, tag_id:int)->None: 
         self._active_tags[tag_id] = time.perf_counter() 
 
-    def clearAnchors(self) -> None:
+    def clear_anchors(self) -> None:
         self._available_anchors.clear() 
 
-    def resetSystem(self) -> None:
+    def reset(self) -> None:
         self._dw.soft_reset() 
         print("BitcrazeTag was reset", 'info', 'device')
     
@@ -327,6 +327,6 @@ class BitcrazeTag(Tag):
             
         return Coordinates(result.x[0], result.x[1], result.x[2])
 
-    def doRanging(self, target_id:int) -> Coordinates | None: 
+    def ranging(self, target_id:int) -> Coordinates | None: 
         distance = self.compute_range(target_id) 
         return Coordinates(x=distance, y=0, z=0) if distance else None 

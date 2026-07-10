@@ -175,7 +175,7 @@ class Messenger:
             sender_id, data = self.tag.receive_data()
 
         if sender_id: 
-            self.tag.addNeighborTag(sender_id) 
+            self.tag.add_neighbor(sender_id) 
 
         if data == b'':
             pass # prevents index error on elif check 

@@ -49,5 +49,5 @@ class Initialization(TDMAState):
 
     def clear_known_devices(self):
         with self.tag_lock:
-            self.tag.clearAnchors()
+            self.tag.clear_anchors()
         # NOTE 2026-06-21: I deleted clearing of some properties anchors.discovery_done and neighborhood.neighbor_list that don't seem to exist anywhere else in code 

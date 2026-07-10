@@ -63,7 +63,7 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def addNeighborTag(tag_id: int) -> None: 
+    def add_neighbor(tag_id: int) -> None: 
         """
         Adds a neighboring tag to the tag's internal active tags dictionary. 
 
@@ -72,13 +72,13 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def clearAnchors(self) -> None:
+    def clear_anchors(self) -> None:
         """
         Clears the list of available anchors. 
         """
 
     @abstractmethod
-    def resetSystem(self) -> None:
+    def reset(self) -> None:
         """
         Resets the tag. 
         """
@@ -154,7 +154,7 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def doRanging(self, target_id:int) -> Coordinates | None: 
+    def ranging(self, target_id:int) -> Coordinates | None: 
         """
         Calculates a UWB range measurement between the tag and another device. 
         Measurement must be in mm. 
