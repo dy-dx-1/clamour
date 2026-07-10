@@ -338,6 +338,8 @@ class DW1000:
         # NOTE: currently not supporting non std operation, so RXFLE should be 0 
         if rxfle_rxflen>0x7F: # Currently, messages should be <= 127bytes 
             print("[WARNING] in DW1000.receive_packet(), received extended data frame (RXFLE!=0). Currently not supporting this, check the message?", 'info', 'device')
+            self.soft_reset()
+            return None, None 
         # Now reading buffer with frame length 
         rxfle_rxflen-=2 # throwing away FCS at the end 
         data = self.read_register([0x11], rxfle_rxflen, return_ints=return_ints)  
