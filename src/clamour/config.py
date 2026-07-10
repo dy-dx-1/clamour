@@ -42,6 +42,11 @@ assert TAG_TYPE in ("Bitcraze", "Pozyx")
 assert 10<TAG_ID<0xFFFF
 
 from .tdma.timing import SCHEDULING_SLOT_COUNT 
+# Each tag's proposal slot is TAG_ID & 0xFF.  SCHEDULING_SLOT_COUNT must be
+# greater than the highest deployed low-byte ID; deployed low-byte IDs must be
+# unique. A smaller safe count gives tags proposal opportunities more often.
+
+# Honestly the 0xFF mask could be removed by simply enforcing tag IDs max 255, anyways low byte must be unique to avoid conflict. To consider TODO.
 assert (TAG_ID & 0xFF) < SCHEDULING_SLOT_COUNT, (
     f"TAG_ID low byte {TAG_ID & 0xFF} must be smaller than SCHEDULING_SLOT_COUNT {SCHEDULING_SLOT_COUNT}"
 )
@@ -51,4 +56,4 @@ assert all([1<=anc['id']<=10 for anc in ANCHORS]) # 0 is unsupported because res
 if TX_POWER_CONFIG: # If specified, TX POWER CONFIG must be list in LSB order of bytes for 0x1E register
     assert type(TX_POWER_CONFIG) == list 
     assert len(TX_POWER_CONFIG) == 4 
-    assert type(TX_POWER_CONFIG[0])== int 
+    assert type(TX_POWER_CONFIG[0])== int
