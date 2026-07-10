@@ -310,7 +310,7 @@ class DW1000:
             err_or_to_mask = 0x04<<24 | 0x27<<16 | 0x90<<8 # aforementioned error/TO bits 
             bits8_31 = status[1]<<8 | status[2]<<16 | status[3]<<24
             if (bits8_31 & err_or_to_mask)!=0: # If any of these bits are 1, there's a problem 
-                print("RX timeout or error during DW1000.listen(), soft-resetting it", 'error', 'gen')
+                print("RX timeout or error during DW1000.listen(), soft-resetting it", 'error', 'device')
                 self.write_register([0x8D], [0x40]) # disable RX 
                 self.soft_reset(rx_only=True)
                 # Re-enableing RX again, we'll keep looping if there's time left 

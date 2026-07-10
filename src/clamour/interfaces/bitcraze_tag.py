@@ -58,7 +58,7 @@ class BitcrazeTag(Tag):
 
         self.EXPECTED_RANGING_HEADER = RANGING_BC_HEADER + list(self.tag_id.to_bytes(6, 'little')) + [0xCF, 0xBC] # the header message that we expect for ranging requests sent to this tag. Generated here to avoid regenerating it every time.
 
-        print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'device') 
+        print(f"SUCCESSFULLY CONNECTED TO BC DEVICE", 'ok', 'gen') 
         print(f"TAG ID: {self._id}", 'ok', 'device')
 
     def __enter__(self): 
