@@ -140,6 +140,8 @@ class BitcrazeTag(Tag):
         self._available_anchors.clear() 
 
     def reset(self) -> None:
+        # NOTE: 2026-07-10 all testing up until now has shown that soft_reset was sufficient 
+        # if a proper hard reset is required, look into implementing full reset with RSTn pin of DW1000 
         self._dw.soft_reset() 
         print("BitcrazeTag was reset", 'info', 'device')
     
