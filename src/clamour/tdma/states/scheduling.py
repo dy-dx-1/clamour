@@ -6,7 +6,7 @@ from .tdmaState import TDMAState
 
 from ..neighborhood import Neighborhood
 from ..slot_assignment import SlotAssignment
-from ..timing import Timing, SCHEDULING_SLOT_COUNT, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
+from ..timing import Timing, SCHEDULING_ROUND_DURATION, NB_TASK_SLOTS, SCHEDULING_SLOT_DURATION
 from ...custom_terminal import print 
 
 if TYPE_CHECKING:
@@ -20,10 +20,11 @@ class Scheduling(TDMAState):
         - Scheduler uses node ID to decide when allowed to broadcast 
     
     Relevant timing constants: 
-    SCHEDULING_SLOT_COUNT is the number of scheduling slots in the round.
+    SCHEDULING_SLOT_COUNT is the number of control-message slots in one
+    repeating proposal round. A node's low-byte ID selects its slot.
     SCHEDULING_SLOT_DURATION is the length of each scheduling slot.
-    NB_SCHEDULING_CYCLES influences the total scheduling window.
-    TASK_START_TIME is derived from these and determines when the task phase should begin.
+    Timing.scheduling_window_duration, calculated after synchronization from
+    the discovered neighbour count, determines when the task phase begins.
     
     NOTES: 
     - Only one node is expected to broadcast control messages at a time 
@@ -55,7 +56,7 @@ class Scheduling(TDMAState):
             self.should_go_back_to_sync = False
             return State.SYNCHRONIZATION
 
-        if self.neighborhood.is_alone_in_state(-1) or (self.timing.logical_clock.clock-self.timing.sync_timestamp) > self.timing.task_start_time:
+        if self.neighborhood.is_alone_in_state(-1) or (self.timing.logical_clock.clock-self.timing.sync_timestamp) > self.timing.scheduling_window_duration:
             print(f"Slot assignement RECEIVE list: {self.slot_assignment.receive_list}", 'info', 'tdma')
             print(f"Slot assignement SEND list: {self.slot_assignment.pure_send_list}", 'info', 'tdma')
             self.timing.cycle_start = self.timing.logical_clock.clock
@@ -86,8 +87,8 @@ class Scheduling(TDMAState):
         self.slot_assignment.pure_send_list = [i if i in random_slots else -1 for i in range(NB_TASK_SLOTS)]
 
     def is_broadcast_slot(self) -> bool: 
-        # NOTE: SCHEDULING_SLOT_COUNT must be > highest low byte ID of the tags to allow it to reach it's broadcasting slot
-        return int(((self.timing.logical_clock.clock - self.timing.sync_timestamp) % (SCHEDULING_SLOT_COUNT * SCHEDULING_SLOT_DURATION))
+        # A tag whose low-byte ID is outside this range has no proposal slot.
+        return int(((self.timing.logical_clock.clock - self.timing.sync_timestamp) % SCHEDULING_ROUND_DURATION)
                 / SCHEDULING_SLOT_DURATION) == self.id & TAG_ID_MASK
 
     def update_pure_send_list(self):

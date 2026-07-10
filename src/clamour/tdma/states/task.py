@@ -31,8 +31,9 @@ class Task(TDMAState):
     Relevant timing constants: 
     TASK_SLOT_DURATION is the length of each task slot.
     NB_TASK_SLOTS is the number of task slots in a frame.
-    FRAME_DURATION is the total length of one task frame.
-    NB_FULL_CYCLES defines how many task frames are included in the full cycle.
+    TASK_FRAME_DURATION is the total length of one task frame.
+    NB_TASK_FRAMES_PER_CYCLE defines how many task frames are included before
+    returning to synchronization.
     MAX_RANGING_DELAY limits how late into a slot the node will still do work.
     """
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood, 
