@@ -35,7 +35,7 @@ class EKFManager:
         self.state_csv, self.writer = self.initialize_csv()
 
     @staticmethod
-    def initialize_csv():
+    def initialize_csv(): # NOTE READY TO DELETE 
         if not SAVE_TO_CSV: 
             return None, None 
         filepath = 'broadcast_state.csv'
@@ -51,7 +51,7 @@ class EKFManager:
 
         return state_csv, writer
 
-    def run(self) -> None:
+    def run(self) -> None: # NOTE READY TO DELETE 
         try:
             self.initialize_ekf()
             while True:
@@ -63,7 +63,7 @@ class EKFManager:
                 traceback.print_exc()
                 raise e
 
-    def initialize_ekf(self) -> None:
+    def initialize_ekf(self) -> None: # NOTE READY TO DELETE
         while self.ekf is None:
             if not self.communication_queue.empty():
                 message = UpdateMessage.load(*self.communication_queue.get_nowait())
@@ -81,7 +81,7 @@ class EKFManager:
 
         print("EKF INITIALIZING DONE", 'ok', 'loc')
 
-    def process_latest_state_info(self) -> None:
+    def process_latest_state_info(self) -> None: # NOTE READY TO DELETE 
         update_functions = {
             UpdateType.PEDOMETER: self.ekf.pedometer_update,
             UpdateType.TRILATERATION: self.ekf.trilateration_update,
@@ -125,7 +125,7 @@ class EKFManager:
         else:
             sleep(0.001)
 
-    def extract_update_info(self, msg: UpdateMessage) -> tuple:
+    def extract_update_info(self, msg: UpdateMessage) -> tuple: # NOTE READY TO DELETE 
         if msg.update_type == UpdateType.PEDOMETER:
             return self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp
         elif msg.update_type == UpdateType.TRILATERATION:
@@ -137,7 +137,7 @@ class EKFManager:
         elif msg.update_type == UpdateType.CUSTOM_POSE:
             return Coordinates(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp
 
-    def infer_coordinates(self, measured_yaw: float) -> Coordinates:
+    def infer_coordinates(self, measured_yaw: float) -> Coordinates:# NOTE READY TO DELETE 
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
         Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
 
@@ -149,11 +149,11 @@ class EKFManager:
         # The pedometer cannot measure height; we assumed it is constant.
         return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
 
-    def correct_yaw(self, measured_yaw: float) -> float:
+    def correct_yaw(self, measured_yaw: float) -> float:# NOTE READY TO DELETE 
         new_yaw = measured_yaw - self.yaw_offset
         return new_yaw if new_yaw > 0 else 360 + new_yaw
 
-    def validate_new_state(self, new_coordinates: Coordinates) -> bool:
+    def validate_new_state(self, new_coordinates: Coordinates) -> bool:# NOTE READY TO DELETE
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
 
         if self.current_room.within_bounds(new_coordinates):
@@ -167,13 +167,13 @@ class EKFManager:
 
         return False
 
-    def generate_zero_update_info(self, timestamp: float) -> tuple:
+    def generate_zero_update_info(self, timestamp: float) -> tuple:# NOTE READY TO DELETE
         return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
 
-    def update_neighbors(self, neighbors: dict):
+    def update_neighbors(self, neighbors: dict):# NOTE READY TO DELETE
         self.last_know_neighbors = neighbors
 
-    def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:
+    def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:# NOTE READY TO DELETE
         if not SAVE_TO_CSV: 
             return 
         if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:
