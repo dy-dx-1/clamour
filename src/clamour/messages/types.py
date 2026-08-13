@@ -11,6 +11,5 @@ class UpdateType(IntEnum):
     PEDOMETER = 0
     TRILATERATION = 1
     RANGING = 2
-    ZERO_MOVEMENT = 3
-    TOPOLOGY = 4
-    CUSTOM_POSE = 5
+    TOPOLOGY = 3
+    CUSTOM_POSE = 4

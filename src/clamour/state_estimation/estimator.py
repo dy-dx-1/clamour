@@ -111,8 +111,6 @@ class StateEstimator:
                 case UpdateType.RANGING: 
                     self.update_neighbors(msg.topology) 
                     self.estimator.ranging_update(raw_pos, raw_yaw, timestamp, msg.neighbors)
-                case UpdateType.ZERO_MOVEMENT: 
-                    self.estimator.zero_movement_update(raw_pos, raw_yaw, timestamp)
                 case UpdateType.TOPOLOGY:  
                     self.update_neighbors(msg.topology) 
                     raw_pos, raw_yaw = self.estimator.get_position(), self.estimator.get_yaw() # just to have something to print for callback 
@@ -131,10 +129,10 @@ class StateEstimator:
                 sound_message = SoundMessage(self.estimator.get_position())
                 self.sound_queue.put(SoundMessage.save(sound_message))
 
-        elif (time() - self.estimator.last_measurement_time) > ZERO_MVT_THRESHOLD: # TODO add last_measurement time parameter, orignally from ekf
+        elif (time() - self.estimator.last_measurement_time) > ZERO_MVT_THRESHOLD: 
             # If too much time goes by without any updates, do a zero mvt one to prevent drift 
             # NOTE TODO: I believe this can be removed in future with addition of IMU 
-            self.zero_movement_update(self.estimator.get_position(), 
+            self.estimator.zero_movement_update(self.estimator.get_position(), 
                                       self.estimator.get_yaw(), 
                                       self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) # need to abstract threshold, may not needed for FG? Maybe dont need zero mvt update at all?
         else: 
