@@ -1,7 +1,7 @@
 from multiprocessing import Lock, Queue
 from time import sleep
 
-from .ekf import EKFManager, CustomOdometry
+from .state_estimation import StateEstimator, CustomOdometry # TODO eval if removing customodometry, check bottom functions
 from .tdma_node import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
@@ -17,7 +17,8 @@ from .custom_terminal import print
 #################################################### CONFIG PARAMETERS
 from .config import (TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS, 
                      UWB_CHANNEL, UWB_BITRATE, UWB_PRF, UWB_PREAMBLE_CODE, UWB_PREAMBLE_LENGTH,
-                     SMART_TX_POWER, TX_POWER_CONFIG)
+                     SMART_TX_POWER, TX_POWER_CONFIG,
+                     ESTIMATOR_TYPE)
 
 match TAG_TYPE:
     case "Bitcraze": 
@@ -55,13 +56,14 @@ class Clamour:
             shared_tag_lock = Lock()
             tag_id = shared_tag.tag_id
             with ContextManagedQueue() as sound_queue:
-                ekf_manager = EKFManager(pose_callback, sound_queue, communication_queue, shared_tag, shared_tag_lock, tag_id, sound)
+                sound_processing_queue = sound_queue if sound else None # Passing None instead of a sound queue to the StateEstimator turns off the sound function
+                estimator = StateEstimator(shared_tag, shared_tag_lock, ESTIMATOR_TYPE, pose_callback, communication_queue, sound_processing_queue)
                 #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
                 tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
                 if sound:
                     sound_player = SoundManager(sound_queue)
-                with ContextManagedProcess(target=ekf_manager.run) as ekf_manager_process:
-                    ekf_manager_process.start()
+                with ContextManagedProcess(target=estimator.run) as estimator_process:
+                    estimator_process.start()
                     with ContextManagedProcess(target=tdma_node.run) as tdma_process:
                         tdma_process.start()
                         #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
@@ -72,6 +74,7 @@ class Clamour:
                         if sound: 
                             keep_alive(sound_player)
 
+    # TODO NOTE : eval if we need start_non_blocking and _on_custom_pose_update and what's their point 
     def start_non_blocking(self, sound: bool, pose_callback):
         self.communication_queue = Queue()
         for custom_odometry in self.custom_odometries:

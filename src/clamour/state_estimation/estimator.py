@@ -26,18 +26,18 @@ class StateEstimator:
     Continuously runs the .run() method in it's own ContextManagedProcess.
 
     ARGS: 
-    - shared_tag: Tag object to track 
-    - shared_tag_lock: Multiprocessing Lock for the tag
+    - tag: Tag object to track 
+    - tag_lock: Multiprocessing Lock for the tag
     - estimator_type: EKF or Factor Graph
     - pose_callback: Function that takes a PoseMessage and prints it on pose update # TODO remove? just put inside? 
     - communication_queue: Queue where pose updates / messages to process appear 
     - sound_queue: Optional, if a Queue is passed, will send updates to it to allow for sound playing 
     """
-    def __init__(self, shared_tag: Tag, shared_tag_lock: Lock,
-                  estimator_type: Literal['ekf', 'fg'], pose_callback: function, 
+    def __init__(self, tag: Tag, tag_lock: Lock,
+                  estimator_type: Literal['EKF', 'FG'], pose_callback: function, 
                   communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue):
-        self.tag = shared_tag 
-        self.tag_lock = shared_tag_lock 
+        self.tag = tag 
+        self.tag_lock = tag_lock 
 
         self.estimator = None 
         self.estimator_type = estimator_type # validity check done in config TODO 
@@ -75,10 +75,10 @@ class StateEstimator:
                     self.yaw_offset = raw_yaw  # Store initial value, which we'll use to correct further poses 
                     raw_pos, raw_yaw = msg.measured_xyz, self.correct_yaw(msg.measured_yaw)
                     
-                    if self.estimator_type == 'ekf': 
+                    if self.estimator_type == 'EKF': 
                         self.estimator = CustomEKF(raw_pos, raw_yaw)
                         self.estimator.trilateration_update(raw_pos, raw_yaw, msg.timestamp)
-                    elif self.estimator_type == 'fg':
+                    elif self.estimator_type == 'FG':
                         # TODO 
                         pass 
 
@@ -88,7 +88,7 @@ class StateEstimator:
                     self.pose_callback(PoseMessage(post_pos.x, post_pos.y, post_pos.z, post_yaw))
             else:
                 sleep(WAIT_TIME_DURING_INIT)  
-        print(f"ESTIMATOR ({self.estimator_type.upper()}) INITIALIZATION DONE", 'ok', 'loc')
+        print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
 
     def process_latest_state_info(self): 
         """

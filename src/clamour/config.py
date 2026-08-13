@@ -19,6 +19,9 @@ UWB_PREAMBLE_CODE = 9
 SMART_TX_POWER = True      # Enable or disable smart TX power - Only works for 6.8Mbps bitrate 
 TX_POWER_CONFIG = None     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
+### State estimation control 
+ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph) 
+
 ### Output control 
 ## Terminal
 GEN_MSGS    = True     # Turn off/on general terminal output 
@@ -57,3 +60,6 @@ if TX_POWER_CONFIG: # If specified, TX POWER CONFIG must be list in LSB order of
     assert type(TX_POWER_CONFIG) == list 
     assert len(TX_POWER_CONFIG) == 4 
     assert type(TX_POWER_CONFIG[0])== int
+
+# Estimator, only supporting EKF or Factor Graphs 
+assert ESTIMATOR_TYPE in ("EKF", "FG") # these match the types accepted and expected by the class StateEstimator 
