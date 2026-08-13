@@ -20,19 +20,19 @@ from ..rooms import Floorplan
 class EKFManager:
     def __init__(self, pose_callback, sound_queue: ContextManagedQueue, communication_queue: ContextManagedQueue,
                  shared_tag: Tag, shared_tag_lock: Lock, tag_id: int, sound: bool):
-        self.tag_id = tag_id
-        self.ekf = None
-        self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
-        self.last_know_neighbors = {}
-        self.sound = sound
-        self.pose_callback = pose_callback
-        self.sound_queue = sound_queue
-        self.communication_queue = communication_queue
-        self.floorplan = Floorplan()
-        self.current_room = self.floorplan.rooms['24']
-        self.tag = shared_tag
-        self.tag_lock = shared_tag_lock
-        self.state_csv, self.writer = self.initialize_csv()
+        #self.tag_id = tag_id
+        #self.ekf = None
+        #self.yaw_offset = 0  # Measured  in degrees relative to global coordinates X-Axis
+        #self.last_know_neighbors = {}
+        #self.sound = sound
+        #self.pose_callback = pose_callback
+        #self.sound_queue = sound_queue
+        #self.communication_queue = communication_queue
+        #self.floorplan = Floorplan()
+        #self.current_room = self.floorplan.rooms['24']
+        #self.tag = shared_tag
+        #self.tag_lock = shared_tag_lock
+        #self.state_csv, self.writer = self.initialize_csv()
 
     @staticmethod
     def initialize_csv(): # NOTE READY TO DELETE 

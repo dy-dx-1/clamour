@@ -7,10 +7,10 @@ from typing import Literal
 from struct import error as StructError
 from multiprocessing.synchronize import Lock
 
+from .ekf import CustomEKF, DT_THRESHOLD
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
 from ..interfaces import Tag, Coordinates
-from .ekf import CustomEKF, DT_THRESHOLD
 from ..contextManagedQueue import ContextManagedQueue
 from ..messages.updateMessage import UpdateMessage
 from ..messages.soundMessage import SoundMessage
@@ -18,97 +18,128 @@ from ..messages.types import UpdateType
 from ..messages.poseMessage import PoseMessage
 from ..rooms import Floorplan
 
-WAIT_TIME_DURING_INIT = 0.001 # s to wait at each iter while waiting for com queue to load first message
+WAIT_TIME_DURING_INIT = 0.001 # s to wait at each iter while waiting for com queue to load message
 
 class StateEstimator: 
     """
     General interface for pose estimation. 
-    Provides the essential methods to use and connects them to the appropriate manager.
+    Continuously runs the .run() method in it's own ContextManagedProcess.
+
+    ARGS: 
+    - shared_tag: Tag object to track 
+    - shared_tag_lock: Multiprocessing Lock for the tag
+    - estimator_type: EKF or Factor Graph
+    - pose_callback: Function that takes a PoseMessage and prints it on pose update # TODO remove? just put inside? 
+    - communication_queue: Queue where pose updates / messages to process appear 
+    - sound_queue: Optional, if a Queue is passed, will send updates to it to allow for sound playing 
     """
-    def __init__(self, shared_tag: Tag, shared_tag_lock: Lock, estimator_type: Literal['ekf', 'fg'], communication_queue: ContextManagedQueue, sound_queue: ContextManagedQueue):
+    def __init__(self, shared_tag: Tag, shared_tag_lock: Lock,
+                  estimator_type: Literal['ekf', 'fg'], pose_callback: function, 
+                  communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue):
         self.tag = shared_tag 
         self.tag_lock = shared_tag_lock 
 
         self.estimator = None 
         self.estimator_type = estimator_type # validity check done in config TODO 
+
+        self.yaw_offset = 0  # Measured in degrees relative to global coordinates X-Axis
+        self.last_know_neighbors = {}
         
+        self.pose_callback = pose_callback # NOTE future eval if can just put this in here, idk why need to pass it as arg 
+
+        self.sound_queue = sound_queue
         self.com_queue = communication_queue
         self.state_csv, self.writer = self.initialize_csv()
 
-    def initialize_estimator(self): 
+        self.floorplan = Floorplan() # NOTE TODO: currently unused 
+        self.current_room = self.floorplan.rooms['24'] 
+
+    def run(self) -> None: 
+        try: 
+            self.initialize_estimator() 
+            while True: 
+                self.process_latest_state_info()
+        except Exception as e: 
+            print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
+            raise e 
+
+    def initialize_estimator(self) -> None: 
+        """
+        Wait for a trilateration update to arrive in communication queue. Use it to init estimator. 
+        Need to start from a fully constrained position to lock in the global reference frame.
+        """
         while self.estimator is None: 
             if not self.com_queue.empty():
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
-                if msg.update_type == UpdateType.TRILATERATION:  # Currently only starting estimator from fully constrained update (trilateration) 
-                    measured_pos, measured_yaw = msg.measured_xyz, self.correct_yaw(msg.measured_yaw)
-                    self.yaw_offset = measured_yaw
-
+                if msg.update_type == UpdateType.TRILATERATION: 
+                    self.yaw_offset = raw_yaw  # Store initial value, which we'll use to correct further poses 
+                    raw_pos, raw_yaw = msg.measured_xyz, self.correct_yaw(msg.measured_yaw)
+                    
                     if self.estimator_type == 'ekf': 
-                        self.estimator = CustomEKF(measured_pos, measured_yaw)
-                        self.estimator.trilateration_update(measured_pos, measured_yaw, msg.timestamp)
+                        self.estimator = CustomEKF(raw_pos, raw_yaw)
+                        self.estimator.trilateration_update(raw_pos, raw_yaw, msg.timestamp)
                     elif self.estimator_type == 'fg':
                         # TODO 
                         pass 
 
-                    post_pos, post_yaw = self.estimator.get_position(), self.estimator.get_yaw() # posterior position and yaw from estimator
+                    # Estimator initialized. Get posterior on position and yaw, save and print output 
+                    post_pos, post_yaw = self.estimator.get_position(), self.estimator.get_yaw() 
                     self.save_to_csv(msg.timestamp, msg, post_pos, post_yaw)
                     self.pose_callback(PoseMessage(post_pos.x, post_pos.y, post_pos.z, post_yaw))
             else:
                 sleep(WAIT_TIME_DURING_INIT)  
-        print("ESTIMATOR INITIALIZATION DONE", 'ok', 'loc')
+        print(f"ESTIMATOR ({self.estimator_type.upper()}) INITIALIZATION DONE", 'ok', 'loc')
 
     def process_latest_state_info(self): 
+        """
+        Get and process an update through the communication queue.
+        Updates the estimator, saves and prints the current measurement.  
+        """
         if not self.com_queue.empty(): 
             msg = UpdateMessage.load(*self.com_queue.get_nowait())
-
-            match msg.update_type: # NOTE TODO, figure out how to deal with trilateration vs taking all measuremetns for FG. Abstract trilat choice into the ekf and just pass all ranges to FG?
+            if msg.update_type != UpdateType.TOPOLOGY: 
+                raw_pos, raw_yaw, timestamp = msg.measured_xyz, msg.measured_yaw, msg.timestamp
+            match msg.update_type: 
+                # NOTE TODO, figure out how to deal with trilateration vs taking all measuremetns for FG. Abstract trilat choice into the ekf and just pass all ranges to FG?
+                # or keep trilat as a general message for passing enough ranges? 
                 case UpdateType.PEDOMETER: 
-                    update_info = (self.infer_coordinates(msg.measured_yaw), self.correct_yaw(msg.measured_yaw), msg.timestamp)
-                    self.estimator.pedometer_update(*update_info) 
+                    self.estimator.pedometer_update(self.pedometer_yaw_to_coords(raw_yaw), raw_yaw, timestamp) 
                 case UpdateType.TRILATERATION: 
                     self.update_neighbors(msg.topology) 
-
-                    update_info = (msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp)
-                    self.estimator.trilateration_update(*update_info)
+                    self.estimator.trilateration_update(raw_pos, raw_yaw, timestamp)
                 case UpdateType.RANGING: 
                     self.update_neighbors(msg.topology) 
-
-                    update_info = (msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp, msg.neighbors)
-                    self.estimator.ranging_update(*update_info)
+                    self.estimator.ranging_update(raw_pos, raw_yaw, timestamp, msg.neighbors)
                 case UpdateType.ZERO_MOVEMENT: 
-                    update_info = (msg.measured_xyz, self.correct_yaw(msg.measured_yaw), msg.timestamp)
-                    self.estimator.zero_movement_update(*update_info)
+                    self.estimator.zero_movement_update(raw_pos, raw_yaw, timestamp)
                 case UpdateType.TOPOLOGY:  
                     self.update_neighbors(msg.topology) 
+                    raw_pos, raw_yaw = self.estimator.get_position(), self.estimator.get_yaw() # just to have something to print for callback 
                 case UpdateType.CUSTOM_POSE: # TODO remove / replace by IMU factor? 
-                    update_info = (Coordinates(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp)
-                    self.estimator.custom_odometry_update(*update_info) 
-
+                    self.estimator.custom_odometry_update(Coordinates(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, timestamp) 
             try: 
                 with self.tag_lock:
                     self.tag.coordinates = self.estimator.get_position() 
             except StructError as s: 
                 print(f"Estimator couldn't get new state estimate in process_latest_state_info(): {str(s)}", 'error', 'loc')
 
-            raw_coords, raw_yaw = (update_info[0], update_info[1]) if msg.update_type != UpdateType.TOPOLOGY else (self.estimator.get_position(), self.estimator.get_yaw())
-            self.save_to_csv(self.estimator.last_measurement_time, msg, raw_coords, raw_yaw) 
-            self.pose_callback(PoseMessage(raw_coords.x, raw_coords.y, raw_coords.z, raw_yaw))
+            self.save_to_csv(self.estimator.last_measurement_time, msg, raw_pos, raw_yaw) 
+            self.pose_callback(PoseMessage(raw_pos.x, raw_pos.y, raw_pos.z, raw_yaw))
 
-            if self.sound: 
+            if self.sound_queue != None: 
                 sound_message = SoundMessage(self.estimator.get_position())
                 self.sound_queue.put(SoundMessage.save(sound_message))
 
         elif (time() - self.last_measurement_time) > DT_THRESHOLD: # TODO add last_measurement time parameter, orignally from ekf
-            # Add DT_THRESHOLD TODO, 
             # If too much time goes by without any updates, do a zero mvt one to prevent drift 
             # NOTE TODO: I believe this can be removed in future with addition of IMU 
             self.zero_movement_update(self.estimator.get_position(), 
                                       self.estimator.get_yaw(), 
-                                      self.last_measurement_time + DT_THRESHOLD)
+                                      self.last_measurement_time + DT_THRESHOLD) # need to abstract DT_THRESHOLD, may not need it for factor graph? 
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
 
-    def infer_coordinates(self, measured_yaw: float) -> Coordinates:
+    def pedometer_yaw_to_coords(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
         Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
 
@@ -121,8 +152,11 @@ class StateEstimator:
         return Coordinates(self.estimator.x[0] + delta_position_x, self.estimator.x[2] + delta_position_y, self.estimator.x[4])
 
     def correct_yaw(self, measured_yaw: float) -> float:
+        """
+        The initial yaw that is measured is '0', subsequent ones need to be corrected to stay consistent. 
+        """
         new_yaw = measured_yaw - self.yaw_offset
-        return new_yaw if new_yaw > 0 else 360 + new_yaw
+        return new_yaw if new_yaw > 0 else 360 + new_yaw # TODO >=0 instead? 
 
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """
@@ -142,15 +176,6 @@ class StateEstimator:
             return True
 
         return False
-    
-    def run(self) -> None: 
-        try: 
-            self.initialize_estimator() 
-            while True: 
-                self.process_latest_state_info()
-        except Exception as e: 
-            print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
-            raise e 
 
     @staticmethod 
     def initialize_csv(): 
