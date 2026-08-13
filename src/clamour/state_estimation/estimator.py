@@ -7,7 +7,7 @@ from typing import Literal
 from struct import error as StructError
 from multiprocessing.synchronize import Lock
 
-from .ekf import CustomEKF, DT_THRESHOLD
+from .ekf import CustomEKF
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
 from ..interfaces import Tag, Coordinates
@@ -18,6 +18,7 @@ from ..messages.types import UpdateType
 from ..messages.poseMessage import PoseMessage
 from ..rooms import Floorplan
 
+ZERO_MVT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
 WAIT_TIME_DURING_INIT = 0.001 # s to wait at each iter while waiting for com queue to load message
 
 class StateEstimator: 
@@ -130,12 +131,12 @@ class StateEstimator:
                 sound_message = SoundMessage(self.estimator.get_position())
                 self.sound_queue.put(SoundMessage.save(sound_message))
 
-        elif (time() - self.last_measurement_time) > DT_THRESHOLD: # TODO add last_measurement time parameter, orignally from ekf
+        elif (time() - self.estimator.last_measurement_time) > ZERO_MVT_THRESHOLD: # TODO add last_measurement time parameter, orignally from ekf
             # If too much time goes by without any updates, do a zero mvt one to prevent drift 
             # NOTE TODO: I believe this can be removed in future with addition of IMU 
             self.zero_movement_update(self.estimator.get_position(), 
                                       self.estimator.get_yaw(), 
-                                      self.last_measurement_time + DT_THRESHOLD) # need to abstract DT_THRESHOLD, may not need it for factor graph? 
+                                      self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) # need to abstract threshold, may not needed for FG? Maybe dont need zero mvt update at all?
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
 

@@ -1,12 +1,9 @@
-from ..custom_terminal import print 
+from ...custom_terminal import print 
 from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, asarray, ndarray, dot, eye, linalg
 
-from ..interfaces import Coordinates
 from .customOdometry import CustomOdometry
-from ..messages.poseMessage import PoseMessage
-
-DT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
+from ...interfaces import Coordinates
 
 class CustomEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates, yaw: float):
