@@ -100,6 +100,7 @@ class StateEstimator:
             msg = UpdateMessage.load(*self.com_queue.get_nowait())
             if msg.update_type != UpdateType.TOPOLOGY: 
                 raw_pos, raw_yaw, timestamp = msg.measured_xyz, msg.measured_yaw, msg.timestamp
+            # TODO add an in-bounds of the room check somewhere 
             match msg.update_type: 
                 # NOTE TODO, figure out how to deal with trilateration vs taking all measuremetns for FG. Abstract trilat choice into the ekf and just pass all ranges to FG?
                 # or keep trilat as a general message for passing enough ranges? 

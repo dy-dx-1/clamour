@@ -56,10 +56,9 @@ class Task(TDMAState):
             self.frame_id_done_discover = self.timing.frame_id
             self.discover_devices()
             self.neighborhood.collect_garbage()
-            self.select_localization_method()
 
         if self.timing.enough_time_left():
-            self.localize()
+            self.get_ranges() 
             #self.testTDMA()
 
         if self.neighborhood.changed:
@@ -95,8 +94,28 @@ class Task(TDMAState):
             print("Task.next(): Moving to SYNC state", 'info', 'tdma')
             return State.SYNCHRONIZATION
 
-    def select_localization_method(self) -> None:
-        self.localize = self.positioning if len(self.tag.available_anchors) >= 3 else self.ranging
+    def get_ranges(self): 
+        """
+        Ranges with appropriate anchors/neighbors through an intelligent selection policy. 
+        Sends the collected info to the state estimator for positioning. 
+        """
+        # Collecting ranges
+        for target in self.select_ranging_targets(): 
+            range_measure = self.tag.ranging(target) 
+        # Packing in an update message and sending to estimator 
+
+    def select_ranging_targets(self)->set:
+        """
+        Selects the best anchors/neighbors to use when ranging to balance computation requirements and information gathered.
+        Returns a tuple of IDs for ranging targets 
+        """
+        # 2026-08-14 NOTE in the future this is a major part of what I'll be modifying for my thesis
+        # for now, simply doing what clamour was doing before, i.e. get anchor ranges if >=3 anchors and 1 neighbor/anchor if not
+        if len(self.tag.available_anchors)>=3: 
+            return self.tag.available_anchors
+        else:
+            return set(self.select_single_ranging_target()) 
+
 
     def positioning(self) -> None:
         with self.tag_lock:
@@ -111,13 +130,9 @@ class Task(TDMAState):
             if angles is None:
                 print("Could not retrieve orientation", 'info', 'loc')
 
-        if (not ((position is None) or (angles is None))) and self.positioning_converges(position):
+        if (not ((position is None) or (angles is None))):
             self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
                                            position, angles.heading, topology=self.neighborhood.current_neighbors)
-
-    @staticmethod
-    def positioning_converges(coordinates: Coordinates) -> bool:
-        return not (coordinates.x == coordinates.y == coordinates.z == 0.0)
 
     def ranging(self) -> None:
         ranging_target_id = self.select_ranging_target()
@@ -139,7 +154,7 @@ class Task(TDMAState):
                                                measured_position, angles.heading, neighbors=atleast_2d(neighbor_position),
                                                topology=self.neighborhood.current_neighbors)
 
-    def select_ranging_target(self) -> int|None:
+    def select_single_ranging_target(self) -> int|None:
         """Selects a target for doing a range measurement.
         Anchors are prioritized because of their lower uncertainty.
         When multiple devices are available, we always select the 
