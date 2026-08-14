@@ -314,13 +314,14 @@ class BitcrazeTag(Tag):
             if dist: 
                 anchors.append([ALL_ANCHORS[anchor_id].x, ALL_ANCHORS[anchor_id].y, ALL_ANCHORS[anchor_id].z])
                 distances.append(dist)
+            time.sleep(0.0001) # Need a break while polling between anchors to prevent collisions TODO tune this in future. 
         if len(anchors)<3: 
             return None # Could not get the minimum amount of range measurements needed 
         # Residual function (Error = Calculated Distance - Measured Distance)
         def equations(position):
             calculated_distances = np.linalg.norm(anchors - position, axis=1)
             return calculated_distances - distances
-        # Solving with Non-linear Least Squares (Levenberg-Marquardt or Trust Region Reflective)
+        # Solving with Non-linear Least Squares (Levenberg-Marquardt)
         initial_guess = np.array(self.coordinates.data)  # using last known position as guess
         result = least_squares(equations, initial_guess, method='lm')  
         

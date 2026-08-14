@@ -35,7 +35,7 @@ class StateEstimator:
     - sound_queue: Optional, if a Queue is passed, will send updates to it to allow for sound playing 
     """
     def __init__(self, tag: Tag, tag_lock: Lock,
-                  estimator_type: Literal['EKF', 'FG'], pose_callback: function, 
+                  estimator_type: Literal['EKF', 'FG'], pose_callback, 
                   communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue):
         self.tag = tag 
         self.tag_lock = tag_lock 
@@ -73,7 +73,7 @@ class StateEstimator:
             if not self.com_queue.empty():
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
                 if msg.update_type == UpdateType.TRILATERATION: 
-                    self.yaw_offset = raw_yaw  # Store initial value, which we'll use to correct further poses 
+                    self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses 
                     raw_pos, raw_yaw = msg.measured_xyz, self.correct_yaw(msg.measured_yaw)
                     
                     if self.estimator_type == 'EKF': 
@@ -137,6 +137,9 @@ class StateEstimator:
                                       self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) # need to abstract threshold, may not needed for FG? Maybe dont need zero mvt update at all?
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
+
+    def update_neighbors(self, neighbors: dict):
+        self.last_know_neighbors = neighbors
 
     def pedometer_yaw_to_coords(self, measured_yaw: float) -> Coordinates:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
@@ -210,8 +213,8 @@ class StateEstimator:
                 'raw_z': coordinates.z,
                 'estimator_z': self.estimator.get_position().z,
                 'raw_yaw': yaw,
-                'ekf_yaw': self.estimator.get_yaw(),
-                'ekf_covariance_matrix': linalg.det(self.estimator.P),
+                'estimator_yaw': self.estimator.get_yaw(),
+                'covariance_matrix': linalg.det(self.estimator.P),
                 'slots': message.slots,
                 'two_hop_neighbors': self.last_know_neighbors
             }

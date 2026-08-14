@@ -11,7 +11,7 @@ if parent_dir not in sys.path:
 
 from src.clamour.interfaces.bitcraze_tag import BitcrazeTag
 
-ANCHOR_ID = 4
+ANCHOR_ID = 2
 
 SMART_TX_POWER = False 
 
@@ -33,7 +33,7 @@ def get_range_measurements(smart_tx, power_cfg): # IN CM
             time.sleep(0.05) 
     return np.array(ranges) 
 
-for pwr_lvl in power_lvls: 
+for pwr_lvl in [[0x10,0x10,0x10,0x10]]: 
     # Computing stats
     ranges = get_range_measurements(SMART_TX_POWER, pwr_lvl)
     if len(ranges) != 0: 

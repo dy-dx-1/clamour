@@ -107,7 +107,7 @@ class Task(TDMAState):
             pass 
         else: 
             if position is None: 
-                print("Trilateration failed", 'info', 'loc')
+                print(f"[WARNING] Trilateration failed, <3 anchors responded", 'info', 'loc')
             if angles is None:
                 print("Could not retrieve orientation", 'info', 'loc')
 
