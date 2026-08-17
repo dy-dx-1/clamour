@@ -243,7 +243,7 @@ class PozyxTag(Tag):
         else: 
             return None 
 
-    def ranging(self, target_id): 
+    def ranging(self, target_id)->int: 
         range_measure = DeviceRange() 
         try: 
             status = self._pozyx_serial.doRanging(target_id, range_measure)
@@ -252,6 +252,6 @@ class PozyxTag(Tag):
             print(f"PozyxTag.doRanging: {str(s)}", 'error', 'loc') 
 
         if status == POZYX_SUCCESS: 
-            return Coordinates(range_measure.distance, 0, 0) # Only along X cause simple ranging measurement. NOTE: distance in mm 
+            return range_measure.distance # distance in mm 
         else: 
             return None

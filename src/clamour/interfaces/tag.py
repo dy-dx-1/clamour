@@ -154,7 +154,7 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def ranging(self, target_id:int) -> Coordinates | None: 
+    def ranging(self, target_id:int) -> int | None: 
         """
         Calculates a UWB range measurement between the tag and another device. 
         Measurement must be in mm. 
@@ -163,5 +163,5 @@ class Tag(ABC):
             - target_id: ID of the target device (int) 
         
         RETURNS:
-            - Coordinates(x=distance_to_device, y=0, z=0) or None
+            - distance in mm or None
         """

@@ -330,6 +330,7 @@ class BitcrazeTag(Tag):
             
         return Coordinates(result.x[0], result.x[1], result.x[2])
 
-    def ranging(self, target_id:int) -> Coordinates | None: 
+    def ranging(self, target_id:int) -> int | None: 
+        # NOTE leaving as separate function in case want to avg measurements here 
         distance = self.compute_range(target_id) 
-        return Coordinates(x=distance, y=0, z=0) if distance else None 
+        return distance if distance else None # range in mm 
