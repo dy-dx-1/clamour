@@ -29,16 +29,15 @@ class Messenger:
         self.should_go_back_to_sync = 0
 
     def send_range_update(self, clock: float, offset: float,
-                        ranging_data: list[tuple], yaw: float,
-                        neighbors: list, topology: dict) -> None:
+                        anchors_ranging_data: list[tuple[Coordinates, int]]|None, tags_ranging_data: list[tuple[Coordinates, int]]|None, 
+                        yaw: float, topology: dict) -> None:
         """
         Sends a RANGING UpdateMessage to the state estimator. 
+        See UpdateMessage docstring for more info on arguments. 
         """
-        # TODO modify use of neighbors. Make it a list of neighbor position and clarify arg name 
-        # ensure consistent
         message = UpdateMessage(UpdateType.RANGING, time(), clock, offset,
-                                ranging_data, yaw,  
-                                self.slot_assignment.pure_send_list, neighbors, topology)
+                                anchors_ranging_data, tags_ranging_data, yaw,  
+                                self.slot_assignment.pure_send_list, topology)
 
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 

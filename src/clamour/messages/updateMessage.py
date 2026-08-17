@@ -12,32 +12,35 @@ class UpdateMessage:
     - PEDOMETER: update_type, timestamp and yaw 
     - RANGING: All parameters, but note that the last yaw is directly passed, no new info on it though. 
     - TOPOLOGY: All but ranging_data, measured_yaw and neighbors
-    
+
+    NOTE: As of 2026-08-17, tentatively separating anchors and tags list, even if same format, to facilitate different covariance info to be added with FG? Maybe there's a cleaner solution apparent when more of the system is constructed. Currently separating them also helps in the EKF to eval if can trilaterate easily.  
+
     ARGS:
     - update_type
     - timestamp
     - synchronized_clock
     - offset
-    - ranging_data: list of ranging values in format (target_id, range_in_mm) or []
+    - anchors_ranging_data: list of ranging to anchors in format (TargetCoordinates, range_in_mm) 
+    - tags_ranging_data: list of ranging to tags in format (TargetCoordinates, range_in_mm) 
     - measured_yaw
     - slots 
-    - neighbors: list or None 
     - topology: dict 
     """
     def __init__(self, update_type: UpdateType, timestamp: float,
                  synchronized_clock: float=0.0, offset: float=0.0,
-                 ranging_data: list[tuple]|None = None, measured_yaw: float=0.0,
-                 slots: list=None, neighbors: list=None, topology: dict=None):
+                 anchors_ranging_data: list[tuple[Coordinates, int]]|None = None, tags_ranging_data: list[tuple[Coordinates, int]]|None = None,
+                 measured_yaw: float=0.0,
+                 slots: list=None, topology: dict=None):
         self.update_type = update_type
         self.timestamp = timestamp
         self.synchronized_clock = synchronized_clock
         self.offset = offset
 
-        self.ranging_data = ranging_data
+        self.anchors_ranging_data = anchors_ranging_data
+        self.tags_ranging_data = tags_ranging_data
         self.measured_yaw = measured_yaw
 
         self.slots = slots
-        self.neighbors = neighbors if neighbors is not None else []
         self.topology = topology if topology is not None else {}
 
     @staticmethod

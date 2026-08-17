@@ -141,17 +141,6 @@ class Tag(ABC):
         RETURNS: 
             - Angles object of the current orientation (heading, roll, pitch)
         """
-    
-    @abstractmethod
-    def trilaterate_position(self) -> Coordinates | None:
-        """
-        Uses trilateration (or multilateration if possible) to position the tag in 3D space. 
-        This should only be called if >3 anchors are available. 
-        Stores the new position in the tag's memory and returns it. 
-
-        RETURNS:
-            - Coordinates object with the position or None
-        """
 
     @abstractmethod
     def ranging(self, target_id:int) -> int | None: 

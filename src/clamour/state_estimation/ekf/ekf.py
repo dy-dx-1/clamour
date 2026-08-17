@@ -1,6 +1,7 @@
 from ...custom_terminal import print 
 from filterpy.kalman import ExtendedKalmanFilter
 from numpy import array, asarray, ndarray, dot, eye, linalg
+from scipy.optimize import least_squares
 
 from .customOdometry import CustomOdometry
 from ...interfaces import Coordinates
@@ -133,6 +134,34 @@ class CustomEKF(ExtendedKalmanFilter):
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_pedometer, self.R_pedometer)
+
+    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple], raw_yaw:float):
+        """
+        This function is called for UpdateType.RANGING updates 
+        It determines if enough anchor ranges are passed for a TRILATERATION update
+        and if not, makes multiple simple ranging updates with individual elements. 
+        """
+        if len(anchors_ranging_data)>3: # Enough anchors for trilateration update, trilaterate position and update EKF 
+            anchor_pos = [] 
+            anchor_dist = [] 
+            for pos, dist in anchors_ranging_data: 
+                anchor_pos.append(pos)
+                anchor_dist.append(dist) 
+            # Residual function (Error = Calculated Distance - Measured Distance)
+            def equations(position):
+                calculated_distances =linalg.norm(anchor_pos - position, axis=1)
+                return calculated_distances - anchor_dist
+            # Solving with Non-linear Least Squares (Levenberg-Marquardt)
+            raw_pos = least_squares(equations, array(self.get_position().data), method='lm')  
+            self.trilateration_update(raw_pos, raw_yaw, timestamp)
+
+        else: # Not enough anchors for trilateration; add multiple ranging updates 
+            for target_position, distance in anchors_ranging_data+tags_ranging_data: 
+                formatted_distance = Coordinates(distance, 0, 0) 
+                formatted_target_pos = array([target_position.x, target_position.y, target_position.z])
+                # NOTE 2026-08-17, in the past, neighbor positions were casted with atleast_2d. 
+                # If conversion problems arise, try to add it to formatted_target_pos / see jacobian methods 
+                self.ranging_update(formatted_distance, raw_yaw, timestamp, formatted_target_pos)
 
     def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)

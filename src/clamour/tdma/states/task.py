@@ -1,10 +1,6 @@
-import random
 from multiprocessing.synchronize import Lock
-from time import perf_counter
+from time import perf_counter, sleep 
 from typing import TYPE_CHECKING
-
-from numpy import array, atleast_2d
-import struct
 
 from ...custom_terminal import print 
 from ...interfaces import Tag, Coordinates, Anchors
@@ -99,15 +95,23 @@ class Task(TDMAState):
         Ranges with appropriate anchors/neighbors through an intelligent selection policy. 
         Sends the collected info to the state estimator for positioning. 
         """
-        # TODO change ranging output to be a float instead of Coordinates object? Propagate modif
-        ranging_measurements = [(target_id, self.tag.ranging(target_id)) for target_id in self.select_ranging_targets()]
+        anchor_zs = []
+        tag_zs = []  
+        for target_id in self.select_ranging_targets():
+            z = self.tag.ranging(target_id) 
+            if z: # Successful measurement, fetch position and add 
+                if self.tag.is_anchor(target_id): 
+                    anchor_zs.append( (self.anchors.anchors_dict[target_id], z) )   # (Coordinates, range_measure_in_mm) 
+                else: 
+                    # TODO NOTE: In future, will need to modify message or other to incorporate covariance info at this level I think 
+                    tag_zs.append( (None, z) ) # TODO REPLACE NONE PLACEHOLDER WITH NEIGHBOR POSITION as Coordinates
+            sleep(0.0001) # TODO test / tune this check if needed now that inside control structure 
         # Packing in an update message and sending to estimator 
-        # TODO update message passing and treatment to support neighbor positions 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
                                          offset=self.timing.logical_clock.offset,
-                                         ranging_data=ranging_measurements,
+                                         anchors_ranging_data=anchor_zs,
+                                         tags_ranging_data=tag_zs,
                                          yaw = self.tag.orientation.heading,
-                                         neighbors = atleast_2d(neighbor_position),
                                          topology= self.neighborhood.current_neighbors)
 
     def select_ranging_targets(self)->set:
@@ -121,44 +125,6 @@ class Task(TDMAState):
             return self.tag.available_anchors
         else:
             return set(self.select_single_ranging_target()) 
-
-
-    def positioning(self) -> None:
-        with self.tag_lock:
-            position = self.tag.trilaterate_position()
-            angles = self.tag.orientation
-
-        if (position is not None) and (angles is not None): 
-            pass 
-        else: 
-            if position is None: 
-                print(f"[WARNING] Trilateration failed, <3 anchors responded", 'info', 'loc')
-            if angles is None:
-                print("Could not retrieve orientation", 'info', 'loc')
-
-        if (not ((position is None) or (angles is None))):
-            self.messenger.send_ekf_update(self.timing.logical_clock.clock, self.timing.logical_clock.offset,
-                                           position, angles.heading, topology=self.neighborhood.current_neighbors)
-
-    def ranging(self) -> None:
-        ranging_target_id = self.select_ranging_target()
-
-        if ranging_target_id:
-            with self.tag_lock: 
-                if self.tag.is_anchor(ranging_target_id):
-                    ref_coordinates = self.anchors.anchors_dict[ranging_target_id]
-                else:
-                    ref_coordinates = self.tag.coordinates
-
-                measured_position = self.tag.ranging(ranging_target_id) 
-                angles = self.tag.orientation
-
-            neighbor_position = array([ref_coordinates.x, ref_coordinates.y, ref_coordinates.z])
-
-            if measured_position is not None and angles is not None: # These will be None if there were errors when getting the ranging/angles 
-                self.messenger.send_ekf_update(UpdateType.RANGING, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
-                                               measured_position, angles.heading, neighbors=atleast_2d(neighbor_position),
-                                               topology=self.neighborhood.current_neighbors)
 
     def select_single_ranging_target(self) -> int|None:
         """Selects a target for doing a range measurement.

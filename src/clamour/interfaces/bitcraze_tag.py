@@ -10,7 +10,6 @@ import time
 import struct
 
 import numpy as np 
-from scipy.optimize import least_squares
 
 ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known anchors 
 
@@ -305,30 +304,6 @@ class BitcrazeTag(Tag):
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
             distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
         return distance
-
-    def trilaterate_position(self) -> Coordinates | None:
-        anchors = [] 
-        distances = [] 
-        for anchor_id in self.available_anchors:  
-            dist = self.compute_range(anchor_id) 
-            if dist: 
-                anchors.append([ALL_ANCHORS[anchor_id].x, ALL_ANCHORS[anchor_id].y, ALL_ANCHORS[anchor_id].z])
-                distances.append(dist)
-            time.sleep(0.0001) # Need a break while polling between anchors to prevent collisions TODO tune this in future. 
-        if len(anchors)<3: 
-            return None # Could not get the minimum amount of range measurements needed 
-        # Residual function (Error = Calculated Distance - Measured Distance)
-        def equations(position):
-            calculated_distances = np.linalg.norm(anchors - position, axis=1)
-            return calculated_distances - distances
-        # Solving with Non-linear Least Squares (Levenberg-Marquardt)
-        initial_guess = np.array(self.coordinates.data)  # using last known position as guess
-        result = least_squares(equations, initial_guess, method='lm')  
-        
-        if not result.success:
-            print("[WARNING] trilaterate_position() did not converge perfectly!", 'info', 'loc')
-            
-        return Coordinates(result.x[0], result.x[1], result.x[2])
 
     def ranging(self, target_id:int) -> int | None: 
         # NOTE leaving as separate function in case want to avg measurements here 

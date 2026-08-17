@@ -66,14 +66,17 @@ class StateEstimator:
 
     def initialize_estimator(self) -> None: 
         """
-        Wait for a trilateration update to arrive in communication queue. Use it to init estimator. 
+        Wait for a trilateration-sufficient update to arrive in communication queue. Use it to init estimator. 
         Need to start from a fully constrained position to lock in the global reference frame.
         """
         while self.estimator is None: 
             if not self.com_queue.empty():
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
-                if msg.update_type == UpdateType.TRILATERATION: 
+                if msg.update_type == UpdateType.RANGING: 
+                    if not len(msg.anchors_ranging_data )<3:  # Need a fully constrained measurement for initialization
+                        continue 
                     self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses 
+                    # TODO pick back up here, add a function that does simple trilat or mean of anchors for proper start position 
                     raw_pos, raw_yaw = msg.measured_xyz, self.correct_yaw(msg.measured_yaw)
                     
                     if self.estimator_type == 'EKF': 
@@ -98,20 +101,17 @@ class StateEstimator:
         """
         if not self.com_queue.empty(): 
             msg = UpdateMessage.load(*self.com_queue.get_nowait())
-            if msg.update_type != UpdateType.TOPOLOGY: 
-                raw_pos, raw_yaw, timestamp = msg.measured_xyz, msg.measured_yaw, msg.timestamp
+            if msg.update_type != UpdateType.TOPOLOGY: # TODO ensure compatible with pedometer/custom update
+                anchors_ranging_data, tags_ranging_data, raw_yaw, timestamp = msg.anchors_ranging_data, msg.tags_ranging_data, msg.measured_yaw, msg.timestamp
             # TODO add an in-bounds of the room check somewhere 
             match msg.update_type: 
                 # NOTE TODO, figure out how to deal with trilateration vs taking all measuremetns for FG. Abstract trilat choice into the ekf and just pass all ranges to FG?
                 # or keep trilat as a general message for passing enough ranges? 
                 case UpdateType.PEDOMETER: 
                     self.estimator.pedometer_update(self.pedometer_yaw_to_coords(raw_yaw), raw_yaw, timestamp) 
-                case UpdateType.TRILATERATION: 
-                    self.update_neighbors(msg.topology) 
-                    self.estimator.trilateration_update(raw_pos, raw_yaw, timestamp)
                 case UpdateType.RANGING: 
                     self.update_neighbors(msg.topology) 
-                    self.estimator.ranging_update(raw_pos, raw_yaw, timestamp, msg.neighbors)
+                    self.estimator.incorporate_ranging_data(timestamp, anchors_ranging_data, tags_ranging_data, raw_yaw) 
                 case UpdateType.TOPOLOGY:  
                     self.update_neighbors(msg.topology) 
                     raw_pos, raw_yaw = self.estimator.get_position(), self.estimator.get_yaw() # just to have something to print for callback 
@@ -123,6 +123,7 @@ class StateEstimator:
             except StructError as s: 
                 print(f"Estimator couldn't get new state estimate in process_latest_state_info(): {str(s)}", 'error', 'loc')
 
+            # TODO fix these, raw_pos is no longer relevant as estimation is abstracted by ranges
             self.save_to_csv(self.estimator.last_measurement_time, msg, raw_pos, raw_yaw) 
             self.pose_callback(PoseMessage(raw_pos.x, raw_pos.y, raw_pos.z, raw_yaw))
 
