@@ -28,11 +28,18 @@ class Messenger:
         self.received_messages = set()
         self.should_go_back_to_sync = 0
 
-    def send_ekf_update(self, update_type: UpdateType, clock: float, offset: float,
-                        measured_position: Coordinates, yaw: float,
-                        neighbors: list=None, topology: dict=None) -> None:
-        message = UpdateMessage(update_type, time(), clock, offset, yaw, measured_position, 
+    def send_range_update(self, clock: float, offset: float,
+                        ranging_data: list[tuple], yaw: float,
+                        neighbors: list, topology: dict) -> None:
+        """
+        Sends a RANGING UpdateMessage to the state estimator. 
+        """
+        # TODO modify use of neighbors. Make it a list of neighbor position and clarify arg name 
+        # ensure consistent
+        message = UpdateMessage(UpdateType.RANGING, time(), clock, offset,
+                                ranging_data, yaw,  
                                 self.slot_assignment.pure_send_list, neighbors, topology)
+
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def send_topology_update(self, clock: float, offset: float, topology: dict) -> None:

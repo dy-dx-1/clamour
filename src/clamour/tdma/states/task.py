@@ -99,10 +99,16 @@ class Task(TDMAState):
         Ranges with appropriate anchors/neighbors through an intelligent selection policy. 
         Sends the collected info to the state estimator for positioning. 
         """
-        # Collecting ranges
-        for target in self.select_ranging_targets(): 
-            range_measure = self.tag.ranging(target) 
+        # TODO change ranging output to be a float instead of Coordinates object? Propagate modif
+        ranging_measurements = [(target_id, self.tag.ranging(target_id)) for target_id in self.select_ranging_targets()]
         # Packing in an update message and sending to estimator 
+        # TODO update message passing and treatment to support neighbor positions 
+        self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
+                                         offset=self.timing.logical_clock.offset,
+                                         ranging_data=ranging_measurements,
+                                         yaw = self.tag.orientation.heading,
+                                         neighbors = atleast_2d(neighbor_position),
+                                         topology= self.neighborhood.current_neighbors)
 
     def select_ranging_targets(self)->set:
         """
@@ -131,7 +137,7 @@ class Task(TDMAState):
                 print("Could not retrieve orientation", 'info', 'loc')
 
         if (not ((position is None) or (angles is None))):
-            self.messenger.send_ekf_update(UpdateType.TRILATERATION, self.timing.logical_clock.clock, self.timing.logical_clock.offset,
+            self.messenger.send_ekf_update(self.timing.logical_clock.clock, self.timing.logical_clock.offset,
                                            position, angles.heading, topology=self.neighborhood.current_neighbors)
 
     def ranging(self) -> None:
