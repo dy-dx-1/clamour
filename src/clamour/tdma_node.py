@@ -4,7 +4,7 @@ from time import sleep, time
 from .interfaces import Anchors, Tag
 from .tdma import Neighborhood, SlotAssignment, Timing
 from .messenger import Messenger
-from .tdma.states import TDMAState, Initialization, Listen, Scheduling, State, Synchronization, Task
+from .tdma.states import Initialization, Listen, Scheduling, State, Synchronization, Task
 
 class TDMANode:
     def __init__(self, multiprocess_communication_queue, shared_tag: Tag,
@@ -21,7 +21,7 @@ class TDMANode:
         self.timing = Timing()
         self.loop_start_time = time()
 
-        self.states = self.states = { # TODO NOTE!! why is there 2 equals? i think this is a code hallucination, to check - 22june 
+        self.states = { 
             State.INITIALIZATION: Initialization(neighborhood, anchors, shared_tag, messenger,
                                                  multiprocess_communication_queue, shared_tag_lock),
             State.SYNCHRONIZATION: Synchronization(neighborhood, slot_assignment, self.timing, messenger,
