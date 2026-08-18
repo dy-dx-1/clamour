@@ -4,7 +4,6 @@ import math
 import numpy as np 
 from time import sleep, time 
 from typing import Literal
-from struct import error as StructError
 from multiprocessing.synchronize import Lock
 
 from .ekf import CustomEKF

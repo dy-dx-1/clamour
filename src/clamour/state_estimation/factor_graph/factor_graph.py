@@ -9,16 +9,13 @@ class PoseGraph:
         self.last_measurement_time = 0 
 
     ### EXTERNAL METHODS USED BY estimator.py 
-    def get_position():  
-        pass 
-    def get_yaw():
-        pass 
+    def get_position(self):  
+        return Coordinates(self.x[0], self.x[2], self.x[4])
+    def get_yaw(self):
+        return self.x[6]
 
-    def trilateration_update(): 
-        # NOTE to confirm if keeping this or just making general 
-        pass 
-    def ranging_update():
-        pass 
+    def incorporate_ranging_data():
+        pass
     def zero_movement_update():
         pass 
     def pedometer_update():

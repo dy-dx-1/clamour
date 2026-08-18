@@ -138,7 +138,7 @@ class CustomEKF(ExtendedKalmanFilter):
     def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple[Coordinates, int]], tags_ranging_data:list[tuple], raw_yaw:float):
         """
         This function is called for UpdateType.RANGING updates 
-        It determines if enough anchor ranges are passed for a TRILATERATION update
+        It determines if enough anchor ranges are passed for a trilateration update
         and if not, makes multiple simple ranging updates with individual elements. 
         """
         if len(anchors_ranging_data)>=3: # Enough anchors for trilateration update, trilaterate position and update EKF 
