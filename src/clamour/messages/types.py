@@ -9,7 +9,6 @@ class MessageType(IntEnum):
 
 class UpdateType(IntEnum):
     PEDOMETER = 0
-    TRILATERATION = 1
-    RANGING = 2
-    TOPOLOGY = 3
-    CUSTOM_POSE = 4
+    RANGING = 1
+    TOPOLOGY = 2
+    CUSTOM_POSE = 3

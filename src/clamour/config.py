@@ -29,7 +29,7 @@ DEVICE_MSGS = True     # Turn off/on device management-related terminal output
 TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
 LOC_MSGS    = True     # Turn off/on localization-related terminal output  
 ## CSV saving 
-SAVE_TO_CSV = True     # Save localization data to csv or not 
+SAVE_TO_CSV = False     # Save localization data to csv or not 
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
