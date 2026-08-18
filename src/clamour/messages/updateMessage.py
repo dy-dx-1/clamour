@@ -49,7 +49,7 @@ class UpdateMessage:
         return message.__class__, message.__dict__
 
     @staticmethod
-    def load(cls, attributes) -> UpdateMessage:
+    def load(cls, attributes) -> 'UpdateMessage':
         """Unpickles the message"""
         obj = cls.__new__(cls)
         obj.__dict__.update(attributes)

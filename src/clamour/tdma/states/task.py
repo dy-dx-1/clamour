@@ -37,7 +37,6 @@ class Task(TDMAState):
                  slot_assignment: SlotAssignment):
         self.timing = timing
         self.anchors = anchors
-        self.localize = self.ranging
         self.tag = shared_tag
         self.tag_lock = shared_tag_lock
         self.neighborhood = neighborhood
@@ -54,7 +53,7 @@ class Task(TDMAState):
             self.neighborhood.collect_garbage()
 
         if self.timing.enough_time_left():
-            self.get_ranges() 
+            self.collect_ranges() 
             #self.testTDMA()
 
         if self.neighborhood.changed:
@@ -90,7 +89,7 @@ class Task(TDMAState):
             print("Task.next(): Moving to SYNC state", 'info', 'tdma')
             return State.SYNCHRONIZATION
 
-    def get_ranges(self): 
+    def collect_ranges(self): 
         """
         Ranges with appropriate anchors/neighbors through an intelligent selection policy. 
         Sends the collected info to the state estimator for positioning. 

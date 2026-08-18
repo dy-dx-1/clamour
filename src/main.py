@@ -1,6 +1,6 @@
 import sys
 
-from rich.traceback import install as install_rich_traceback
+#from rich.traceback import install as install_rich_traceback
 
 from clamour.clamour import Clamour
 from clamour.contextManagedQueue import ContextManagedQueue
@@ -20,7 +20,7 @@ def on_new_pose_estimated(pose_msg: PoseMessage) -> None:
 
 
 def main() -> None:
-    install_rich_traceback()  # Display readable tracebacks for this CLI entry point.
+    #install_rich_traceback()  # Display readable tracebacks for this CLI entry point.
 
     sound = False
     if len(sys.argv) > 1:

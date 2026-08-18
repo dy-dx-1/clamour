@@ -73,7 +73,7 @@ class StateEstimator:
             if not self.com_queue.empty():
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
                 if msg.update_type == UpdateType.RANGING: 
-                    if not len(msg.anchors_ranging_data)<3:  # Need a fully constrained measurement for initialization
+                    if len(msg.anchors_ranging_data)<3:  # Need a fully constrained measurement for initialization
                         continue 
                     self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses  
                     # Whatever the estimator, initializing the position with trilateration or it's equivalent is done through
@@ -131,6 +131,7 @@ class StateEstimator:
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
 
+    @staticmethod
     def calculate_3D_mean(points:list[tuple])->Coordinates:
         """
         Takes a list of at least 3 positions and calculates the mean. 
@@ -210,7 +211,7 @@ class StateEstimator:
         if not SAVE_TO_CSV: 
             return None, None 
         filepath = 'pose_estimation.csv'
-        is_new_file = os.path.exists(filepath)
+        is_new_file = not os.path.exists(filepath)
         fieldnames = ['tag_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
                       'estimator_x', 'estimator_y', 'estimator_z', 'estimator_yaw', 
                       'covariance_matrix', 'slots', 'two_hop_neighbors']
