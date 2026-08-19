@@ -14,12 +14,11 @@ RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~
 
 """
 Collecting questions to check 
-- What about neighboring tags? These have a unique ID, but their position will change. Should they be added every time with the same symbol? Will GTSAM be confused if their position changes? 
-- When initialising the graph, are we forced to define a PriorFactorPose in addition to the 3+ anchors?  Can't the graph define it just with anchors? 
+- 
 """
 
 class PoseGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float): 
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float): 
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to initialize the prior position 
@@ -27,8 +26,7 @@ class PoseGraph:
         # Internal data about the current state. Kept up to date and fed back to estimator.py 
         prior_pos = anchors.get_centroid_for(data[0] for data in anchors_range_data) 
         self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, prior_yaw, 0]) # State vector is coords and speed 
-        self.last_measurement_time = 0 # NOTE check how EKF does it in init? init with timestamp to estimate speeds? 
-
+        self.last_measurement_time = timestamp 
         # Graph trackers 
         self._state_counter = 0   # Keeps track of how many state nodes have been added to the graph
         self.seen_anchors = set() # Keeps track of anchors we have previously seen, to avoid re-adding prior factors
@@ -66,26 +64,31 @@ class PoseGraph:
         """
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
+        current_state_id = self.state_counter
 
-        x = gt.symbol('x', self.state_counter) 
+        x = gt.symbol('x', current_state_id) 
         # TODO i think for now to mimick EKF behavior could add inside of this function a betweenfactor that uses calculated speed to estimate a prior for this pose 
         # before adding anchor data 
         
         # Anchor data 
         for id, z in anchors_ranging_data: 
-            l = gt.symbol('l', id) 
+            anchor = gt.symbol('a', id) 
             anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in mm 
             if id not in self.seen_anchors:
                 # If we have never seen this anchor, need to add a prior on it's position 
                 # If we have, then no need to re-add a prior. Just directly reference it during range add
-                graph.add(gt.PriorFactorPoint3(l, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
-                initial_values.insert(l, gt.Point3(*anchor_pos))
+                graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
+                initial_values.insert(anchor, gt.Point3(*anchor_pos))
                 self.seen_anchors.add(id) 
-            graph.add(gt.RangeFactor3D(x, l, z, RANGING_NOISE))
+            graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
             
         # Tag data 
         for pos, z in tags_ranging_data: # TODO eval format compared to anchors, same ID or not? 
-            pass 
+            neighbor = gt.symbol('n', int(f'{n_id}{current_state_id}'))
+            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*received_neighbor_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
+            initial_values.insert(neighbor, gt.Point3(*received_neighbor_pos))
+            graph.add(gt.RangeFactor3D(x, neighbor, z, RANGING_NOISE))
+            
 
         # Updating graph and internal data 
         self.isam.update(graph, initial_values) 
