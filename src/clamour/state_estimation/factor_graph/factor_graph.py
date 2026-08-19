@@ -11,11 +11,7 @@ anchors = Anchors()
 ## Units in mm, like the rest of the graph 
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([50, 50, 50]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~ 10cm 
-
-"""
-Collecting questions to check 
-- 
-"""
+ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 500, 500, 500]) # currently using constant velocity so very loose 
 
 class PoseGraph: 
     def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float): 
@@ -27,6 +23,7 @@ class PoseGraph:
         prior_pos = anchors.get_centroid_for(data[0] for data in anchors_range_data) 
         self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, prior_yaw, 0]) # State vector is coords and speed 
         self.last_measurement_time = timestamp 
+        self.dt = None 
         # Graph trackers 
         self._state_counter = 0   # Keeps track of how many state nodes have been added to the graph
         self.seen_anchors = set() # Keeps track of anchors we have previously seen, to avoid re-adding prior factors
@@ -46,11 +43,35 @@ class PoseGraph:
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5])))
         initial_values.insert(x, gt.Pose3(prior_pos.x, prior_pos.y, prior_pos.z)) # initial guess on the position 
 
+    def validate_update(self, timestamp:float)->bool: 
+        """
+        To be called before an update. Adjusts the internal timestamp and speed for the constant velocity model. 
+        Returns bool depending on if the update can be applied. 
+        NOTE: eventually, this will be replaced by an IMU factor 
+        """
+        if timestamp > self.last_measurement_time: 
+            self.dt = timestamp - self.last_measurement_time
+            self.last_measurement_time = timestamp
+            return True 
+        else: 
+            print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')
+            return False 
+
     ### Properties
     @property
     def state_counter(self)->int:
         self._state_counter += 1 
         return self._state_counter 
+
+    ### INTERNAL COMPUTATION METHODS 
+    def constant_velocity_model(self)->list: 
+        """
+        Supposes a constant velocity to estimate the motion of the next step 
+        """
+        delta_x = self.x[1]*self.dt 
+        delta_y = self.x[3]*self.dt 
+        delta_z = self.x[5]*self.dt 
+        return delta_x, delta_y, delta_z
 
     ### EXTERNAL METHODS USED BY estimator.py 
     def get_position(self):  
@@ -58,18 +79,27 @@ class PoseGraph:
     def get_yaw(self):
         return self.x[6]
 
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple[Coordinates, int]], tags_ranging_data:list[tuple[Coordinates, int]], raw_yaw:float):
+    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple], raw_yaw:float):
         """
         Called whenever we get new ranges from anchors or tags to add to the factor graph. 
         """
+        if not self.validate_update(timestamp): 
+            return # TODO error handling here if unvalid update 
+        
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
         current_state_id = self.state_counter
-
         x = gt.symbol('x', current_state_id) 
-        # TODO i think for now to mimick EKF behavior could add inside of this function a betweenfactor that uses calculated speed to estimate a prior for this pose 
-        # before adding anchor data 
-        
+
+        # Connecting to previous state through a motion model 
+        # NOTE: currently using simple constant velocity 
+        x_prev = gt.symbol('x', current_state_id-1) # fetching past state
+        delta_x, delta_y, delta_z = self.constant_velocity_model() # relative movement that got us here 
+        mvt = gt.Pose3(0, 0, 0, delta_x, delta_y, delta_z) 
+        graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
+        previous_pose = gt.Pose3(0, 0, self.get_yaw(), self.x[0], self.x[2], self.x[4]) # NOTE when doing a more complex model, should fetch the pose with results.atPose3()
+        initial_values.insert(x, previous_pose.compose(mvt))
+
         # Anchor data 
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
@@ -83,7 +113,7 @@ class PoseGraph:
             graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
             
         # Tag data 
-        for pos, z in tags_ranging_data: # TODO eval format compared to anchors, same ID or not? 
+        for pos, z in tags_ranging_data: 
             neighbor = gt.symbol('n', int(f'{n_id}{current_state_id}'))
             graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*received_neighbor_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
             initial_values.insert(neighbor, gt.Point3(*received_neighbor_pos))
@@ -94,6 +124,15 @@ class PoseGraph:
         self.isam.update(graph, initial_values) 
         results = self.isam.calculateEstimate() 
         current_state_estimate = results.atPose3(x) 
+        new_x = np.array([current_state_estimate.x(), 
+                          (current_state_estimate.x()-self.x[0])/self.dt, 
+                           current_state_estimate.y(), 
+                           (current_state_estimate.y()-self.x[2])/self.dt, 
+                           current_state_estimate.z(), 
+                           (current_state_estimate.z()-self.x[4])/self.dt, 
+                           current_state_estimate.rotation().rpy()[2], 
+                           0])
+        self.x = new_x 
 
     def zero_movement_update():
         pass 
