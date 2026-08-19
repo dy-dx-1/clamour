@@ -6,10 +6,10 @@ from scipy.optimize import least_squares
 from .customOdometry import CustomOdometry
 from ...interfaces import Coordinates, Anchors
 
-anchors = Anchors().anchors_dict
+anchors = Anchors()
 
 class CustomEKF(ExtendedKalmanFilter):
-    def __init__(self, position: Coordinates, yaw: float):
+    def __init__(self, anchor_data:list[tuple[int, int]], yaw: float):
         super(CustomEKF, self).__init__(dim_x=8, dim_z=4)
 
         self.dt = 0.1
@@ -40,6 +40,10 @@ class CustomEKF(ExtendedKalmanFilter):
                                          [0, 0, 0, 0, 1, 0, 0, 0],
                                          [0, 0, 0, 0, 0, 0, 1, 0]])
 
+        # anchor_data is a list of (id, range) for available anchors. we use the centroid as rough initial guess
+        # anyways, in estimator.py, a subsequent call to incorporate_ranging_data will fix the position properly
+        # we just need self.x to be a rough guess initially to provide a starting value for the non-linear optimization
+        position = anchors.get_centroid_for(*[data[0] for data in anchor_data])
         self.x = array([position.x, 0, position.y, 0, position.z, 0, yaw, 0])
 
     def get_position(self) -> Coordinates:
@@ -147,7 +151,7 @@ class CustomEKF(ExtendedKalmanFilter):
             anchor_pos = [] 
             anchor_dist = [] 
             for id, dist in anchors_ranging_data: 
-                anchor_pos.append(anchors[id].data) # .data to extract the list version of the Coordinates object 
+                anchor_pos.append(anchors.anchors_dict[id].data) # .data to extract the list version of the Coordinates object 
                 anchor_dist.append(dist) 
             # Residual function (Error = Calculated Distance - Measured Distance)
             def equations(position):

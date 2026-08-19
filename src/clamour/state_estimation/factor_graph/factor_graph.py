@@ -6,7 +6,7 @@ from ...interfaces import Anchors
 
 import numpy as np 
 
-anchors = Anchors().anchors_dict
+anchors = Anchors()
 ### Defining noise models 
 ## Units in mm, like the rest of the graph 
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([50, 50, 50]) # uncertainty in anchor placement
@@ -14,15 +14,18 @@ RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~
 
 """
 Collecting questions to check 
-- Given that anchors do not change their position, do we need to re-add PriorFactorPoint3 every time we add a measurement related to one of them? 
-- Related to the previous question: do we need to add an initial Values corresponding to an anchor every time we see it, or just the first time? 
 - What about neighboring tags? These have a unique ID, but their position will change. Should they be added every time with the same symbol? Will GTSAM be confused if their position changes? 
 - When initialising the graph, are we forced to define a PriorFactorPose in addition to the 3+ anchors?  Can't the graph define it just with anchors? 
-- 
 """
 
 class PoseGraph: 
-    def __init__(self, prior_pos:Coordinates, prior_yaw:float): 
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float): 
+        """
+        Factor Graph based 3D pose estimator. 
+        - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to initialize the prior position 
+        """
+        # Internal data about the current state. Kept up to date and fed back to estimator.py 
+        prior_pos = anchors.get_centroid_for(data[0] for data in anchors_range_data) 
         self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, prior_yaw, 0]) # State vector is coords and speed 
         self.last_measurement_time = 0 # NOTE check how EKF does it in init? init with timestamp to estimate speeds? 
 
@@ -71,7 +74,7 @@ class PoseGraph:
         # Anchor data 
         for id, z in anchors_ranging_data: 
             l = gt.symbol('l', id) 
-            anchor_pos = anchors[id].data # List of the x, y, z coordinates in mm 
+            anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in mm 
             if id not in self.seen_anchors:
                 # If we have never seen this anchor, need to add a prior on it's position 
                 # If we have, then no need to re-add a prior. Just directly reference it during range add

@@ -75,14 +75,10 @@ class StateEstimator:
                     if len(msg.anchors_ranging_data)<3:  # Need a fully constrained measurement for initialization
                         continue 
                     self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses  
-                    # Whatever the estimator, initializing the position with trilateration or it's equivalent is done through
-                    # non-linear optimization, which requires an initial guess to converge. We set this initial value
-                    # to the simple centroid of the available anchors 
-                    initial_pos = self.calculate_3D_mean([data[0].data for data in msg.anchors_ranging_data])
                     raw_yaw = self.correct_yaw(msg.measured_yaw)
                     
                     if self.estimator_type == 'EKF': 
-                        self.estimator = CustomEKF(initial_pos, raw_yaw)
+                        self.estimator = CustomEKF(msg.anchors_ranging_data, raw_yaw)
                         # For the EKF, incorporating ranging data with >3 anchors will directly trigger a trilateration update
                         self.estimator.incorporate_ranging_data(msg.timestamp, msg.anchors_ranging_data, msg.tags_ranging_data, raw_yaw)
                     elif self.estimator_type == 'FG':
@@ -129,25 +125,6 @@ class StateEstimator:
                                       self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) # need to abstract threshold, may not needed for FG? Maybe dont need zero mvt update at all?
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
-
-    @staticmethod
-    def calculate_3D_mean(points:list[tuple])->Coordinates:
-        """
-        Takes a list of at least 3 positions and calculates the mean. 
-        This is used in initialize_estimator as a first estimate of the tag's position. 
-        - points: [(x1,y1,z1), (x2,y2,z2), (x3,y3,z3), ...] 
-        """ 
-        points_array = np.array(points)
-        
-        # Validation checks
-        if points_array.ndim != 2 or points_array.shape[1] != 3:
-            raise ValueError("Each point in the input array must have exactly 3 coordinates (X, Y, Z).")
-        if points_array.shape[0] < 3:
-            raise ValueError("Input must contain at least 3 distinct 3D positions.")
-            
-        # Compute the average along the row axis
-        mean = np.mean(points_array, axis=0) 
-        return Coordinates(int(mean[0]), int(mean[1]), int(mean[2]))
 
     def update_neighbors(self, neighbors: dict):
         self.last_know_neighbors = neighbors
