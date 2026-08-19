@@ -2,28 +2,47 @@ import gtsam as gt
 
 from ...custom_terminal import print 
 from ...interfaces import Coordinates 
+from ...interfaces import Anchors 
 
 import numpy as np 
 
+anchors = Anchors().anchors_dict
 ### Defining noise models 
 ## Units in mm, like the rest of the graph 
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([50, 50, 50]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~ 10cm 
+
+"""
+Collecting questions to check 
+- Given that anchors do not change their position, do we need to re-add PriorFactorPoint3 every time we add a measurement related to one of them? 
+- Related to the previous question: do we need to add an initial Values corresponding to an anchor every time we see it, or just the first time? 
+- What about neighboring tags? These have a unique ID, but their position will change. Should they be added every time with the same symbol? Will GTSAM be confused if their position changes? 
+- When initialising the graph, are we forced to define a PriorFactorPose in addition to the 3+ anchors?  Can't the graph define it just with anchors? 
+- 
+"""
 
 class PoseGraph: 
     def __init__(self, prior_pos:Coordinates, prior_yaw:float): 
         self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, prior_yaw, 0]) # State vector is coords and speed 
         self.last_measurement_time = 0 # NOTE check how EKF does it in init? init with timestamp to estimate speeds? 
 
-        # Graph related stuff 
-        self._state_counter = 0  # Keeps track of how many state nodes have been added to the graph 
+        # Graph trackers 
+        self._state_counter = 0   # Keeps track of how many state nodes have been added to the graph
+        self.seen_anchors = set() # Keeps track of anchors we have previously seen, to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
 
+        # Initialising first pose 
         x = gt.symbol('x', self.state_counter) 
-        graph = gt.NonlinearFactorGraph() # initial graph for prior 
+        graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
-        # TODO fill inside of args. Define if using centroid or if should trilaterate 
-        graph.add(gt.PriorFactorPose3(x, gt.Pose3(), gt.noiseModel.Diagonal.Sigmas([])))
+        # Our initial pose takes in the prior yaw and throwaway values for pitch and roll as not tracking them right now
+        # the prior pose is loosely defined a simply the centroid of the anchors. This is inaccurate and only 
+        # serves to give 'ok' initial conditions for the >3 anchors to fully define the first position 
+        # henceforth, the rotational noise is small compared to a very large, loose, positional noise for the prior 
+        # estimator.py will initialise and subsequently call incorporate_ranging_data with >3 anchors, which will determine the position. 
+        graph.add(gt.PriorFactorPose3(x, 
+                                      gt.Pose3(0, 0, prior_yaw, prior_pos.x, prior_pos.y, prior_pos.z), 
+                                      gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5])))
         initial_values.insert(x, gt.Pose3(prior_pos.x, prior_pos.y, prior_pos.z)) # initial guess on the position 
 
     ### Properties
@@ -46,15 +65,23 @@ class PoseGraph:
         initial_values = gt.Values() 
 
         x = gt.symbol('x', self.state_counter) 
+        # TODO i think for now to mimick EKF behavior could add inside of this function a betweenfactor that uses calculated speed to estimate a prior for this pose 
+        # before adding anchor data 
+        
         # Anchor data 
-        for pos, z in anchors_ranging_data: 
-            # TODO add way of mapping to anchor's ID to be able to associate to proper landmark ID 
-            # need to do same for tags? or not since their position changes? 
-            l = gt.symbol('l', anchor_id) 
-            graph.add()
-            pass 
+        for id, z in anchors_ranging_data: 
+            l = gt.symbol('l', id) 
+            anchor_pos = anchors[id].data # List of the x, y, z coordinates in mm 
+            if id not in self.seen_anchors:
+                # If we have never seen this anchor, need to add a prior on it's position 
+                # If we have, then no need to re-add a prior. Just directly reference it during range add
+                graph.add(gt.PriorFactorPoint3(l, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
+                initial_values.insert(l, gt.Point3(*anchor_pos))
+                self.seen_anchors.add(id) 
+            graph.add(gt.RangeFactor3D(x, l, z, RANGING_NOISE))
+            
         # Tag data 
-        for pos, z in tags_ranging_data: 
+        for pos, z in tags_ranging_data: # TODO eval format compared to anchors, same ID or not? 
             pass 
 
         # Updating graph and internal data 

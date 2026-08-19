@@ -4,7 +4,9 @@ from numpy import array, asarray, ndarray, dot, eye, linalg
 from scipy.optimize import least_squares
 
 from .customOdometry import CustomOdometry
-from ...interfaces import Coordinates
+from ...interfaces import Coordinates, Anchors
+
+anchors = Anchors().anchors_dict
 
 class CustomEKF(ExtendedKalmanFilter):
     def __init__(self, position: Coordinates, yaw: float):
@@ -135,7 +137,7 @@ class CustomEKF(ExtendedKalmanFilter):
                                       lambda _: self.observation_matrix,
                                       self.hx_pedometer, self.R_pedometer)
 
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple[Coordinates, int]], tags_ranging_data:list[tuple], raw_yaw:float):
+    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple[int, int]], tags_ranging_data:list[tuple], raw_yaw:float):
         """
         This function is called for UpdateType.RANGING updates 
         It determines if enough anchor ranges are passed for a trilateration update
@@ -144,8 +146,8 @@ class CustomEKF(ExtendedKalmanFilter):
         if len(anchors_ranging_data)>=3: # Enough anchors for trilateration update, trilaterate position and update EKF 
             anchor_pos = [] 
             anchor_dist = [] 
-            for pos, dist in anchors_ranging_data: 
-                anchor_pos.append(pos.data) # .data to extract the list version of the Coordinates object 
+            for id, dist in anchors_ranging_data: 
+                anchor_pos.append(anchors[id].data) # .data to extract the list version of the Coordinates object 
                 anchor_dist.append(dist) 
             # Residual function (Error = Calculated Distance - Measured Distance)
             def equations(position):
@@ -159,6 +161,7 @@ class CustomEKF(ExtendedKalmanFilter):
             print("ADDING RANGE UPDATES", 'ok', 'loc')
             print(f"{anchors_ranging_data}", 'ok', 'loc')
             print(f"{tags_ranging_data}", 'ok', 'loc')
+            raise ValueError("uninplemented, need to first ensure anchors_ranging_data and tags_ranging data are joined correctly.")
             for target_position, distance in anchors_ranging_data+tags_ranging_data: 
                 formatted_distance = Coordinates(distance, 0, 0)
                 formatted_target_pos = array([[target_position.x, target_position.y, target_position.z]])

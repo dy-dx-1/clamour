@@ -29,7 +29,7 @@ class Messenger:
         self.should_go_back_to_sync = 0
 
     def send_range_update(self, clock: float, offset: float,
-                        anchors_ranging_data: list[tuple[Coordinates, int]]|None, tags_ranging_data: list[tuple[Coordinates, int]]|None, 
+                        anchors_ranging_data: list[tuple[int, int]]|None, tags_ranging_data: list[tuple[Coordinates, int]]|None, 
                         yaw: float, topology: dict) -> None:
         """
         Sends a RANGING UpdateMessage to the state estimator. 

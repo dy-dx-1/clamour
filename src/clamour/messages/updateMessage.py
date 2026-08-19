@@ -20,7 +20,7 @@ class UpdateMessage:
     - timestamp
     - synchronized_clock
     - offset
-    - anchors_ranging_data: list of ranging to anchors in format (TargetCoordinates, range_in_mm) 
+    - anchors_ranging_data: list of ranging to anchors in format (id, range_in_mm) 
     - tags_ranging_data: list of ranging to tags in format (TargetCoordinates, range_in_mm) 
     - measured_yaw
     - slots 
@@ -28,7 +28,7 @@ class UpdateMessage:
     """
     def __init__(self, update_type: UpdateType, timestamp: float,
                  synchronized_clock: float=0.0, offset: float=0.0,
-                 anchors_ranging_data: list[tuple[Coordinates, int]]|None = None, tags_ranging_data: list[tuple[Coordinates, int]]|None = None,
+                 anchors_ranging_data: list[tuple[int, int]]|None = None, tags_ranging_data: list[tuple[Coordinates, int]]|None = None,
                  measured_yaw: float=0.0,
                  slots: list=None, topology: dict=None):
         self.update_type = update_type

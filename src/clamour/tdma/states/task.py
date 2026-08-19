@@ -36,7 +36,7 @@ class Task(TDMAState):
                  shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
                  slot_assignment: SlotAssignment):
         self.timing = timing
-        self.anchors = anchors
+        self.anchors = anchors # TODO Remove, unused 
         self.tag = shared_tag
         self.tag_lock = shared_tag_lock
         self.neighborhood = neighborhood
@@ -100,10 +100,10 @@ class Task(TDMAState):
             z = self.tag.ranging(target_id) 
             if z: # Successful measurement, fetch position and add 
                 if self.tag.is_anchor(target_id): 
-                    anchor_zs.append( (self.anchors.anchors_dict[target_id], z) )   # (Coordinates, range_measure_in_mm) 
+                    anchor_zs.append( (target_id, z) )   # (id, range_measure_in_mm) 
                 else: 
                     # TODO NOTE: In future, will need to modify message or other to incorporate covariance info at this level I think 
-                    tag_zs.append( (None, z) ) # TODO REPLACE NONE PLACEHOLDER WITH NEIGHBOR POSITION as Coordinates
+                    tag_zs.append( (None, z) ) # TODO REPLACE NONE PLACEHOLDER WITH NEIGHBOR POSITION as Coordinates and or id 
             sleep(0.0001) # TODO test / tune this check if needed now that inside control structure 
         # Packing in an update message and sending to estimator 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
