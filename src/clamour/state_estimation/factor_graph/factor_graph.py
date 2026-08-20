@@ -1,10 +1,9 @@
 import gtsam as gt 
+import numpy as np 
 
 from ...custom_terminal import print 
 from ...interfaces import Coordinates 
 from ...interfaces import Anchors 
-
-import numpy as np 
 
 anchors = Anchors()
 ### Defining noise models 
@@ -19,9 +18,9 @@ class PoseGraph:
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to initialize the prior position 
         """
-        # Internal data about the current state. Kept up to date and fed back to estimator.py 
-        prior_pos = anchors.get_centroid_for(data[0] for data in anchors_range_data) 
-        self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, prior_yaw, 0]) # State vector is coords and speed 
+        # Internal data about the current state. Kept up to date and fed back to estimator.py  
+        # State vector is [x,xdot,y,ydot,z,zdot,theta,thetadot]. Only here for clarity, as the prior will overwrite these 0s. 
+        self.x = np.array([0, 0, 0, 0, 0, 0, 0, 0]) 
         self.last_measurement_time = timestamp 
         self.dt = None 
         
@@ -30,22 +29,8 @@ class PoseGraph:
         self.seen_anchors = set() # Keeps track of anchors we have previously seen, to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
 
-        # Initialising first pose 
-        x0 = gt.symbol('x', self.state_counter) 
-        graph = gt.NonlinearFactorGraph() 
-        initial_values = gt.Values() 
-        # TODO the prior pose here is only really needed to lock in the rotation part of the state. The subsequent trilat update will lock position. Either keep as is with very loose position noise to allow anchors to converge or find a cleaner solution that locks yaw without this prior? 
-        # Our initial pose takes in the prior yaw and throwaway values for pitch and roll as not tracking them right now
-        # the prior pose is loosely defined a simply the centroid of the anchors. This is inaccurate and only 
-        # serves to give 'ok' initial conditions for the >3 anchors to fully define the first position 
-        # henceforth, the rotational noise is small compared to a very large, loose, positional noise for the prior 
-        # estimator.py will initialise and subsequently call incorporate_ranging_data with >3 anchors, which will determine the position. 
-        graph.add(gt.PriorFactorPose3(x0, 
-                                      gt.Pose3(gt.Rot3.Ypr(prior_yaw, 0, 0), gt.Point3(prior_pos.x, prior_pos.y, prior_pos.z)), 
-                                      gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5])))
-        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(prior_yaw, 0, 0), gt.Point3(prior_pos.x, prior_pos.y, prior_pos.z))) # initial guess on the position 
-        self.isam.update(graph, initial_values)
-        # No need to update self.x because currently it's the only thing in the graph, no new info. 
+        # Creating prior factor to lock in rotation  
+        self.insert_prior_rotation_lock() 
 
     ### Properties
     @property
@@ -54,6 +39,29 @@ class PoseGraph:
         return self._state_counter 
 
     ### INTERNAL COMPUTATION METHODS 
+    def insert_prior_rotation_lock(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]]): 
+        """
+        Only to be used in __init__! Updates the graph and internal state with a simple prior to constrain rotation. 
+        As of 2026-08-20, this function is only here while we don't have an IMU. 
+        No way to measure rotation, so we don't track/update it. However, to avoid an 
+        underterminate system in the graph, we need to initialize it to a known value.
+        Therefore, we insert a prior with very loose covariance on a rough position, but tight on the rotation. 
+        The position component is simply the centroid of the anchors. This is inaccurate and only serves to put a rough guess that will be corrected by the anchors. 
+        estimator.py will then call a incorporate_ranging_data with >=3 anchors, which will correct and lock the position appropriately. 
+        """
+        prior_pos = anchors.get_centroid_for(data[0] for data in anchors_range_data)
+        # NOTE check if way to avoid locking in position even loosely before anchors? 
+        x0 = gt.symbol('x', self.state_counter) 
+        graph = gt.NonlinearFactorGraph() 
+        initial_values = gt.Values() 
+        graph.add(gt.PriorFactorPose3(x0, 
+                                      gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(prior_pos.x, prior_pos.y, prior_pos.z)), 
+                                      gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5])))
+        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(prior_pos.x, prior_pos.y, prior_pos.z)))
+        self.isam.update(graph, initial_values)
+        # Also updating internal state tracker 
+        self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, yaw_prior, 0])
+
     def validate_update(self, timestamp:float)->bool: 
         """
         To be called before an update. Adjusts the internal timestamp and speed for the constant velocity model. 
