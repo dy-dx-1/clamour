@@ -119,7 +119,7 @@ class CustomEKF(ExtendedKalmanFilter):
             self.dt = timestamp - self.last_measurement_time
             self.last_measurement_time = timestamp
             self.set_qf()
-        else:
+        else: # TODO 2026-08-20 I believe this has a mistake: should have a way to block update if bad timestamp, currently just printing, try with block? 
             print("CustomEKF.pre_update(): Received message with bad timestamp", 'error', 'loc')
         self.predict()
 
