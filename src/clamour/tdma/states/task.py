@@ -7,8 +7,6 @@ from ...interfaces import Tag, Coordinates, Anchors
 from ..neighborhood import Neighborhood
 from ..slot_assignment import SlotAssignment
 from ..timing import Timing
-from ...messages.updateMessage import UpdateMessage
-from ...messages.types import UpdateType
 
 if TYPE_CHECKING:
     from ...messenger import Messenger
@@ -102,8 +100,8 @@ class Task(TDMAState):
                 if self.tag.is_anchor(target_id): 
                     anchor_zs.append( (target_id, z) )   # (id, range_measure_in_mm) 
                 else: 
-                    # TODO NOTE: In future, will need to modify message or other to incorporate covariance info at this level I think 
-                    tag_zs.append( (None, z) ) # TODO REPLACE NONE PLACEHOLDER WITH NEIGHBOR POSITION as Coordinates and or id 
+                    # TODO add Coordinates for neighbor position and other for covar 
+                    tag_zs.append( (target_id, neighbor_pos, neighbor_covar, z) ) 
             sleep(0.0001) # TODO test / tune this check if needed now that inside control structure 
         # Packing in an update message and sending to estimator 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
