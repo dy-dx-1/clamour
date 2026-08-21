@@ -125,7 +125,7 @@ class Tag(ABC):
     @abstractmethod
     def coordinates(self) -> Coordinates: 
         """
-        The last-known position of the tag. 
+        The last-known position and covariance of the tag. 
         """
 
     @coordinates.setter 
@@ -143,14 +143,15 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def ranging(self, target_id:int) -> int | None: 
+    def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
         """
-        Calculates a UWB range measurement between the tag and another device. 
-        Measurement must be in mm. 
+        Calculates a UWB range measurement in mm between the tag and another device. 
+        If the target is another tag, also returns that tag's Coordinates, which holds position and covariance. 
         
         ARGS:
             - target_id: ID of the target device (int) 
         
         RETURNS:
             - distance in mm or None
+            - Coordinates of the other tag if it is one 
         """

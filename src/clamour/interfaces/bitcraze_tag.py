@@ -52,7 +52,7 @@ class BitcrazeTag(Tag):
 
         self._active_tags = dict()      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 
-        self._pos = Coordinates()       # Tag position 
+        self._pos = Coordinates()       # Tag position and associated covariance
         self._orientation = Angles() 
 
         self.EXPECTED_RANGING_HEADER = RANGING_BC_HEADER + list(self.tag_id.to_bytes(6, 'little')) + [0xCF, 0xBC] # the header message that we expect for ranging requests sent to this tag. Generated here to avoid regenerating it every time.
@@ -204,7 +204,7 @@ class BitcrazeTag(Tag):
     def respond_to_ranging_exchange(self, requester_id:int, msg:list, R1:int): 
         """
         To be called if we received a ranging (POLL) request from a fellow tag. 
-        Tries to perform the ranging request. 
+        Tries to perform the ranging request and embeds the tag's position and covariance in the response.  
         """
         # Get TWR seq of this transaction 
         twr_seq = msg[22] 
@@ -215,6 +215,9 @@ class BitcrazeTag(Tag):
         if R3: 
             # Report consists of header + 5 bytes each for R1, T2, R3 (40bit clock timings) 
             report = self.gen_twr_msg_header(requester_id, 'REPORT', twr_seq) + list(R1.to_bytes(5, 'little') + T2.to_bytes(5, 'little') + R3.to_bytes(5, 'little'))
+            # TODO here we add the tags own covariance and position to the message
+            position = self.coordinates.data # [x,y,z] 
+            covariance = self.coordinates.covar # 3x3 np array 
             self._dw.transmit(report, ranging=True)
 
     def listen_for_TWR_msg(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|tuple[None,None]: 
@@ -262,12 +265,20 @@ class BitcrazeTag(Tag):
     @property
     def orientation(self):
         return self._orientation
-    
-    def compute_range(self, target_id:int)->int|None: 
+
+    def extract_report_neighbor_info(report_msg)->Coordinates: 
         """
-        Computes the distance in mm between the tag and another device. 
-        Returns None if the transaction is unsuccessful.  
-        TODO: a more thorough testing of timeouts to actually figure out what is a good reliable value  
+        Takes in a TWR report from a neighboring tag and extracts the embedded neighbor position and covariance info from it. 
+        """
+
+    def compute_range(self, target_id:int)->tuple[int|None, Coordinates|None]: 
+        """
+        Computes the distance in mm between the tag and another device. If the other device is a tag, also returns the tag's Coordinates object (which also holds covar)
+        
+        TODO: a more thorough testing of timeouts to actually figure out what is a good reliable value 
+        RETURNS: 
+        - Measured distance in mm if successful, None if not 
+        - Coordinates position of the target, if it's a tag    
         """
         if self.is_anchor(target_id): 
             ANTENNA_TICK_DELAY = ANTENNA_TICK_DELAY_ANCHORS
@@ -279,7 +290,7 @@ class BitcrazeTag(Tag):
             TICK_DELTA_MASK = (1 << 40) - 1
             return (t2-t1) & TICK_DELTA_MASK
 
-        distance = None 
+        distance, target_coords = None, None
         twr_seq = self.TWR_seq # for this entire ranging transaction
          
         ## Ranging exchanges with both the tag and anchors are based on Bitcraze's TWR transactions
@@ -303,9 +314,13 @@ class BitcrazeTag(Tag):
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
             distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
-        return distance
+        # We got the distance, if it's a tag, also extract it's position and covariance from the response 
+        if not self.is_anchor(target_id): 
+            target_coords = self.extract_report_neighbor_info(report) 
+        return distance, target_coords
 
-    def ranging(self, target_id:int) -> int | None: 
+    def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
+        # TODO add to docstring, returns range, target position Coordinates if it's a tag only
         # NOTE leaving as separate function in case want to avg measurements here 
-        distance = self.compute_range(target_id) 
-        return distance if distance else None # range in mm 
+        distance, target_pos = self.compute_range(target_id) 
+        return distance, target_pos

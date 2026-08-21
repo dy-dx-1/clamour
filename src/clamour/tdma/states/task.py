@@ -95,13 +95,12 @@ class Task(TDMAState):
         anchor_zs = []
         tag_zs = []  
         for target_id in self.select_ranging_targets():
-            z = self.tag.ranging(target_id) 
+            z, target_pos = self.tag.ranging(target_id)  # target_pos also holds covar and will only be returned and used if target_id is another tag
             if z: # Successful measurement, fetch position and add 
                 if self.tag.is_anchor(target_id): 
                     anchor_zs.append( (target_id, z) )   # (id, range_measure_in_mm) 
                 else: 
-                    # TODO add Coordinates for neighbor position and other for covar 
-                    tag_zs.append( (target_id, neighbor_pos, neighbor_covar, z) ) 
+                    tag_zs.append( (target_id, target_pos, z) ) # TODO propagate extraction of covar and pos from Coordinates to estimators
             sleep(0.0001) # TODO test / tune this check if needed now that inside control structure 
         # Packing in an update message and sending to estimator 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 

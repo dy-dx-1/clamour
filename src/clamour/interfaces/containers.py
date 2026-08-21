@@ -5,7 +5,7 @@ import numpy as np
 
 class Coordinates: 
     """
-    Container for x, y, z coordinates (in mm). 
+    Container for x, y, z coordinates (in mm) and associated covariance, if available. 
     """ 
     def __init__(self, x:int=0, y:int=0, z:int=0): 
         self._data = [int(x),int(y),int(z)] 
