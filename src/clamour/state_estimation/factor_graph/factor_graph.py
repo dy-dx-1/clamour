@@ -100,7 +100,7 @@ class PoseGraph:
     def get_yaw(self):
         return self.x[6]
 
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple], raw_yaw:float):
+    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Coordinates, int]], raw_yaw:float):
         """
         Called whenever we get new ranges from anchors or tags to add to the factor graph. 
         NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model. 
@@ -141,7 +141,8 @@ class PoseGraph:
             graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
             
         # Tag data 
-        for n_id, n_pos, n_cov, z in tags_ranging_data:  # iterating over neighbor id's, positions, cov, and range data to them
+        for n_id, n_coords, z in tags_ranging_data:  # iterating over neighbor id's, Coordinates, and range data to them
+            n_pos, n_cov = n_coords.data, n_coords.covar
             neighbor = gt.symbol('n', int(f'{n_id}000{current_state_id}'))
             graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
             initial_values.insert(neighbor, gt.Point3(*n_pos))

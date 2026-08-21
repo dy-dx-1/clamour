@@ -22,4 +22,4 @@ class Anchors:
         """
         points = np.array( [self.anchors_dict[id].data for id in anchor_ids] ) 
         mean = np.mean(points, axis=0)
-        return Coordinates(int(mean[0]), int(mean[1]), int(mean[2]))
+        return Coordinates(mean[0], mean[1], mean[2])
