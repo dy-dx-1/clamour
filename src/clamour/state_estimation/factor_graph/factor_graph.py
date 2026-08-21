@@ -134,11 +134,11 @@ class PoseGraph:
                 self.seen_anchors.add(id) 
             graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
             
-        # Adding tag-related ranges
-        for pos, z in tags_ranging_data: 
-            neighbor = gt.symbol('n', int(f'{n_id}{current_state_id}'))
-            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*received_neighbor_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
-            initial_values.insert(neighbor, gt.Point3(*received_neighbor_pos))
+        # Tag data 
+        for n_id, n_pos, n_cov, z in tags_ranging_data:  # iterating over neighbor id's, positions, cov, and range data to them
+            neighbor = gt.symbol('n', int(f'{n_id}000{current_state_id}'))
+            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
+            initial_values.insert(neighbor, gt.Point3(*n_pos))
             graph.add(gt.RangeFactor3D(x, neighbor, z, RANGING_NOISE))
             
         # Updating graph and internal data 
