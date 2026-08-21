@@ -146,7 +146,7 @@ class StateEstimator:
         The initial yaw that is measured is '0', subsequent ones need to be corrected to stay consistent. 
         """
         new_yaw = measured_yaw - self.yaw_offset
-        return new_yaw if new_yaw > 0 else 360 + new_yaw # TODO >=0 instead? 
+        return new_yaw if new_yaw >= 0 else 360 + new_yaw 
 
     def validate_new_state(self, new_coordinates: Coordinates) -> bool:
         """

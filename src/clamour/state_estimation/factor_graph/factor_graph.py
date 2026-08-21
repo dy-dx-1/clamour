@@ -30,7 +30,7 @@ class PoseGraph:
         self.isam = gt.ISAM2() 
 
         # Creating prior factor to lock in rotation  
-        self.insert_prior_rotation_lock() 
+        self.insert_prior_rotation_lock(anchors_range_data, prior_yaw) 
 
     ### Properties
     @property
@@ -110,20 +110,19 @@ class PoseGraph:
         
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
-        current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)                             
 
+        current_state_id = self.state_counter
+        x = gt.symbol('x', current_state_id)        # new state to add                             
+        x_prev = gt.symbol('x', current_state_id-1) # fetching past state (corresponding to the current value of self.x)
+                
+        previous_pose = gt.Pose3(gt.Rot3.Ypr(self.get_yaw(), 0, 0), gt.Point3(*self.get_position().data)) # NOTE when doing a more complex model, should fetch the pose with results.atPose3()
         # Connecting to previous state through a motion model 
-        # NOTE: currently using simple constant velocity and not taking yaw into account 
-        previous_pose = gt.Pose3(gt.Rot3.Ypr(self.get_yaw(), 0, 0), gt.Point3(self.x[0], self.x[2], self.x[4])) # NOTE when doing a more complex model, should fetch the pose with results.atPose3()
-        x_prev = gt.symbol('x', current_state_id-1) # fetching past state
-        delta_local_frame = self.constant_velocity_model(previous_pose) # relative movement that got us here 
-        mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame ) 
+        delta_local_frame = self.constant_velocity_model(previous_pose) # Supposing constant velocity, what would be the local vector to the new state?
+        mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame ) # NOTE simple constant velocity model keeps yaw constant
         graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
-        
         initial_values.insert(x, previous_pose.compose(mvt))
 
-        # Anchor data 
+        # Adding anchor-related ranges
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
             anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in mm 
@@ -135,14 +134,13 @@ class PoseGraph:
                 self.seen_anchors.add(id) 
             graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
             
-        # Tag data 
+        # Adding tag-related ranges
         for pos, z in tags_ranging_data: 
             neighbor = gt.symbol('n', int(f'{n_id}{current_state_id}'))
             graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*received_neighbor_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
             initial_values.insert(neighbor, gt.Point3(*received_neighbor_pos))
             graph.add(gt.RangeFactor3D(x, neighbor, z, RANGING_NOISE))
             
-
         # Updating graph and internal data 
         self.isam.update(graph, initial_values) 
         results = self.isam.calculateEstimate() 
