@@ -188,13 +188,14 @@ class CustomEKF(ExtendedKalmanFilter):
                                       args=neighbor_position,
                                       hx_args=(neighbor_position, yaw))
 
-    def zero_movement_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
+    def zero_movement_update(self, timestamp: float) -> None:
         """This function updates the filter with its previous state.
         This allows to keep the dt relatively small and avoid drift.
         Indeed, if dt is too big, the process noise increase even if there was no change to the state."""
 
         self.pre_update(timestamp)
-
+        position = self.get_position() 
+        yaw = self.get_yaw() 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_zero_movement, self.R_zero_movement)

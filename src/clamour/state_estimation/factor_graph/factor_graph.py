@@ -11,6 +11,7 @@ anchors = Anchors()
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([50, 50, 50]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~ 10cm 
 ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 500, 500, 500]) # currently using constant velocity so very loose 
+ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 
 class PoseGraph: 
     def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float): 
@@ -112,9 +113,14 @@ class PoseGraph:
         initial_values = gt.Values() 
 
         current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)        # new state to add                             
+        x = gt.symbol('x', current_state_id)        # new state to add    
+
+        ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
+        # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
+        # which would directly be ~equivalent to blindly trilaterating and discarding each step. 
+        # Having even a loose motion model allows us to link states and smooth the global trajectory, for example, correcting sudden bad trilaterations due to NLOS. 
+        # Any information is useful information to include, as long as it's even slightly relevant, as it will affect the joint posterior. 
         x_prev = gt.symbol('x', current_state_id-1) # fetching past state (corresponding to the current value of self.x)
-                
         previous_pose = gt.Pose3(gt.Rot3.Ypr(self.get_yaw(), 0, 0), gt.Point3(*self.get_position().data)) # NOTE when doing a more complex model, should fetch the pose with results.atPose3()
         # Connecting to previous state through a motion model 
         delta_local_frame = self.constant_velocity_model(previous_pose) # Supposing constant velocity, what would be the local vector to the new state?
@@ -157,8 +163,44 @@ class PoseGraph:
                            0])
         self.x = new_x 
 
-    def zero_movement_update():
-        pass 
+    def zero_movement_update(self, timestamp: float) -> None:
+        """Temporarily constrain the next pose to the current one after an input gap.
+
+        This mirrors the EKF's synthetic zero-movement update to limit drift from
+        the constant-velocity model. It is valid only when an idle input queue
+        really means the tag is stationary; it will be replaced by IMU-based
+        propagation and stationary detection.
+        """
+        if not self.validate_update(timestamp):
+            return
+
+        graph = gt.NonlinearFactorGraph()
+        initial_values = gt.Values()
+
+        current_state_id = self.state_counter
+        x = gt.symbol('x', current_state_id)
+        x_prev = gt.symbol('x', current_state_id - 1)
+        previous_pose = gt.Pose3(
+            gt.Rot3.Ypr(self.get_yaw(), 0, 0),
+            gt.Point3(*self.get_position().data),
+        )
+        zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
+
+        graph.add(gt.BetweenFactorPose3(x_prev, x, zero_motion, ZERO_MOVEMENT_NOISE))
+        initial_values.insert(x, previous_pose)
+
+        self.isam.update(graph, initial_values)
+        current_state_estimate = self.isam.calculateEstimate().atPose3(x)
+        self.x = np.array([
+            current_state_estimate.x(),
+            (current_state_estimate.x() - self.x[0]) / self.dt,
+            current_state_estimate.y(),
+            (current_state_estimate.y() - self.x[2]) / self.dt,
+            current_state_estimate.z(),
+            (current_state_estimate.z() - self.x[4]) / self.dt,
+            current_state_estimate.rotation().rpy()[2],
+            0])
+        
     def pedometer_update():
         pass 
     def custom_odometry_update():

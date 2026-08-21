@@ -119,10 +119,14 @@ class StateEstimator:
 
         elif (time() - self.estimator.last_measurement_time) > ZERO_MVT_THRESHOLD: 
             # If too much time goes by without any updates, do a zero mvt one to prevent drift 
-            # NOTE TODO: I believe this can be removed in future with addition of IMU 
-            self.estimator.zero_movement_update(self.estimator.get_position(), 
-                                      self.estimator.get_yaw(), 
-                                      self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) # need to abstract threshold, may not needed for FG? Maybe dont need zero mvt update at all?
+            # NOTE TODO: this should be REMOVED in the future with arrival of IMU, as it 
+            # ONLY serves as a patch to compensate for the constant velocity model. 
+            # When no updates arrive, the previous estimated velocity could cause the estimator to think 
+            # the tag kept moving for a while, so this serves to simply re-inject the current position 
+            # and enforce the fact that it hasn't moved. HOWEVER, it relies on assuming no messages == no movement
+            # which is not necessarily true, what if the tag kept moving, but simply didn't see anyone? 
+            # Adding the IMU will render this obsolete. 
+            self.estimator.zero_movement_update(self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) 
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
 
