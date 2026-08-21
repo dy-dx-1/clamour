@@ -27,13 +27,31 @@ class Coordinates:
         3x3 covariance matrix on the position, if available 
         """
         return self._covar
-    
+
     @covar.setter
-    def covar(self, updated_covar:np.ndarray): 
+    def covar(self, new_matrix:np.ndarray): 
         """
-        3x3 covariance matrix on the position 
+        3x3 covariance matrix on the position, if available 
+        [xx, xy, xz]
+        [xy, yy, yz] 
+        [xz, yz, zz]
         """
-        self._covar = updated_covar
+        self._covar = new_matrix
+    
+    def update_covar(self, covariances:tuple[int,int,int,int,int,int]): 
+        """
+        Update the 3x3 covar matrix by passing the covariance of each distinct element in a tuple containing:
+        - xx
+        - yy
+        - zz
+        - xy
+        - xz
+        - yz
+        """
+        xx, yy, zz, xy, xz, yz = covariances
+        self._covar = np.array([[xx, xy, xz], 
+                                [xy, yy, yz], 
+                                [xz, yz, zz]])
 
     def load(self, data:list):
         """ Updates the XYZ object with new data in format [x,y,z], all ints"""

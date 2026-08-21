@@ -9,8 +9,6 @@ from typing import Literal
 import time  
 import struct
 
-import numpy as np 
-
 ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known anchors 
 
 SPEED_OF_LIGHT = 299_792_458
@@ -199,6 +197,7 @@ class BitcrazeTag(Tag):
             sender_id = msg[7] | (msg[8]<<8)
             data = msg[9:] 
             return sender_id, bytes(data) 
+        
         return None, b'' 
     
     def respond_to_ranging_exchange(self, requester_id:int, msg:list, R1:int): 
@@ -216,8 +215,19 @@ class BitcrazeTag(Tag):
             # Report consists of header + 5 bytes each for R1, T2, R3 (40bit clock timings) 
             report = self.gen_twr_msg_header(requester_id, 'REPORT', twr_seq) + list(R1.to_bytes(5, 'little') + T2.to_bytes(5, 'little') + R3.to_bytes(5, 'little'))
             # TODO here we add the tags own covariance and position to the message
-            position = self.coordinates.data # [x,y,z] 
-            covariance = self.coordinates.covar # 3x3 np array 
+            # each element is represented by a SIGNED 4 byte int. The first 12 bytes of the message are the position and the last 24 the covariance
+            position = self.coordinates.data
+            # position is [x,y,z], we pack each int in the same order with 4 bytes each 
+            report += list(position[0].to_bytes(4, 'little', signed=True)) + list(position[1].to_bytes(4, 'little', signed=True)) + list(position[2].to_bytes(4, 'little', signed=True))
+            # covariance is a 3x3 np array (only need 24bytes to represent because symmetric matrix) 
+            # we pack it in the order [xx, yy, zz, xy, xz, yz]
+            covar = self.coordinates.covar # 3x3 np array (only need 24bytes to represent because symmetric matrix) 
+            report += list(covar[0][0].to_bytes(4, 'little', signed=True)) +\
+                      list(covar[1][1].to_bytes(4, 'little', signed=True)) +\
+                      list(covar[2][2].to_bytes(4, 'little', signed=True)) +\
+                      list(covar[0][1].to_bytes(4, 'little', signed=True)) +\
+                      list(covar[0][2].to_bytes(4, 'little', signed=True)) +\
+                      list(covar[2][1].to_bytes(4, 'little', signed=True)) +\
             self._dw.transmit(report, ranging=True)
 
     def listen_for_TWR_msg(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|tuple[None,None]: 
@@ -266,10 +276,17 @@ class BitcrazeTag(Tag):
     def orientation(self):
         return self._orientation
 
-    def extract_report_neighbor_info(report_msg)->Coordinates: 
+    @staticmethod
+    def extract_report_neighbor_info(report_msg:list)->Coordinates: 
         """
         Takes in a TWR report from a neighboring tag and extracts the embedded neighbor position and covariance info from it. 
         """
+        # This function is only called when receiving a report from a tag, so we know everything at index >=38 is the position/covariance info
+        # Following the convention stated in the respond_to_ranging_exchange method, we can extract: 
+        x, y, z, xx, yy, zz, xy, xz, yz = struct.unpack('<9i', bytes(report_msg[38:74])) # 9 signed ints 
+        neighbor_coords = Coordinates(x, y, z) 
+        neighbor_coords.update_covar((xx, yy, zz, xy, xz, yz))
+        return neighbor_coords
 
     def compute_range(self, target_id:int)->tuple[int|None, Coordinates|None]: 
         """
@@ -306,7 +323,7 @@ class BitcrazeTag(Tag):
         if report and R2: # Ensures transaction happened 
             # NOTE: I also check R2 as it might have returned None even if the message was sent, but never received by us. Since we send T3 anyways, the transaction might complete even if we didn't get R2. 
             # Calculating TOF 
-            timing_info = report[23:38] # If talking with an anchor, the rest is pressure related info, don't care
+            timing_info = report[23:38] # The rest is either ranging info with tags or, if talking with an anchor, pressure and stuff, don't care 
             R1, T2, R3 = struct.unpack('<5s5s5s', bytes(timing_info))
             T_r1  = compute_clock_delta(R2, T1)
             T_r2  = compute_clock_delta(int.from_bytes(R3, byteorder='little'), int.from_bytes(T2, byteorder='little'))
@@ -314,9 +331,9 @@ class BitcrazeTag(Tag):
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
             distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
-        # We got the distance, if it's a tag, also extract it's position and covariance from the response 
-        if not self.is_anchor(target_id): 
-            target_coords = self.extract_report_neighbor_info(report) 
+            # We got the distance, if it's a tag, also extract it's position and covariance from the response 
+            if not self.is_anchor(target_id) and len(report)==74: # Checking report size as we shouldn't be receiving anything else. 2026-08-21
+                target_coords = self.extract_report_neighbor_info(report) 
         return distance, target_coords
 
     def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
