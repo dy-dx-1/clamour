@@ -18,10 +18,12 @@ class PoseGraph:
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to initialize the prior position 
+        NOTE finish docstring 
         """
         # Internal data about the current state. Kept up to date and fed back to estimator.py  
         # State vector is [x,xdot,y,ydot,z,zdot,theta,thetadot]. Only here for clarity, as the prior will overwrite these 0s. 
         self.x = np.array([0, 0, 0, 0, 0, 0, 0, 0]) 
+        self.covars = (0, 0, 0, 0, 0, 0) # Covar on position xx, yy, zz, xy, xz, yz 
         self.last_measurement_time = timestamp 
         self.dt = None 
         
@@ -95,9 +97,20 @@ class PoseGraph:
         return delta_body
 
     ### EXTERNAL METHODS USED BY estimator.py 
-    def get_position(self):  
+    def get_position(self)->Coordinates:  
+        """
+        Current posterior position in Coordinates format. 
+        """
         return Coordinates(self.x[0], self.x[2], self.x[4])
-    def get_yaw(self):
+    def get_covars(self)->tuple: 
+        """
+        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Coordinates.update_covar method
+        """
+        return self.covars 
+    def get_yaw(self)->float:
+        """
+        Current posterior yaw
+        """
         return self.x[6]
 
     def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Coordinates, int]], raw_yaw:float):
@@ -168,6 +181,16 @@ class PoseGraph:
                            current_state_estimate.rotation().rpy()[2], 
                            0])
         self.x = new_x 
+        # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it 
+        covariance = self.isam.marginalCovariance(x)
+        self.covars = (
+            covariance[0, 0],
+            covariance[1, 1],
+            covariance[2, 2],
+            covariance[0, 1],
+            covariance[0, 2],
+            covariance[1, 2],
+        )
 
     def zero_movement_update(self, timestamp: float) -> None:
         """Temporarily constrain the next pose to the current one after an input gap.

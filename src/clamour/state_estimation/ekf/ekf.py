@@ -52,6 +52,19 @@ class CustomEKF(ExtendedKalmanFilter):
     def get_yaw(self) -> float:
         return self.x[6]
 
+    def get_covars(self) -> tuple: 
+        """
+        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Coordinates.update_covar method
+        """
+        return (
+            self.P[0, 0],
+            self.P[2, 2],
+            self.P[4, 4],
+            self.P[0, 2],
+            self.P[0, 4],
+            self.P[2, 4],
+        )
+
     def set_qf(self):
         # As we integrate to find position, we lose precision. Thus we trust x less than dx/dt, hence the dt*2 vs dt.
         self.Q = array([[self.dt * 2, 0, 0, 0, 0, 0, 0, 0],

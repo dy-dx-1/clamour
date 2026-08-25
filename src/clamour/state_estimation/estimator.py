@@ -179,7 +179,7 @@ class StateEstimator:
         """
         with self.tag_lock:
             self.tag.coordinates = self.estimator.get_position() 
-            self.tag.coordinates.update_covar(self.estimator.get_covars())
+            self.tag.coordinates.update_covar(self.estimator.get_covars()) # update_covar casts to int automatically 
 
         post_pos, post_yaw = self.estimator.get_position(), self.estimator.get_yaw() 
         self.pose_callback(PoseMessage(post_pos.x, post_pos.y, post_pos.z, post_yaw))
