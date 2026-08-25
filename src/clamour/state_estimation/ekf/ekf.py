@@ -165,13 +165,21 @@ class CustomEKF(ExtendedKalmanFilter):
             print("ADDING RANGE UPDATES", 'ok', 'loc')
             print(f"{anchors_ranging_data}", 'ok', 'loc')
             print(f"{tags_ranging_data}", 'ok', 'loc')
-            raise ValueError("uninplemented, need to first ensure anchors_ranging_data and tags_ranging data are joined correctly.")
-            for target_position, distance in anchors_ranging_data+tags_ranging_data: 
-                formatted_distance = Coordinates(distance, 0, 0)
-                formatted_target_pos = array([[target_position.x, target_position.y, target_position.z]])
+            for id, z in anchors_ranging_data: 
+                formatted_dist = Coordinates(z, 0,0) 
+                formatted_target_pos = array([[anchors.anchors_dict[id].x, anchors.anchors_dict[id].y, anchors.anchors_dict[id].z]]) 
                 # NOTE 2026-08-17, in the past, neighbor positions were casted with atleast_2d. 
                 # If conversion problems arise, try to add it to formatted_target_pos / see jacobian methods 
-                self.ranging_update(formatted_distance, raw_yaw, timestamp, formatted_target_pos)
+                self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)
+            
+            # Tag data 
+            for n_id, n_pos, z in tags_ranging_data:  
+                # Originally the code didn't support adding ranges from neighbors with changing covariance (seemingly at least) 
+                # since EKF is being phased out, I am not implementing it now, this is just to check everything works 
+                # and keep 'some' functionality 2026-08-25
+                formatted_dist = Coordinates(z, 0,0) 
+                formatted_target_pos = array([[n_pos.x, n_pos.y, n_pos.z]])
+                self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)
 
     def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)

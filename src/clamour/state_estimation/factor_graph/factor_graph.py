@@ -141,11 +141,16 @@ class PoseGraph:
             graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
             
         # Tag data 
-        for n_id, n_coords, z in tags_ranging_data:  # iterating over neighbor id's, Coordinates, and range data to them
-            n_pos, n_cov = n_coords.data, n_coords.covar
-            neighbor = gt.symbol('n', int(f'{n_id}000{current_state_id}'))
-            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(neighbor_covar)))
+        for n_id, n_coords, z in tags_ranging_data:  
+            # Iterating over neighbor id's, Coordinates, and range between us
+            # tags_ranging_data only contains tags that have known positions/covar (filtered at TASK level)
+            # NOTE: in future, could be nice to add here or in TASK a filter for stale data based on timestamps 
+            n_pos, n_cov = n_coords.data, n_coords.covar  
+            # Adding the other tag's position to the graph with a special ID that tracks his position and the time
+            neighbor = gt.symbol('t', int(f'{n_id}000{current_state_id}')) 
+            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov)))
             initial_values.insert(neighbor, gt.Point3(*n_pos))
+            # Adding range data 
             graph.add(gt.RangeFactor3D(x, neighbor, z, RANGING_NOISE))
             
         # Updating graph and internal data 

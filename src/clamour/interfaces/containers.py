@@ -5,14 +5,18 @@ import numpy as np
 
 class Coordinates: 
     """
-    Container for x, y, z coordinates (in mm) and associated covariance, if available. 
+    Container for x, y, z coordinates (in mm) and associated covariance (mm^2), if available.
+
+    ALL ELEMENTS MUST BE INTEGERS. 
+
+    Covariance is initialized by default as None. Must be updated with update_covar() method if present.  
     """ 
     def __init__(self, x:int=0, y:int=0, z:int=0): 
         self._data = [int(x),int(y),int(z)] 
         self._covar = None 
     
     def __str__(self):
-        return f"X: {self.x}, Y: {self.y}, Z:{self.z}"
+        return f"Coords X: {self.x}, Y: {self.y}, Z:{self.z}"
 
     @property
     def data(self)->list[int,int,int]:
@@ -24,7 +28,7 @@ class Coordinates:
     @property
     def covar(self)->np.ndarray|None: 
         """
-        3x3 covariance matrix on the position, if available 
+        3x3 covariance matrix on the position, if available. ALL ELEMENTS MUST BE INTS. 
         """
         return self._covar
 
@@ -49,9 +53,9 @@ class Coordinates:
         - yz
         """
         xx, yy, zz, xy, xz, yz = covariances
-        self._covar = np.array([[xx, xy, xz], 
-                                [xy, yy, yz], 
-                                [xz, yz, zz]])
+        self._covar = np.array([[int(xx), int(xy), int(xz)], 
+                                [int(xy), int(yy), int(yz)], 
+                                [int(xz), int(yz), int(zz)]])
 
     def load(self, data:list):
         """ Updates the XYZ object with new data in format [x,y,z], all ints"""

@@ -100,7 +100,8 @@ class Task(TDMAState):
                 if self.tag.is_anchor(target_id): 
                     anchor_zs.append( (target_id, z) )   # (id, range_measure_in_mm) 
                 else: 
-                    tag_zs.append( (target_id, target_pos, z) ) # TODO propagate extraction of covar and pos from Coordinates to estimators
+                    if target_pos: # If None, we didn't get covariance info, so won't pass it to estimator
+                        tag_zs.append( (target_id, target_pos, z) ) 
             sleep(0.0001) # TODO test / tune this check if needed now that inside control structure 
         # Packing in an update message and sending to estimator 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 

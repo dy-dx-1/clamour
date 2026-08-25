@@ -243,7 +243,7 @@ class PozyxTag(Tag):
         else: 
             return None 
 
-    def ranging(self, target_id)->int: 
+    def ranging(self, target_id) -> tuple[int|None, Coordinates|None]: 
         range_measure = DeviceRange() 
         try: 
             status = self._pozyx_serial.doRanging(target_id, range_measure)
@@ -252,6 +252,9 @@ class PozyxTag(Tag):
             print(f"PozyxTag.doRanging: {str(s)}", 'error', 'loc') 
 
         if status == POZYX_SUCCESS: 
-            return range_measure.distance # distance in mm 
+            # Since we don't care about pozyx anymore and just keeping basic compatibility for testing
+            # not spending time adding neighbor covariance sharing or checking if it's possible 
+            # pozyx will simply not support neighbor ranging with the factor graph. 
+            return (range_measure.distance, None) # distance in mm 
         else: 
-            return None
+            return (None, None)

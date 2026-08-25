@@ -5,6 +5,7 @@ from .containers import Coordinates, Angles
 from .dw_1000 import DW1000
 from .anchors import Anchors
 
+import numpy as np 
 from typing import Literal
 import time  
 import struct
@@ -221,17 +222,18 @@ class BitcrazeTag(Tag):
             # The tag position and covariance is sent as 9 signed ints [x, y, z, xx, yy, zz, xy, xz, yz]
             coordinates = self.coordinates
             covariance = coordinates.covar
-            if covariance is not None: # TODO check where covariance is updated and check if it can happen that it's not done before this is called? 
-                try:                   # TODO also ENSURE covar is only ints in estimator use, to prevent failure here 
-                    neighbor_info = REPORT_NEIGHBOR_INFO.pack(
-                        *coordinates.data,
-                        covariance[0][0], covariance[1][1], covariance[2][2],
-                        covariance[0][1], covariance[0][2], covariance[1][2],
-                    )
-                except (IndexError, OverflowError, struct.error, TypeError) as error:
-                    print(f"BitcrazeTag.respond_to_ranging_exchange: invalid position metadata: {error}", 'error', 'loc')
-                else:
-                    report += list(neighbor_info)
+            if covariance is None: # If covar is not ready, we'll send 0s everywhere (impossible), if the other tag sees this they'll ignore our message
+                covariance = np.array([[0,0,0],[0,0,0],[0,0,0]])
+            try:                 
+                neighbor_info = REPORT_NEIGHBOR_INFO.pack(
+                    *coordinates.data,
+                    covariance[0][0], covariance[1][1], covariance[2][2],
+                    covariance[0][1], covariance[0][2], covariance[1][2],
+                )
+            except (IndexError, OverflowError, struct.error, TypeError) as error:
+                print(f"BitcrazeTag.respond_to_ranging_exchange: invalid position metadata: {error}", 'error', 'loc')
+            else:
+                report += list(neighbor_info)
             self._dw.transmit(report, ranging=True)
 
     def listen_for_TWR_msg(self, timeout:int, exp_src:int, exp_dest:int, exp_msg_type:int, exp_twr_seq:int)->tuple[list,int]|tuple[None,None]: 
@@ -281,13 +283,16 @@ class BitcrazeTag(Tag):
         return self._orientation
 
     @staticmethod
-    def extract_report_neighbor_info(report_msg:list) -> Coordinates:
+    def extract_report_neighbor_info(report_msg:list) -> Coordinates|None:
         """
         Takes in a TWR report from a neighboring tag and extracts the embedded neighbor position and covariance info from it. 
+        If the neighbor didn't share covar (ex: too early), we ignore him and return None. 
         """
         payload_start = REPORT_HEADER_SIZE + REPORT_TIMESTAMP_SIZE
         payload_end = payload_start + REPORT_NEIGHBOR_INFO.size
         x, y, z, xx, yy, zz, xy, xz, yz = REPORT_NEIGHBOR_INFO.unpack(bytes(report_msg[payload_start:payload_end]))
+        if xx==0: # This is our sign that the neighbor didn't have covar info as it will never be exactly 0 
+            return None 
         neighbor_coords = Coordinates(x, y, z)
         neighbor_coords.update_covar((xx, yy, zz, xy, xz, yz))
         return neighbor_coords
@@ -336,7 +341,7 @@ class BitcrazeTag(Tag):
             distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
             # We got the distance, if it's a tag, also extract it's position and covariance from the response 
             if not self.is_anchor(target_id) and len(report) == REPORT_HEADER_SIZE + REPORT_TIMESTAMP_SIZE + REPORT_NEIGHBOR_INFO.size:
-                target_coords = self.extract_report_neighbor_info(report) 
+                target_coords = self.extract_report_neighbor_info(report) # if neighbor doesn't give position AND covar, this is None 
         return distance, target_coords
 
     def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
