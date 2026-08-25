@@ -7,6 +7,7 @@ from typing import Literal
 from multiprocessing.synchronize import Lock
 
 from .ekf import CustomEKF
+from .factor_graph import PoseGraph
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
 from ..interfaces import Tag, Coordinates
@@ -82,8 +83,10 @@ class StateEstimator:
                         # For the EKF, incorporating ranging data with >3 anchors will directly trigger a trilateration update
                         self.estimator.incorporate_ranging_data(msg.timestamp, msg.anchors_ranging_data, msg.tags_ranging_data, raw_yaw)
                     elif self.estimator_type == 'FG':
-                        # TODO 
-                        pass 
+                        self.estimator = PoseGraph(msg.anchors_ranging_data, raw_yaw, msg.timestamp)
+                        # Not calling incorporate_ranging_data yet, as need to update timestamp first 
+                        # however should add a way to set factors in init as using directly incorporate_... will add a BetweenFactor
+                        # separate adding functions inside incorporate and just put the ones adding the anchors and tags inside of the init part? 
 
                     # Estimator initialized. Internalise and publish the posterior.  
                     self.publish_state(msg) 
@@ -192,15 +195,13 @@ class StateEstimator:
         if not SAVE_TO_CSV: 
             return None, None 
         filepath = 'pose_estimation.csv'
-        is_new_file = not os.path.exists(filepath)
         fieldnames = ['tag_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
                       'estimator_x', 'estimator_y', 'estimator_z', 'estimator_yaw', 
                       'covariance_matrix', 'slots', 'two_hop_neighbors']
 
         state_csv = open(filepath, 'w')
         writer = csv.DictWriter(state_csv, delimiter=',', fieldnames=fieldnames)
-        if is_new_file:
-            writer.writeheader()
+        writer.writeheader()
 
         return state_csv, writer
     
@@ -226,7 +227,7 @@ class StateEstimator:
                 'estimator_y': self.estimator.get_position().y,
                 'estimator_z': self.estimator.get_position().z,
                 'estimator_yaw': self.estimator.get_yaw(),
-                'covariance_matrix': np.linalg.det(self.estimator.P),
+                'covariance_matrix': "to implement", # previously: np.linalg.det(self.estimator.P)
                 'slots': message.slots,
                 'two_hop_neighbors': self.last_know_neighbors
             }

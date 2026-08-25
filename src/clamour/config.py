@@ -20,7 +20,7 @@ SMART_TX_POWER = False      # Enable or disable smart TX power - Only works for 
 TX_POWER_CONFIG = [0x10, 0x10, 0x10, 0x10]     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
 ### State estimation control 
-ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph) 
+ESTIMATOR_TYPE = "FG"     # EKF or FG (Factor Graph) 
 
 ### Output control 
 ## Terminal

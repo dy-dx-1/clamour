@@ -23,8 +23,8 @@ class PoseGraph:
         # Internal data about the current state. Kept up to date and fed back to estimator.py  
         # State vector is [x,xdot,y,ydot,z,zdot,theta,thetadot]. Only here for clarity, as the prior will overwrite these 0s. 
         self.x = np.array([0, 0, 0, 0, 0, 0, 0, 0]) 
-        self.covars = (0, 0, 0, 0, 0, 0) # Covar on position xx, yy, zz, xy, xz, yz 
-        self.last_measurement_time = timestamp 
+        self.covars = (0, 0, 0, 0, 0, 0)         # Covar on position xx, yy, zz, xy, xz, yz 
+        self.last_measurement_time = timestamp   # Will be updated during subsequent call of validate_update by incorporate_ranging_data 
         self.dt = None 
         
         # Graph trackers 
@@ -33,7 +33,7 @@ class PoseGraph:
         self.isam = gt.ISAM2() 
 
         # Creating prior factor to lock in rotation  
-        self.insert_prior_rotation_lock(anchors_range_data, prior_yaw) 
+        self.insert_prior_rotation_lock(prior_yaw, anchors_range_data) 
 
     ### Properties
     @property
@@ -52,7 +52,7 @@ class PoseGraph:
         The position component is simply the centroid of the anchors. This is inaccurate and only serves to put a rough guess that will be corrected by the anchors. 
         estimator.py will then call a incorporate_ranging_data with >=3 anchors, which will correct and lock the position appropriately. 
         """
-        prior_pos = anchors.get_centroid_for(data[0] for data in anchors_range_data)
+        prior_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
         # NOTE check if way to avoid locking in position even loosely before anchors? 
         x0 = gt.symbol('x', self.state_counter) 
         graph = gt.NonlinearFactorGraph() 
@@ -90,6 +90,8 @@ class PoseGraph:
         then BetweenFactor will apply the 5 value to the local 'x' axis, which would result in global mvt along 'y'. 
         """
         # Expected delta in the global reference frame 
+        #print(f"Speed: {(self.x[1], self.x[3], self.x[5])}", 'info', 'loc') 
+        #print(f"Delta: {(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)}", 'info', 'loc') 
         delta_world = gt.Point3(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)
         # Mapping it to the local frame so BetweenFactor can be applied 
         # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
