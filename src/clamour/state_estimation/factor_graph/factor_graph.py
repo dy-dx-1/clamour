@@ -98,6 +98,40 @@ class PoseGraph:
         delta_body = previous_pose.rotation().unrotate(delta_world)
         return delta_body
 
+    def add_ranging_data(self, state_symbol, state_id, graph, initial_values, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple]): 
+        """
+        Add anchor and tag ranging data of a new state to the graph 
+        - state_symbol: gt.Symbol of the new state to add to the graph 
+        - state_id: Key corresponding to the new state 
+        - graph: Factor Graph object 
+        - initial_values: Values object related to the graph 
+        - anchors_ranging_data: list of measurements [(anchor_id, range), ...] 
+        - tags_ranging_data: list of measurements [(neighbor_id, neighbor_Coordinates, range), ...] 
+        """
+        # ANCHORS
+        for id, z in anchors_ranging_data: 
+            anchor = gt.symbol('a', id) 
+            anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in mm 
+            if id not in self.seen_anchors:
+                # If we have never seen this anchor, need to add a prior on it's position 
+                # If we have, then no need to re-add a prior. Just directly reference it during range add
+                graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
+                initial_values.insert(anchor, gt.Point3(*anchor_pos))
+                self.seen_anchors.add(id) 
+            graph.add(gt.RangeFactor3D(state_symbol, anchor, z, RANGING_NOISE))
+        # TAGS 
+        for n_id, n_coords, z in tags_ranging_data:  
+            # Iterating over neighbor id's, Coordinates, and range between us
+            # tags_ranging_data only contains tags that have known positions/covar (filtered at TASK level)
+            # NOTE: in future, could be nice to add here or in TASK a filter for stale data based on timestamps 
+            n_pos, n_cov = n_coords.data, n_coords.covar  
+            # Adding the other tag's position to the graph with a special ID that tracks his position and the time
+            neighbor = gt.symbol('t', int(f'{n_id}000{state_id}')) 
+            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov)))
+            initial_values.insert(neighbor, gt.Point3(*n_pos))
+            # Adding range data 
+            graph.add(gt.RangeFactor3D(state_symbol, neighbor, z, RANGING_NOISE))
+
     ### EXTERNAL METHODS USED BY estimator.py 
     def get_position(self)->Coordinates:  
         """
@@ -143,38 +177,15 @@ class PoseGraph:
         graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
         initial_values.insert(x, previous_pose.compose(mvt))
 
-        # Adding anchor-related ranges
-        for id, z in anchors_ranging_data: 
-            anchor = gt.symbol('a', id) 
-            anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in mm 
-            if id not in self.seen_anchors:
-                # If we have never seen this anchor, need to add a prior on it's position 
-                # If we have, then no need to re-add a prior. Just directly reference it during range add
-                graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
-                initial_values.insert(anchor, gt.Point3(*anchor_pos))
-                self.seen_anchors.add(id) 
-            graph.add(gt.RangeFactor3D(x, anchor, z, RANGING_NOISE))
-            
-        # Tag data 
-        for n_id, n_coords, z in tags_ranging_data:  
-            # Iterating over neighbor id's, Coordinates, and range between us
-            # tags_ranging_data only contains tags that have known positions/covar (filtered at TASK level)
-            # NOTE: in future, could be nice to add here or in TASK a filter for stale data based on timestamps 
-            n_pos, n_cov = n_coords.data, n_coords.covar  
-            # Adding the other tag's position to the graph with a special ID that tracks his position and the time
-            neighbor = gt.symbol('t', int(f'{n_id}000{current_state_id}')) 
-            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov)))
-            initial_values.insert(neighbor, gt.Point3(*n_pos))
-            # Adding range data 
-            graph.add(gt.RangeFactor3D(x, neighbor, z, RANGING_NOISE))
+        ## Adding ranges 
+        self.add_ranging_data(x, current_state_id, graph, initial_values, anchors_ranging_data, tags_ranging_data) 
             
         # Updating graph and internal data 
         self.isam.update(graph, initial_values) 
-        results = self.isam.calculateEstimate() 
-        current_state_estimate = results.atPose3(x) 
+        current_state_estimate = self.isam.calculateEstimate().atPose3(x) 
         # Use the last stored state (self.x) and the new current estimate through the incorporation of the data
         # to estimate the speed and update the stored state to reflect the new one 
-        new_x = np.array([current_state_estimate.x(), 
+        posterior = np.array([current_state_estimate.x(), 
                           (current_state_estimate.x()-self.x[0])/self.dt, 
                            current_state_estimate.y(), 
                            (current_state_estimate.y()-self.x[2])/self.dt, 
@@ -182,7 +193,7 @@ class PoseGraph:
                            (current_state_estimate.z()-self.x[4])/self.dt, 
                            current_state_estimate.rotation().rpy()[2], 
                            0])
-        self.x = new_x 
+        self.x = posterior 
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it 
         covariance = self.isam.marginalCovariance(x)
         self.covars = (
