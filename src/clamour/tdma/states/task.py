@@ -121,7 +121,7 @@ class Task(TDMAState):
         if len(self.tag.available_anchors)>=3: 
             return self.tag.available_anchors
         else:
-            return set(self.select_single_ranging_target()) 
+            return set([self.select_single_ranging_target()]) 
 
     def select_single_ranging_target(self) -> int|None:
         """Selects a target for doing a range measurement.

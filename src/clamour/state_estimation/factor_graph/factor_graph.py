@@ -32,8 +32,9 @@ class PoseGraph:
         self.seen_anchors = set() # Keeps track of anchors we have previously seen, to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
 
-        # Creating prior factor to lock in rotation  
-        self.insert_prior_rotation_lock(prior_yaw, anchors_range_data) 
+        # Creating prior factor that locks rotation and position at initial estimate
+        self.insert_prior(prior_yaw, anchors_range_data) 
+        print(f"Initial state: {self.x}", 'ok', 'loc')
 
     ### Properties
     @property
@@ -42,7 +43,7 @@ class PoseGraph:
         return self._state_counter 
 
     ### INTERNAL COMPUTATION METHODS 
-    def insert_prior_rotation_lock(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]]): 
+    def insert_prior(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]]): 
         """
         Only to be used in __init__! Updates the graph and internal state with a simple prior to constrain rotation. 
         As of 2026-08-20, this function is only here while we don't have an IMU. 
@@ -50,20 +51,25 @@ class PoseGraph:
         underterminate system in the graph, we need to initialize it to a known value.
         Therefore, we insert a prior with very loose covariance on a rough position, but tight on the rotation. 
         The position component is simply the centroid of the anchors. This is inaccurate and only serves to put a rough guess that will be corrected by the anchors. 
-        estimator.py will then call a incorporate_ranging_data with >=3 anchors, which will correct and lock the position appropriately. 
+        We then call add_ranging_data which will lock the position appropriately. 
         """
-        prior_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
+        ### ROTATION LOCK 
+        throwaway_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
         # NOTE check if way to avoid locking in position even loosely before anchors? 
-        x0 = gt.symbol('x', self.state_counter) 
+        state_key = self.state_counter
+        x0 = gt.symbol('x', state_key) 
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
         graph.add(gt.PriorFactorPose3(x0, 
-                                      gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(prior_pos.x, prior_pos.y, prior_pos.z)), 
+                                      gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)), 
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5])))
-        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(prior_pos.x, prior_pos.y, prior_pos.z)))
+        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)))
+        ### POSITION LOCK 
+        self.add_ranging_data(x0, state_key, graph, initial_values, anchors_range_data, [])
+        ### GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
-        # Also updating internal state tracker 
-        self.x = np.array([prior_pos.x, 0, prior_pos.y, 0, prior_pos.z, 0, yaw_prior, 0])
+        current_state_estimate = self.isam.calculateEstimate().atPose3(x0) 
+        self.x = np.array([current_state_estimate.x(), 0, current_state_estimate.y(), 0, current_state_estimate.z(), 0, yaw_prior, 0])
 
     def validate_update(self, timestamp:float)->bool: 
         """
@@ -90,8 +96,8 @@ class PoseGraph:
         then BetweenFactor will apply the 5 value to the local 'x' axis, which would result in global mvt along 'y'. 
         """
         # Expected delta in the global reference frame 
-        #print(f"Speed: {(self.x[1], self.x[3], self.x[5])}", 'info', 'loc') 
-        #print(f"Delta: {(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)}", 'info', 'loc') 
+        print(f"Speed: {(self.x[1], self.x[3], self.x[5])}", 'info', 'loc') 
+        print(f"Delta: {(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)}", 'info', 'loc') 
         delta_world = gt.Point3(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)
         # Mapping it to the local frame so BetweenFactor can be applied 
         # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
@@ -108,6 +114,7 @@ class PoseGraph:
         - anchors_ranging_data: list of measurements [(anchor_id, range), ...] 
         - tags_ranging_data: list of measurements [(neighbor_id, neighbor_Coordinates, range), ...] 
         """
+        print(f"Adding anchors {anchors_ranging_data} ||| Tags {tags_ranging_data}", 'info', 'loc')
         # ANCHORS
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
@@ -197,14 +204,14 @@ class PoseGraph:
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it 
         covariance = self.isam.marginalCovariance(x)
         self.covars = (
-            covariance[0, 0],
-            covariance[1, 1],
-            covariance[2, 2],
-            covariance[0, 1],
-            covariance[0, 2],
-            covariance[1, 2],
+            covariance[3, 3],
+            covariance[4, 4],
+            covariance[5, 5],
+            covariance[3, 4],
+            covariance[3, 5],
+            covariance[4, 5],
         )
-
+        
     def zero_movement_update(self, timestamp: float) -> None:
         """Temporarily constrain the next pose to the current one after an input gap.
 
