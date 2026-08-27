@@ -64,7 +64,7 @@ class PoseGraph:
         initial_values = gt.Values() 
         graph.add(gt.PriorFactorPose3(x0, 
                                       gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)), 
-                                      gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5])))
+                                      gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)))
         ### POSITION LOCK 
         self.add_ranging_data(x0, state_key, graph, initial_values, anchors_range_data, [])

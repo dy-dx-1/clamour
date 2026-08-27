@@ -18,7 +18,7 @@ UWB_BITRATE = 6.8          # 110kps, 850kps or 6.8Mbps
 UWB_PREAMBLE_LENGTH = 128  # Any in [64,128,256,512,1024,1536,2048,4096] symbols
 UWB_PREAMBLE_CODE = 9     
 SMART_TX_POWER = True      # Enable or disable smart TX power - Only works for 6.8Mbps bitrate 
-TX_POWER_CONFIG = None#[0x10, 0x10, 0x10, 0x10]     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
+TX_POWER_CONFIG = None     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
 ### State estimation control 
 ESTIMATOR_TYPE = "FG"     # EKF or FG (Factor Graph) 
@@ -30,14 +30,14 @@ DEVICE_MSGS = True     # Turn off/on device management-related terminal output
 TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
 LOC_MSGS    = True     # Turn off/on localization-related terminal output  
 ## CSV saving 
-SAVE_TO_CSV = False     # Save localization data to csv or not 
+SAVE_TO_CSV = True     # Save localization data to csv or not 
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be >0 and <=10. Coordinates are in mm. 
 # temp NOTE A2 with broken usb is ID 2 
-ANCHORS = ({'id': 2, 'level': 0, 'x': 2100, 'y': 320, 'z': 850}, 
-           {'id': 3, 'level': 0, 'x': -350, 'y': 1300, 'z': 1330},
+ANCHORS = ({'id': 2, 'level': 0, 'x': 2100, 'y': 320, 'z': 670}, 
+           {'id': 3, 'level': 0, 'x': -350, 'y': 1300, 'z': 1770},
            {'id': 4, 'level': 0, 'x': 2250, 'y': 3500, 'z': 1060},
            {'id': 5, 'level': 0, 'x': 0, 'y': 0, 'z': 900}) 
 
