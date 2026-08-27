@@ -16,8 +16,8 @@ UWB_PRF = 64               # 16 or 64 MHz
 UWB_BITRATE = 6.8          # 110kps, 850kps or 6.8Mbps
 UWB_PREAMBLE_LENGTH = 128  # Any in [64,128,256,512,1024,1536,2048,4096] symbols
 UWB_PREAMBLE_CODE = 9     
-SMART_TX_POWER = False      # Enable or disable smart TX power - Only works for 6.8Mbps bitrate 
-TX_POWER_CONFIG = [0x10, 0x10, 0x10, 0x10]     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
+SMART_TX_POWER = True      # Enable or disable smart TX power - Only works for 6.8Mbps bitrate 
+TX_POWER_CONFIG = None#[0x10, 0x10, 0x10, 0x10]     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
 ### State estimation control 
 ESTIMATOR_TYPE = "FG"     # EKF or FG (Factor Graph) 

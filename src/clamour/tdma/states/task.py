@@ -102,7 +102,7 @@ class Task(TDMAState):
                 else: 
                     if target_pos: # If None, we didn't get covariance info, so won't pass it to estimator
                         tag_zs.append( (target_id, target_pos, z) ) 
-            sleep(0.0001) # TODO test / tune this check if needed now that inside control structure 
+            sleep(0.000001) # Short break to ensure exchange finished. Should be more than enough.
         # Packing in an update message and sending to estimator 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
                                          offset=self.timing.logical_clock.offset,

@@ -98,8 +98,6 @@ class PoseGraph:
         then BetweenFactor will apply the 5 value to the local 'x' axis, which would result in global mvt along 'y'. 
         """
         # Expected delta in the global reference frame 
-        print(f"Speed: {(self.x[1], self.x[3], self.x[5])}", 'info', 'loc') 
-        print(f"Delta: {(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)}", 'info', 'loc') 
         delta_world = gt.Point3(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)
         # Mapping it to the local frame so BetweenFactor can be applied 
         # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
