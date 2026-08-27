@@ -10,7 +10,7 @@ anchors = Anchors()
 ## Units in mm, like the rest of the graph 
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([50, 50, 50]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~ 10cm 
-ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 500, 500, 500]) # currently using constant velocity so very loose 
+ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 500, 500, 200]) # currently using constant velocity so very loose (except on z cause expect less mvt that way) 
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 
 class PoseGraph: 
@@ -45,13 +45,15 @@ class PoseGraph:
     ### INTERNAL COMPUTATION METHODS 
     def insert_prior(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]]): 
         """
-        Only to be used in __init__! Updates the graph and internal state with a simple prior to constrain rotation. 
+        Only to be used in __init__! Updates the graph and internal state with a prior that locks rotation and range factors that lock position. 
         As of 2026-08-20, this function is only here while we don't have an IMU. 
-        No way to measure rotation, so we don't track/update it. However, to avoid an 
-        underterminate system in the graph, we need to initialize it to a known value.
+        No way to measure rotation, so we don't track/update it. However, to avoid an inderterminate system in the graph, we need to initialize it to a known value.
+        
         Therefore, we insert a prior with very loose covariance on a rough position, but tight on the rotation. 
-        The position component is simply the centroid of the anchors. This is inaccurate and only serves to put a rough guess that will be corrected by the anchors. 
-        We then call add_ranging_data which will lock the position appropriately. 
+        The position component of the prior is simply the centroid of the anchors. This is inaccurate and only serves to put a rough guess that will be corrected by the anchors. 
+        We then call add_ranging_data which will lock the position appropriately with range factors. 
+        
+        NOTE: To avoid imprecise/unstable measures, one should ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
         """
         ### ROTATION LOCK 
         throwaway_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
