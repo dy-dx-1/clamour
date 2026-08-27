@@ -30,16 +30,16 @@ DEVICE_MSGS = True     # Turn off/on device management-related terminal output
 TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
 LOC_MSGS    = True     # Turn off/on localization-related terminal output  
 ## CSV saving 
-SAVE_TO_CSV = True     # Save localization data to csv or not 
+SAVE_TO_CSV = False     # Save localization data to csv or not 
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be >0 and <=10. Coordinates are in cm. 
 # temp NOTE A2 with broken usb is ID 2 
-ANCHORS = ({'id': 2, 'level': 0, 'x': 2100, 'y': 320, 'z': 670}, 
-           {'id': 3, 'level': 0, 'x': -350, 'y': 1300, 'z': 1770},
-           {'id': 4, 'level': 0, 'x': 2250, 'y': 3500, 'z': 1060},
-           {'id': 5, 'level': 0, 'x': 0, 'y': 0, 'z': 900}) 
+ANCHORS = ({'id': 2, 'level': 0, 'x': 210, 'y': 32, 'z': 67}, 
+           {'id': 3, 'level': 0, 'x': -35, 'y': 130, 'z': 177},
+           {'id': 4, 'level': 0, 'x': 225, 'y': 350, 'z': 106},
+           {'id': 5, 'level': 0, 'x': 0, 'y': 0, 'z': 90}) 
 
 
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 

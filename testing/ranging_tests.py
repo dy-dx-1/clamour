@@ -13,7 +13,7 @@ from src.clamour.interfaces.bitcraze_tag import BitcrazeTag
 
 ANCHOR_ID = 2
 
-SMART_TX_POWER = False 
+SMART_TX_POWER = True 
 
 power_lvls = [ [0x67, 0x67, 0x67, 0x67], [0x60,0x60,0x60,0x60], [0x58,0x58,0x58,0x58], [0x50,0x50,0x50,0x50], [0x48,0x48,0x48,0x48], [0x40,0x40,0x40,0x40], [0x30,0x30,0x30,0x30], [0x20,0x20,0x20,0x20], [0x10,0x10,0x10,0x10], [0x08,0x08,0x08,0x08], [0x00,0x00,0x00,0x00] ] 
 relative_power = 100 # just to print %  
@@ -27,13 +27,13 @@ def get_range_measurements(smart_tx, power_cfg): # IN CM
         # Taking 100 measurements 
         ranges = [] 
         for _ in range(100): 
-            range_measurement = bc.compute_range(ANCHOR_ID)
+            range_measurement = bc.compute_range(ANCHOR_ID)[0]
             if range_measurement: 
                 ranges.append(round(range_measurement/10)) 
             time.sleep(0.05) 
     return np.array(ranges) 
 
-for pwr_lvl in [[0x10,0x10,0x10,0x10]]: 
+for pwr_lvl in [None]: 
     # Computing stats
     ranges = get_range_measurements(SMART_TX_POWER, pwr_lvl)
     if len(ranges) != 0: 

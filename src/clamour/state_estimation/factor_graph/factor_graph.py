@@ -211,7 +211,7 @@ class PoseGraph:
             covariance[3, 5],
             covariance[4, 5],
         )
-        
+
     def zero_movement_update(self, timestamp: float) -> None:
         """Temporarily constrain the next pose to the current one after an input gap.
 
