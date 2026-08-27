@@ -346,6 +346,6 @@ class BitcrazeTag(Tag):
 
     def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
         # TODO add to docstring, returns range, target position Coordinates if it's a tag only
-        # NOTE leaving as separate function in case want to avg measurements here 
+        # NOTE leaving as separate function in case want to avg/median measurements here 
         distance, target_pos = self.compute_range(target_id) 
         return distance, target_pos

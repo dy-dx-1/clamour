@@ -3,6 +3,7 @@ Defines all configuration parameters for Clamour.
 - Tag type and ID 
 - DW1000/UWB settings if applicable 
 - Terminal output control 
+- Saving output to CSV
 - Anchor definition 
 """
 ### Tag type and ID 
