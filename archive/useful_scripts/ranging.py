@@ -9,11 +9,11 @@ from pypozyx.tools.version_check import perform_latest_version_check
 class ReadyToRange(object):
     """Continuously performs ranging between the Pozyx and a destination and sets their LEDs"""
 
-    def __init__(self, pozyx, destination_id, range_step_mm=1000, protocol=PozyxConstants.RANGE_PROTOCOL_PRECISION,
+    def __init__(self, pozyx, destination_id, range_step_cm=100, protocol=PozyxConstants.RANGE_PROTOCOL_PRECISION,
                  remote_id=None):
         self.pozyx = pozyx
         self.destination_id = destination_id
-        self.range_step_mm = range_step_mm
+        self.range_step_cm = range_step_cm
         self.remote_id = remote_id
         self.protocol = protocol
 
@@ -23,7 +23,7 @@ class ReadyToRange(object):
         print("NOTES: ")
         print(" - Change the parameters: ")
         print("\tdestination_id(target device)")
-        print("\trange_step(mm)")
+        print("\trange_step(cm)")
         print("")
         print("- Approach target device to see range and")
         print("led control")
@@ -54,7 +54,7 @@ class ReadyToRange(object):
             self.destination_id, device_range, self.remote_id)
         if status == POZYX_SUCCESS:
             print(device_range)
-            if self.ledControl(device_range.distance) == POZYX_FAILURE:
+            if self.ledControl(device_range.distance / 10) == POZYX_FAILURE:
                 print("ERROR: setting (remote) leds")
         else:
             error_code = SingleRegister()
@@ -71,10 +71,10 @@ class ReadyToRange(object):
         ids = [self.remote_id, self.destination_id]
         # set the leds of both local/remote and destination pozyx device
         for id in ids:
-            status &= self.pozyx.setLed(4, (distance < range_step_mm), id)
-            status &= self.pozyx.setLed(3, (distance < 2 * range_step_mm), id)
-            status &= self.pozyx.setLed(2, (distance < 3 * range_step_mm), id)
-            status &= self.pozyx.setLed(1, (distance < 4 * range_step_mm), id)
+            status &= self.pozyx.setLed(4, (distance < self.range_step_cm), id)
+            status &= self.pozyx.setLed(3, (distance < 2 * self.range_step_cm), id)
+            status &= self.pozyx.setLed(2, (distance < 3 * self.range_step_cm), id)
+            status &= self.pozyx.setLed(1, (distance < 4 * self.range_step_cm), id)
         return status
 
 
@@ -100,13 +100,13 @@ if __name__ == "__main__":
 
     destination_id = 0x1111      # network ID of the ranging destination
     # distance that separates the amount of LEDs lighting up.
-    range_step_mm = 1000
+    range_step_cm = 100
 
     # the ranging protocol, other one is PozyxConstants.RANGE_PROTOCOL_PRECISION
     ranging_protocol = PozyxConstants.RANGE_PROTOCOL_PRECISION
 
     pozyx = PozyxSerial(serial_port)
-    r = ReadyToRange(pozyx, destination_id, range_step_mm,
+    r = ReadyToRange(pozyx, destination_id, range_step_cm,
                      ranging_protocol, remote_id)
     r.setup()
     while True:

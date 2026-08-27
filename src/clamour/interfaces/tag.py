@@ -145,13 +145,13 @@ class Tag(ABC):
     @abstractmethod
     def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
         """
-        Calculates a UWB range measurement in mm between the tag and another device. 
+        Calculates a UWB range measurement in cm between the tag and another device. 
         If the target is another tag, also returns that tag's Coordinates, which holds position and covariance. 
         
         ARGS:
             - target_id: ID of the target device (int) 
         
         RETURNS:
-            - distance in mm or None
+            - distance in cm or None
             - Coordinates of the other tag if it is one 
         """

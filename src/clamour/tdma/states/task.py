@@ -98,7 +98,7 @@ class Task(TDMAState):
             z, target_pos = self.tag.ranging(target_id)  # target_pos also holds covar and will only be returned and used if target_id is another tag
             if z: # Successful measurement, fetch position and add 
                 if self.tag.is_anchor(target_id): 
-                    anchor_zs.append( (target_id, z) )   # (id, range_measure_in_mm) 
+                    anchor_zs.append( (target_id, z) )   # (id, range_measure_in_cm)
                 else: 
                     if target_pos: # If None, we didn't get covariance info, so won't pass it to estimator
                         tag_zs.append( (target_id, target_pos, z) ) 

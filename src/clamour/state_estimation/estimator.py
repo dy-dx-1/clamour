@@ -140,7 +140,7 @@ class StateEstimator:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
         Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
 
-        step_length = 750  # millimeters
+        step_length = 75  # centimeters
 
         delta_position_x = step_length * -math.cos(math.radians(self.correct_yaw(measured_yaw)))
         delta_position_y = step_length * math.sin(math.radians(self.correct_yaw(measured_yaw)))

@@ -151,9 +151,9 @@ class PozyxTag(Tag):
             devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
             # Coordinates is our general version, needs to be formatted to pypozyx version 
             for id in devices: 
-                x = ALL_ANCHORS[id].x
-                y = ALL_ANCHORS[id].y
-                z = ALL_ANCHORS[id].z
+                x = ALL_ANCHORS[id].x * 10
+                y = ALL_ANCHORS[id].y * 10
+                z = ALL_ANCHORS[id].z * 10
                 pozyx_obj = pozyxDeviceCoordinates(network_id=id, flag=1, pos = pozyxCoordinates(x, y, z) )
                 self._pozyx_serial.addDevice(pozyx_obj)
         elif discovery_type == "all": 
@@ -204,11 +204,11 @@ class PozyxTag(Tag):
             status = 0 
             print(f"PozyxTag.getCoordinates: {str(s)}", 'error', 'loc') 
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
-        return Coordinates(coords_container.x, coords_container.y, coords_container.z) # Converting to our general object         
+        return Coordinates(int(coords_container.x / 10), int(coords_container.y / 10), int(coords_container.z / 10)) # Convert Pozyx hardware units to cm
 
     @coordinates.setter
     def coordinates(self, new_coords:Coordinates): 
-        pozyx_coords = pozyxCoordinates(int(new_coords.x), int(new_coords.y), int(new_coords.z))
+        pozyx_coords = pozyxCoordinates(int(new_coords.x * 10), int(new_coords.y * 10), int(new_coords.z * 10))
         self._pozyx_serial.setCoordinates(pozyx_coords)
     
     @property
@@ -239,7 +239,7 @@ class PozyxTag(Tag):
             print(f"PozyxTag.trilaterate_position: {str(s)}", 'error', 'loc')
 
         if status == POZYX_SUCCESS: 
-            return Coordinates(pos.x, pos.y, pos.z)
+            return Coordinates(int(pos.x / 10), int(pos.y / 10), int(pos.z / 10))
         else: 
             return None 
 
@@ -255,6 +255,6 @@ class PozyxTag(Tag):
             # Since we don't care about pozyx anymore and just keeping basic compatibility for testing
             # not spending time adding neighbor covariance sharing or checking if it's possible 
             # pozyx will simply not support neighbor ranging with the factor graph. 
-            return (range_measure.distance, None) # distance in mm 
+            return (range_measure.distance // 10, None) # Convert Pozyx hardware units to cm
         else: 
             return (None, None)

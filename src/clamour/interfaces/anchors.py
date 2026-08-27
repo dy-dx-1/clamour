@@ -4,7 +4,7 @@ import numpy as np
 
 class Anchors:
     def __init__(self):
-        self.floor_height = 18900 - 300
+        self.floor_height = 1890 - 30
         self.anchors_dict = self.load_anchors_from_config() # Dict of ALL deployed anchors {anchor_id: Coordinates()}
 
     def load_anchors_from_config(self) -> dict[int, Coordinates]:

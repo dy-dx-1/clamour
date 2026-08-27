@@ -5,7 +5,7 @@ import numpy as np
 
 class Coordinates: 
     """
-    Container for x, y, z coordinates (in mm) and associated covariance (mm^2), if available.
+    Container for x, y, z coordinates (in cm) and associated covariance (cm^2), if available.
 
     ALL ELEMENTS MUST BE INTEGERS. 
 

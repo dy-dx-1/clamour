@@ -8,11 +8,11 @@ import time
 class comm(object):
     """Continuously performs ranging between the Pozyx and a destination and sets their LEDs"""
 
-    def __init__(self, pozyx, destination_id, range_step_mm=1000,
+    def __init__(self, pozyx, destination_id, range_step_cm=100,
                  remote_id=None):
         self.pozyx = pozyx
         self.destination_id = destination_id
-        self.range_step_mm = range_step_mm
+        self.range_step_cm = range_step_cm
         self.remote_id = remote_id
         self.count = 0
         self.lastTime = time.time()
@@ -23,7 +23,7 @@ class comm(object):
         print("NOTES: ")
         print(" - Change the parameters: ")
         print("\tdestination_id(target device)")
-        print("\trange_step(mm)")
+        print("\trange_step(cm)")
         print("")
         print("- Approach target device to see range and")
         print("led control")

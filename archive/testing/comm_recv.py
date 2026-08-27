@@ -9,11 +9,11 @@ import time, sys
 class comm():
     """Continuously performs ranging between the Pozyx and a destination and sets their LEDs"""
 
-    def __init__(self, pozyx, destination_id=0, range_step_mm=1000,
+    def __init__(self, pozyx, destination_id=0, range_step_cm=100,
                  remote_id=None):
         self.pozyx = pozyx
         self.destination_id = destination_id
-        self.range_step_mm = range_step_mm
+        self.range_step_cm = range_step_cm
         self.remote_id = remote_id
         self.successCount = 1
         self.lastTime = time.time()

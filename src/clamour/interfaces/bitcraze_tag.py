@@ -299,11 +299,11 @@ class BitcrazeTag(Tag):
 
     def compute_range(self, target_id:int)->tuple[int|None, Coordinates|None]: 
         """
-        Computes the distance in mm between the tag and another device. If the other device is a tag, also returns the tag's Coordinates object (which also holds covar)
+        Computes the distance in cm between the tag and another device. If the other device is a tag, also returns the tag's Coordinates object (which also holds covar)
         
         TODO: a more thorough testing of timeouts to actually figure out what is a good reliable value 
         RETURNS: 
-        - Measured distance in mm if successful, None if not 
+        - Measured distance in cm if successful, None if not
         - Coordinates position of the target, if it's a tag    
         """
         if self.is_anchor(target_id): 
@@ -338,7 +338,7 @@ class BitcrazeTag(Tag):
             T_rp1 = compute_clock_delta(int.from_bytes(T2, byteorder='little'), int.from_bytes(R1, byteorder='little'))
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
-            distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 1000) # in mm 
+            distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 100) # in cm
             # We got the distance, if it's a tag, also extract it's position and covariance from the response 
             if not self.is_anchor(target_id) and len(report) == REPORT_HEADER_SIZE + REPORT_TIMESTAMP_SIZE + REPORT_NEIGHBOR_INFO.size:
                 target_coords = self.extract_report_neighbor_info(report) # if neighbor doesn't give position AND covar, this is None 

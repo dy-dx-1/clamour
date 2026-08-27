@@ -7,10 +7,10 @@ from ...interfaces import Anchors
 
 anchors = Anchors()
 ### Defining noise models 
-## Units in mm, like the rest of the graph 
-ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([50, 50, 50]) # uncertainty in anchor placement
-RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 100) # precise 1D measurement ~ 10cm 
-ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 500, 500, 200]) # currently using constant velocity so very loose (except on z cause expect less mvt that way) 
+## Units in cm, like the rest of the graph
+ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([5, 5, 5]) # uncertainty in anchor placement
+RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 10) # precise 1D measurement ~ 10cm
+ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # currently using constant velocity so very loose (except on z cause expect less mvt that way)
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 
 class PoseGraph: 
@@ -120,7 +120,7 @@ class PoseGraph:
         # ANCHORS
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
-            anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in mm 
+            anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in cm
             if id not in self.seen_anchors:
                 # If we have never seen this anchor, need to add a prior on it's position 
                 # If we have, then no need to re-add a prior. Just directly reference it during range add

@@ -14,7 +14,7 @@ PLACEHOLDER = "xxx_yyy_zzz"  # file name template example: xxx_yyy_zzz_HH_FF_TTT
 PATH = "../../chambord_flacs/"
 SOUND_XYZ_FILES_JSON = '../sound/xyz_files.json'
 EXTENSION = ".flac"
-ORIGIN = [28, 4, 1959]
+ORIGIN = [2.8, 0.4, 195.9]
 
 
 class SoundManager(object):
@@ -66,9 +66,9 @@ class SoundManager(object):
 
     @staticmethod
     def convert_coordinates_to_indexes(coordinates: Coordinates):
-        return "{}_{}_{}".format(int(round((coordinates.x - ORIGIN[0]) / 30)),
-                                 int(round((coordinates.y - ORIGIN[1]) / 30)),
-                                 int(round((coordinates.z - ORIGIN[2]) / 30)))
+        return "{}_{}_{}".format(int(round((coordinates.x - ORIGIN[0]) / 3)),
+                     int(round((coordinates.y - ORIGIN[1]) / 3)),
+                     int(round((coordinates.z - ORIGIN[2]) / 3)))
 
     def build_play_list(self):
         """This function switches the different stats and call the sound that must be played."""
@@ -95,18 +95,18 @@ class SoundManager(object):
         while True:
             if not self.sound_queue.empty():
                 message = SoundMessage.load(*self.sound_queue.get_nowait())
-                scaled_position = Coordinates(message.coordinates.x / 10,
-                                              message.coordinates.y / 10,
-                                              min(message.coordinates.z / 10, 2250))
+                scaled_position = Coordinates(message.coordinates.x,
+                                              message.coordinates.y,
+                                              min(message.coordinates.z, 225))
                 self.cyclic_call(scaled_position)
             else:
                 sleep(0.01) # NOTE: added to reduce CPU load, confirm
 
     def main(self):
-        for posX in range(-2000, 2000, 40):
-            for posY in range(-2000, 2000, 40):
-                print(posX, posY, 1896)
-                self.cyclic_call(Coordinates(posX, posY, 1896))
+        for posX in range(-200, 200, 4):
+            for posY in range(-200, 200, 4):
+                print(posX, posY, 189)
+                self.cyclic_call(Coordinates(posX, posY, 189))
                 sleep(0.4)
 
 

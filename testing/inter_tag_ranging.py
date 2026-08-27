@@ -31,7 +31,7 @@ if TAG_ID == 11:
         ### Sender tag 
         for _ in range(10): 
             d = bc.compute_range(15) 
-            print(f"Range measured: {d}mm")
+            print(f"Range measured: {d}cm")
 
 elif TAG_ID == 15: 
     with BitcrazeTag(tag_id=TAG_ID, dw1000_bus=1, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8,

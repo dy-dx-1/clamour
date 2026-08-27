@@ -20,8 +20,8 @@ class UpdateMessage:
     - timestamp
     - synchronized_clock
     - offset
-    - anchors_ranging_data: list of ranging to anchors in format (id, range_in_mm) 
-    - tags_ranging_data: list of ranging to tags in format (TargetCoordinates, range_in_mm) 
+    - anchors_ranging_data: list of ranging to anchors in format (id, range_in_cm)
+    - tags_ranging_data: list of ranging to tags in format (TargetCoordinates, range_in_cm)
     - measured_yaw
     - slots 
     - topology: dict 
