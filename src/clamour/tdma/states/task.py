@@ -43,7 +43,7 @@ class Task(TDMAState):
         self.frame_id_done_discover = -1
         self.neighborUpdateFrequency = 5 # every five frames, do discovery and update neighbor information
         self.ranging_references = {'anchors':{}, 'tags':{}}     # Keeps track of what anchors/tags we previously used for ranging to allow variety in selection 
-
+        self.c = 0
     def execute(self) -> State:
         if self.frame_id_done_discover != self.timing.frame_id and not self.timing.frame_id % self.neighborUpdateFrequency: # do discovery at first slot of every $neighborUpdateFrequency frames
             self.frame_id_done_discover = self.timing.frame_id
@@ -104,6 +104,13 @@ class Task(TDMAState):
                         tag_zs.append( (target_id, target_pos, z) ) 
             sleep(0.000001) # Short break to ensure exchange finished. Should be more than enough.
         # Packing in an update message and sending to estimator 
+        ##TEMP inserting fake measures to test performance 
+        anchor_zs.append( (2, 226), (3, 186), (4, 198), (5,260) )
+        if self.c==1: 
+            n = Coordinates(102, 402, 0) 
+            n.update_covar((5,5,5,5,5,5))
+            tag_zs.append( (15, n, 200) )
+        self.c+=1 
         self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
                                          offset=self.timing.logical_clock.offset,
                                          anchors_ranging_data=anchor_zs,
