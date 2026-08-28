@@ -17,8 +17,9 @@ class PoseGraph:
     def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float): 
         """
         Factor Graph based 3D pose estimator. 
-        - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to initialize the prior position 
-        NOTE finish docstring 
+        - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
+        - prior_yaw: prior yaw value on initialization 
+        - timestamp: timestamp of the initial data, will serve as reference for subsequent updates to calculate dt 
         """
         # Internal data about the current state. Kept up to date and fed back to estimator.py  
         # State vector is [x,xdot,y,ydot,z,zdot,theta,thetadot]. Only here for clarity, as the prior will overwrite these 0s. 
@@ -29,11 +30,11 @@ class PoseGraph:
         
         # Graph trackers 
         self._state_counter = 0   # Keeps track of how many state nodes have been added to the graph
-        self.seen_anchors = set() # Keeps track of anchors we have previously seen, to avoid re-adding prior factors
+        self.seen_anchors = set() # Keeps track of the anchors we have previously seen, to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
 
         # Creating prior factor that locks rotation and position at initial estimate
-        self.insert_prior(prior_yaw, anchors_range_data) 
+        self.insert_init_prior(prior_yaw, anchors_range_data) 
 
     ### Properties
     @property
@@ -41,11 +42,11 @@ class PoseGraph:
         self._state_counter += 1 
         return self._state_counter 
 
-    ### INTERNAL COMPUTATION METHODS 
-    def insert_prior(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]]): 
+    ### -------------------------------------------------- INTERNAL COMPUTATION METHODS --------------------------------------------------
+    def insert_init_prior(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]]): 
         """
         Only to be used in __init__! Updates the graph and internal state with a prior that locks rotation and range factors that lock position. 
-        As of 2026-08-20, this function is only here while we don't have an IMU. 
+        As of 2026-08-20, the rotation lock is needed while we don't have an IMU. 
         No way to measure rotation, so we don't track/update it. However, to avoid an inderterminate system in the graph, we need to initialize it to a known value.
         
         Therefore, we insert a prior with very loose covariance on a rough position, but tight on the rotation. 
@@ -56,7 +57,6 @@ class PoseGraph:
         """
         ### ROTATION LOCK 
         throwaway_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
-        # NOTE check if way to avoid locking in position even loosely before anchors? 
         state_key = self.state_counter
         x0 = gt.symbol('x', state_key) 
         graph = gt.NonlinearFactorGraph() 
@@ -141,7 +141,7 @@ class PoseGraph:
             # Adding range data 
             graph.add(gt.RangeFactor3D(state_symbol, neighbor, z, RANGING_NOISE))
 
-    ### EXTERNAL METHODS USED BY estimator.py 
+    ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
     def get_position(self)->Coordinates:  
         """
         Current posterior position in Coordinates format. 
@@ -166,12 +166,13 @@ class PoseGraph:
         if not self.validate_update(timestamp): 
             # If the timestamp is not valid, don't use this data for an update
             return 
-        
+
+        ## Initialize the new section of the graph and the new state 
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
 
         current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)        # new state to add    
+        x = gt.symbol('x', current_state_id)         
 
         ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
         # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
@@ -189,7 +190,7 @@ class PoseGraph:
         ## Adding ranges 
         self.add_ranging_data(x, current_state_id, graph, initial_values, anchors_ranging_data, tags_ranging_data) 
             
-        # Updating graph and internal data 
+        ## Updating graph and internal data with the posterior 
         self.isam.update(graph, initial_values) 
         current_state_estimate = self.isam.calculateEstimate().atPose3(x) 
         # Use the last stored state (self.x) and the new current estimate through the incorporation of the data

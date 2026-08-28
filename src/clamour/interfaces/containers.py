@@ -9,14 +9,14 @@ class Coordinates:
 
     ALL ELEMENTS MUST BE INTEGERS. 
 
-    Covariance is initialized by default as None. Must be updated with update_covar() method if present.  
+    Covariance is None by default, can be initialized as a 3x3 array of ints or updated with update_covar() method.  
     """ 
-    def __init__(self, x:int=0, y:int=0, z:int=0): 
+    def __init__(self, x:int=0, y:int=0, z:int=0, covar:np.ndarray=None): 
         self._data = [int(x),int(y),int(z)] 
-        self._covar = None 
+        self._covar = covar # Trusting user reads the docstring 
     
-    def __str__(self):
-        return f"Coords X: {self.x}, Y: {self.y}, Z:{self.z}"
+    def __repr__(self):
+        return f"Coordinates: ({self.x}, {self.y}, {self.z}) | Covar: {self._covar}"
 
     @property
     def data(self)->list[int,int,int]:
@@ -87,7 +87,7 @@ class Coordinates:
 
 class Angles:
     """
-    Container for angles as heading(yaw), roll, and pitch (in degrees).
+    Container for Euler angles as heading(yaw), roll, and pitch (in degrees).
     """
 
     def __init__(self, heading=0, roll=0, pitch=0):
