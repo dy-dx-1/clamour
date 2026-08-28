@@ -128,6 +128,7 @@ class StateEstimator:
             # which is not necessarily true, what if the tag kept moving, but simply didn't see anyone? 
             # Adding the IMU will render this obsolete. 
             self.estimator.zero_movement_update(self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) 
+            print(f"ZERO MOVEMENT UPDATE APPLIED, POSE: {self.estimator.get_position()}", 'ok', 'loc')
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
 
