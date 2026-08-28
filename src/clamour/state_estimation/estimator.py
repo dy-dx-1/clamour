@@ -1,7 +1,5 @@
-import os 
 import csv
 import math 
-import numpy as np 
 from time import sleep, time 
 from typing import Literal
 from multiprocessing.synchronize import Lock

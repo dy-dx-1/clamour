@@ -9,7 +9,7 @@ anchors = Anchors()
 ### Defining noise models 
 ## Units in cm, like the rest of the graph
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([5, 5, 5]) # uncertainty in anchor placement
-RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 10) # precise 1D measurement ~ 10cm
+RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
 ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # currently using constant velocity so very loose (except on z cause expect less mvt that way)
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 
@@ -34,7 +34,6 @@ class PoseGraph:
 
         # Creating prior factor that locks rotation and position at initial estimate
         self.insert_prior(prior_yaw, anchors_range_data) 
-        print(f"Initial state: {self.x}", 'ok', 'loc')
 
     ### Properties
     @property
@@ -134,7 +133,10 @@ class PoseGraph:
             n_pos, n_cov = n_coords.data, n_coords.covar  
             # Adding the other tag's position to the graph with a special ID that tracks his position and the time
             neighbor = gt.symbol('t', int(f'{n_id}000{state_id}')) 
-            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov)))
+            # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
+            # If an indeterminate system is thrown when ranging with neighbors, printing out the matrix and checking that it's invertible 
+            # is a good debugging step, as gt.noiseModel.Gaussian.Covariance will attempt to invert it to get the Information Matrix
+            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov.astype(float)))) 
             initial_values.insert(neighbor, gt.Point3(*n_pos))
             # Adding range data 
             graph.add(gt.RangeFactor3D(state_symbol, neighbor, z, RANGING_NOISE))
