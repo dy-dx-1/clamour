@@ -51,14 +51,15 @@ class LSM6DSV320X:
                         8:  0.244, 
                         16: 0.488}
 
-    def __init__(self, ODR_rate:int, accelerometer_scale:Literal[2,4,8,16], gyro_dps_scale: Literal[250,500,1000,2000,4000],
+    def __init__(self, ODR_rate:Literal['7.5', 15, 30, 60, 120, 240, 480, 960, 1920, 3840, 7680], accelerometer_scale:Literal[2,4,8,16], gyro_dps_scale: Literal[250,500,1000,2000,4000],
                  SDO_state:bool,  i2c_bus:int=1): 
         """
         I2C interface with the LSM6DSV320X IMU. 
-        **ONLY USE WITH A CONTEXT MANAGER**. 
 
-        Currently only supporting: 
-        - High performance mode 
+        IMPORTANT CONSIDERATIONS: 
+        - ALWAYS USE WITH A CONTEXT MANAGER 
+        - Currently only supporting high performance mode accel/gyro
+        - Ensure arg values are properly selected according to manual. No internal safeguards. 
 
         ARGS: 
         - ODR_rate: Output Data Rate in Hz (must match High Perf mode see p.65 manual)
