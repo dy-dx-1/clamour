@@ -1,4 +1,5 @@
 import smbus2
+from typing import Literal 
 
 def unsigned_to_signed(value:int)->int: 
     """
@@ -6,9 +7,52 @@ def unsigned_to_signed(value:int)->int:
     """ 
     return value - 0x10000 if value & 0x8000 else value
 
-
 class LSM6DSV320X: 
-    def __init__(self, SDO_state:bool, i2c_bus:int=1): 
+    # ODR bit value to set for a desired rate in Hz 
+    # These values apply for the CTRL1 and CTRL2 registers (accel and gyro) 
+    # NOTE Not all rates are compatible with all modes 
+    # Although high-performance mode is compatible with all rates
+    # Currently only supporting high-perf so it's ok, but careful in the future 
+    ODR_from_HZ = {1.875: 0b0001,
+                   7.5:   0b0010, 
+                   15:    0b0011,
+                   30:    0b0100,
+                   60:    0b0101,
+                   120:   0b0110,
+                   240:   0b0111,
+                   480:   0b1000,
+                   960:   0b1001,
+                   1920:  0b1010,
+                   3840:  0b1011,
+                   7680:  0b1100}
+
+    # CTRL6 bits to set depending on desired DPS range for the Gyro 
+    # Bit in position 4 is needed for correct operation of device (see p.69)
+    GYRO_DPS_SCALE_BITS = {250:  0b1001, 
+                           500:  0b1010,
+                           1000: 0b1011, 
+                           2000: 0b1100, 
+                           4000: 0b1101}
+
+    # CTRL8 bits to set depending on accelerometer scale in gs 
+    ACCEL_SCALE_BITS = {2:  0b00, 
+                        4:  0b01, 
+                        8:  0b10, 
+                        16: 0b11}
+
+    # CONVERSION FACTORS mg/LSB and mdps/LSB (p.12) DEPENDING ON SCALES 
+    GYRO_SCALE_CONVERSION = {250:  8.75, 
+                             500:  17.50,
+                             1000: 35, 
+                             2000: 70, 
+                             4000: 140}
+    ACCEL_SCALE_CONVERSION = {2:  0.061, 
+                        4:  0.122, 
+                        8:  0.244, 
+                        16: 0.488}
+
+    def __init__(self, ODR_rate:int, accelerometer_scale:Literal[2,4,8,16], gyro_dps_scale: Literal[250,500,1000,2000,4000],
+                 SDO_state:bool,  i2c_bus:int=1): 
         """
         I2C interface with the LSM6DSV320X IMU. 
         **ONLY USE WITH A CONTEXT MANAGER**. 
@@ -17,7 +61,10 @@ class LSM6DSV320X:
         - High performance mode 
 
         ARGS: 
-        - SDO_state: True for 'HIGH' and False for 'LOW', defines the Target Address (TAD)
+        - ODR_rate: Output Data Rate in Hz (must match High Perf mode see p.65 manual)
+        - accelerometer_scale: Full scale of the accelerometer measurements in g's 
+        - gyro_dps_scale: Full scale of the gyro measurements in dps 
+        - SDO_state: True for 'HIGH' and False for 'LOW', defines the Target Address 
         - i2c_bus: I2C bus, 1 by default 
         """
         self.TAD = 0x6A if not SDO_state else 0x6B 
@@ -25,7 +72,7 @@ class LSM6DSV320X:
         if not self.validate_connection(): 
             raise RuntimeError("Could not connect to the LSM6DSV320X IMU. Check wiring.")
         else:
-            self.configure() 
+            self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
             print("SUCCESSFULLY CONNECTED TO IMU")
 
     def __enter__(self):
@@ -50,15 +97,11 @@ class LSM6DSV320X:
             check = False 
         return check 
 
-    def configure(self): 
+    def configure(self, accel_scale:int, gyro_scale:int, ODR_rate:int): 
         """
-        Configures the settings of the IMU and the internal dependent conversion factors.  
+        Configures the settings of the IMU and the internal dependent conversion factors. Args are taken from __init__
         
-        **Currently only supporting**:
-        - High performance mode accel/gyro
-        - 120Hz ODR
-        - 500dps gyro bandwidth, filtered for 120Hz 
-        - Accelerometer +-2g 
+        **Currently only supporting high performance mode accel/gyro**
         
         Affects the following registers: 
         - CTRL1 (0x10) 
@@ -69,26 +112,27 @@ class LSM6DSV320X:
         ### Some configs need to be done with the accelerometer and gyro in power down mode, so we first turn them off 
         self.bus.write_byte_data(self.TAD, 0x10, 0x00)
         self.bus.write_byte_data(self.TAD, 0x11, 0x00) 
+
         ### CTRL6 (0x15) Gyro bandwidth 
-        lpf1_bw = 0b0000 # NOTE bandwidth selection currently hardcoded at 120Hz 
-        fs_g = 0b1010    # NOTE Currently hardcoded at 500 dps, see p.69 of manual for others 
-        self.LSB_TO_MDPS = 17.5 # CONVERSION FACTOR FOR 500DPS p.12
+        lpf1_bw = 0b0000 # NOTE low passfilter tuning NOT DONE, this is default 
+        fs_g    = self.GYRO_DPS_SCALE_BITS[gyro_scale] 
+        self.LSB_TO_MDPS = self.GYRO_SCALE_CONVERSION[gyro_scale]
         self.bus.write_byte_data(self.TAD, 0x15, lpf1_bw<<4|fs_g)
+
         ### CTRL8 (0x17) Accelerometer scale 
-        # not touching HP_LPF2_XL_BW_2 
-        self.LSB_TO_MG = 0.061 # CONVERSION FACTOR FOR +-2g p.12
-        fs_xl = 0b00 # NOTE currently hardcoded +-2g (see p.71 to change) 
+        # NOTE currently not touching HP_LPF2_XL_BW_2 
+        self.LSB_TO_MG = self.ACCEL_SCALE_CONVERSION[accel_scale]
+        fs_xl = self.ACCEL_SCALE_BITS[accel_scale] 
         self.bus.write_byte_data(self.TAD, 0x17, fs_xl) 
+
         ### Accelerometer control reg 1 - CTRL1 - 0x10 
-        # AND 
+        ### AND 
         ### Gyroscope control reg 2 - CTRL2 - 0x11 
         # The 4 MSBs will all be 0 as long as we only support high-perf mode
-        # NOTE For now hardcoding 120Hz, see p.65 of manual if want other ones 
-        self.bus.write_byte_data(self.TAD, 0x10, 0b00000110)
-        self.bus.write_byte_data(self.TAD, 0x11, 0b00000110)
-
-        # TODO ADD SECTION THAT DEFINES UNIT CONVERSION CONSTANTS BASED ON CONFIG 
-        # SEE p.12 
+        mode = 0b0000 # NOTE ONLY SUPPORTING HIGH-PERF MODE CURRENTLY 
+        ODR_bits = self.ODR_from_HZ[ODR_rate]
+        self.bus.write_byte_data(self.TAD, 0x10, mode<<4 | ODR_bits)
+        self.bus.write_byte_data(self.TAD, 0x11, mode<<4 | ODR_bits)
 
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
 
@@ -140,11 +184,8 @@ class LSM6DSV320X:
         print("0x40 reading: ", self.bus.read_byte_data(self.TAD, 0x40)) 
         return int.from_bytes(raw_bytes, 'big')*21.7
 
-with LSM6DSV320X(False) as imu: 
-    import time 
-    a = time.perf_counter() 
-    while (time.perf_counter()-a)<60: 
-        x,y,z = imu.get_x_y_z_accel()
-        p,r,y = imu.get_pitch_roll_yaw_speeds() 
-        print(f"{x=:.0f}, {y=:.0f}, {z=:.0f}, {p=:.0f} {r=:.0f}, {y=:.0f} ")
-        time.sleep(0.3) 
+with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
+
+    x,y,z = imu.get_x_y_z_accel()
+    p,r,y = imu.get_pitch_roll_yaw_speeds() 
+    print(f"{x=:.0f}, {y=:.0f}, {z=:.0f}, {p=:.0f} {r=:.0f}, {y=:.0f} ")
