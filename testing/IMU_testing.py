@@ -86,6 +86,7 @@ class LSM6DSV320X:
         self.write_reg_byte(0x15, lpf1_bw<<4|fs_g)
         ### CTRL8 (0x17) Accelerometer scale 
         # not touching HP_LPF2_XL_BW_2 
+        self.LSB_TO_MG = 0.061 # CONVERSION FACTOR FOR +-2g p.12
         fs_xl = 0b00 # NOTE currently hardcoded +-2g (see p.71 to change) 
         self.write_reg_byte(0x17, fs_xl) 
         ### Accelerometer control reg 1 - CTRL1 - 0x10 
@@ -125,8 +126,22 @@ class LSM6DSV320X:
         yaw   = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x26)) 
         return pitch*self.LSB_TO_MDPS, roll*self.LSB_TO_MDPS, yaw*self.LSB_TO_MDPS
 
+    def get_x_y_z_accel(self)->tuple[int,int,int]:
+        """
+        Gets the raw linear acceleration (in mg) for the:
+        - X axis from the 0x28 and 0x29 registers. 
+        - Y axis from the 0x2A and 0x2B registers. 
+        - Z axis from the 0x2C and 0x2D registers. 
+
+        **The conversion units used depend on the configured accelerometer scale.**         
+        """
+        x = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x28))
+        y = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x2A))
+        z = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x2C))
+        return x*self.LSB_TO_MG, y*self.LSB_TO_MG, z*self.LSB_TO_MG
+
 with LSM6DSV320X(False) as imu: 
-
-
     ## ANGULAR SPEEDS 
     print(imu.get_pitch_roll_yaw_speeds())
+    ## Accel 
+    print(imu.get_x_y_z_accel())
