@@ -40,16 +40,6 @@ class LSM6DSV320X:
         except: 
             pass
 
-    # TODO not sure I need these tbh 
-    def read_reg_byte(self, reg_address:int)->int: 
-        """Helper to read a single byte from a register address without having to rewrite the target address every time"""
-        return self.bus.read_byte_data(self.TAD, reg_address)
-
-    def write_reg_byte(self, reg_address:int, byte:int): 
-        """Helper to write a single byte to a register address without having to rewrite the target address every time"""
-        self.bus.write_byte_data(self.TAD, reg_address, byte)
-
-
     def validate_connection(self): 
         """
         Reads the WHO_AM_I register (0x0F) and checks it's value to confirm if a connection is properly established. 
@@ -77,25 +67,25 @@ class LSM6DSV320X:
         - CTRL8 (0x17) 
         """
         ### Some configs need to be done with the accelerometer and gyro in power down mode, so we first turn them off 
-        self.write_reg_byte(0x10, 0x00)
-        self.write_reg_byte(0x11, 0x00) 
+        self.bus.write_byte_data(self.TAD, 0x10, 0x00)
+        self.bus.write_byte_data(self.TAD, 0x11, 0x00) 
         ### CTRL6 (0x15) Gyro bandwidth 
         lpf1_bw = 0b0000 # NOTE bandwidth selection currently hardcoded at 120Hz 
         fs_g = 0b1010    # NOTE Currently hardcoded at 500 dps, see p.69 of manual for others 
         self.LSB_TO_MDPS = 17.5 # CONVERSION FACTOR FOR 500DPS p.12
-        self.write_reg_byte(0x15, lpf1_bw<<4|fs_g)
+        self.bus.write_byte_data(self.TAD, 0x15, lpf1_bw<<4|fs_g)
         ### CTRL8 (0x17) Accelerometer scale 
         # not touching HP_LPF2_XL_BW_2 
         self.LSB_TO_MG = 0.061 # CONVERSION FACTOR FOR +-2g p.12
         fs_xl = 0b00 # NOTE currently hardcoded +-2g (see p.71 to change) 
-        self.write_reg_byte(0x17, fs_xl) 
+        self.bus.write_byte_data(self.TAD, 0x17, fs_xl) 
         ### Accelerometer control reg 1 - CTRL1 - 0x10 
         # AND 
         ### Gyroscope control reg 2 - CTRL2 - 0x11 
         # The 4 MSBs will all be 0 as long as we only support high-perf mode
         # NOTE For now hardcoding 120Hz, see p.65 of manual if want other ones 
-        self.write_reg_byte(0x10, 0b00000110)
-        self.write_reg_byte(0x11, 0b00000110)
+        self.bus.write_byte_data(self.TAD, 0x10, 0b00000110)
+        self.bus.write_byte_data(self.TAD, 0x11, 0b00000110)
 
         # TODO ADD SECTION THAT DEFINES UNIT CONVERSION CONSTANTS BASED ON CONFIG 
         # SEE p.12 
@@ -140,8 +130,21 @@ class LSM6DSV320X:
         z = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x2C))
         return x*self.LSB_TO_MG, y*self.LSB_TO_MG, z*self.LSB_TO_MG
 
+    def get_timestamp(self)->int: 
+        """
+        Gets the timestamp data from the 0x40, 0x41, 0x42 and 0x43 registers. 
+        Returns timestamp in microseconds 
+        """
+        # From p.85, the conversion is 1LSB=21.7microseconds 
+        raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
+        print("0x40 reading: ", self.bus.read_byte_data(self.TAD, 0x40)) 
+        return int.from_bytes(raw_bytes, 'big')*21.7
+
 with LSM6DSV320X(False) as imu: 
-    ## ANGULAR SPEEDS 
-    print(imu.get_pitch_roll_yaw_speeds())
-    ## Accel 
-    print(imu.get_x_y_z_accel())
+    import time 
+    a = time.perf_counter() 
+    while (time.perf_counter()-a)<60: 
+        x,y,z = imu.get_x_y_z_accel()
+        p,r,y = imu.get_pitch_roll_yaw_speeds() 
+        print(f"{x=:.0f}, {y=:.0f}, {z=:.0f}, {p=:.0f} {r=:.0f}, {y=:.0f} ")
+        time.sleep(0.3) 
