@@ -47,9 +47,9 @@ class LSM6DSV320X:
                              2000: 70, 
                              4000: 140}
     ACCEL_SCALE_CONVERSION = {2:  0.061, 
-                        4:  0.122, 
-                        8:  0.244, 
-                        16: 0.488}
+                              4:  0.122, 
+                              8:  0.244, 
+                              16: 0.488}
 
     def __init__(self, ODR_rate:Literal['7.5', 15, 30, 60, 120, 240, 480, 960, 1920, 3840, 7680], accelerometer_scale:Literal[2,4,8,16], gyro_dps_scale: Literal[250,500,1000,2000,4000],
                  SDO_state:bool,  i2c_bus:int=1): 
@@ -147,7 +147,7 @@ class LSM6DSV320X:
         raw = self.bus.read_word_data(self.TAD, 0x20) 
         return unsigned_to_signed(raw) / 256 + 25 # Units based on p.16 of user manual 
 
-    def get_pitch_roll_yaw_speeds(self)->tuple[int,int,int]: 
+    def get_pitch_roll_yaw_speeds(self)->tuple[float, float, float]: 
         """
         Gets the raw angular rate (in mdps) for the:
         - X (pitch) axis from the 0x22 and 0x23 registers. 
@@ -156,12 +156,13 @@ class LSM6DSV320X:
 
         **The conversion units used depend on the selected gyro dps bandwidth.** 
         """
-        pitch = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x22)) 
-        roll  = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x24)) 
-        yaw   = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x26)) 
+        data = self.bus.read_i2c_block_data(self.TAD, 0x22, 6)
+        pitch = unsigned_to_signed(data[0] | (data[1] << 8)) 
+        roll  = unsigned_to_signed(data[2] | (data[3] << 8)) 
+        yaw   = unsigned_to_signed(data[4] | (data[5] << 8)) 
         return pitch*self.LSB_TO_MDPS, roll*self.LSB_TO_MDPS, yaw*self.LSB_TO_MDPS
 
-    def get_x_y_z_accel(self)->tuple[int,int,int]:
+    def get_x_y_z_accel(self)->tuple[float, float, float]:
         """
         Gets the raw linear acceleration (in mg) for the:
         - X axis from the 0x28 and 0x29 registers. 
@@ -170,10 +171,11 @@ class LSM6DSV320X:
 
         **The conversion units used depend on the configured accelerometer scale.**         
         """
-        x = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x28))
-        y = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x2A))
-        z = unsigned_to_signed(self.bus.read_word_data(self.TAD, 0x2C))
-        return x*self.LSB_TO_MG, y*self.LSB_TO_MG, z*self.LSB_TO_MG
+        data = self.bus.read_i2c_block_data(self.TAD, 0x28, 6)
+        x = unsigned_to_signed(data[0] | (data[1] << 8))
+        y = unsigned_to_signed(data[2] | (data[3] << 8))
+        z = unsigned_to_signed(data[4] | (data[5] << 8))
+        return x * self.LSB_TO_MG, y * self.LSB_TO_MG, z * self.LSB_TO_MG
 
     def get_timestamp(self)->int: 
         """
@@ -186,7 +188,13 @@ class LSM6DSV320X:
         return int.from_bytes(raw_bytes, 'big')*21.7
 
 with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
+    print(imu.bus.read_byte_data(imu.TAD, 0x12))
+    import time 
+    import math
+    a = time.perf_counter() 
+    while time.perf_counter()-a < 60: 
+        x,y,z = (accel*0.00980665 for accel in imu.get_x_y_z_accel()) # in m/s2 
+        p,r,yaw = (mdps/1000 for mdps in imu.get_pitch_roll_yaw_speeds()) # in deg/s 
+        print(f"{x=:.2f}, {y=:.2f}, {z=:.2f}, mag: {math.sqrt(x*x + y*y + z*z)/9.81:.1f}g           |           {p=:.0f} {r=:.0f}, {y=:.0f} ")
 
-    x,y,z = imu.get_x_y_z_accel()
-    p,r,y = imu.get_pitch_roll_yaw_speeds() 
-    print(f"{x=:.0f}, {y=:.0f}, {z=:.0f}, {p=:.0f} {r=:.0f}, {y=:.0f} ")
+        time.sleep(0.15) 
