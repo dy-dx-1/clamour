@@ -110,10 +110,12 @@ class LSM6DSV320X:
         - CTRL2 (0x11) 
         - CTRL6 (0x15)
         - CTRL8 (0x17) 
+        - FUNCTIONS_ENABLE (0x50)
         """
+        # TODO check if replace all writes by write only if read differs
         ### Ensure BDU and IF_INC are turned on in the CTRL3 reg as we depend on these in this class. 
         if self.bus.read_byte_data(self.TAD, 0x12)!=0x44: self.bus.write_byte_data(self.TAD, 0x12, 0x44)
-        
+
         ### Some configs need to be done with the accelerometer and gyro in power down mode, so we first turn them off 
         self.bus.write_byte_data(self.TAD, 0x10, 0x00)
         self.bus.write_byte_data(self.TAD, 0x11, 0x00) 
@@ -139,6 +141,11 @@ class LSM6DSV320X:
         self.bus.write_byte_data(self.TAD, 0x10, mode<<4 | ODR_bits)
         self.bus.write_byte_data(self.TAD, 0x11, mode<<4 | ODR_bits)
 
+        ### Enable timestamp - FUNCTIONS_ENABLE - 0x50
+        # NOTE for now not touching other functions 
+        current = self.bus.read_byte_data(self.TAD, 0x50) 
+        TIMESTAMP_EN = 1<<6 
+        self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
 
     def get_temp(self): 
@@ -195,9 +202,9 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
     import time 
     import math
     a = time.perf_counter() 
-    while time.perf_counter()-a < 60: 
+    while time.perf_counter()-a < 5: 
         x,y,z = (accel*0.00980665 for accel in imu.get_x_y_z_accel()) # in m/s2 
         p,r,yaw = (mdps/1000 for mdps in imu.get_pitch_roll_yaw_speeds()) # in deg/s 
         print(f"{x=:.2f}, {y=:.2f}, {z=:.2f}, mag: {math.sqrt(x*x + y*y + z*z)/9.81:.1f}g           |           {p=:.0f} {r=:.0f}, {y=:.0f} ")
-
+        print(imu.get_timestamp())
         time.sleep(0.15) 
