@@ -71,7 +71,7 @@ class LSM6DSV320X:
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
         if not self.validate_connection(): 
-            raise RuntimeError("Could not connect to the LSM6DSV320X IMU. Check wiring.")
+            raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
         else:
             self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
             print("SUCCESSFULLY CONNECTED TO IMU")
@@ -105,11 +105,15 @@ class LSM6DSV320X:
         **Currently only supporting high performance mode accel/gyro**
         
         Affects the following registers: 
+        - CTRL3 (0x12) 
         - CTRL1 (0x10) 
         - CTRL2 (0x11) 
         - CTRL6 (0x15)
         - CTRL8 (0x17) 
         """
+        ### Ensure BDU and IF_INC are turned on in the CTRL3 reg as we depend on these in this class. 
+        if self.bus.read_byte_data(self.TAD, 0x12)!=0x44: self.bus.write_byte_data(self.TAD, 0x12, 0x44)
+        
         ### Some configs need to be done with the accelerometer and gyro in power down mode, so we first turn them off 
         self.bus.write_byte_data(self.TAD, 0x10, 0x00)
         self.bus.write_byte_data(self.TAD, 0x11, 0x00) 
@@ -184,8 +188,7 @@ class LSM6DSV320X:
         """
         # From p.85, the conversion is 1LSB=21.7microseconds 
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
-        print("0x40 reading: ", self.bus.read_byte_data(self.TAD, 0x40)) 
-        return int.from_bytes(raw_bytes, 'big')*21.7
+        return int.from_bytes(raw_bytes, 'little')*21.7
 
 with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
     print(imu.bus.read_byte_data(imu.TAD, 0x12))
