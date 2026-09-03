@@ -148,6 +148,37 @@ class LSM6DSV320X:
         self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
 
+    def fifo_config(self, data_freq:int): 
+        ### FIFO_CTRL1 - 0x07 
+        ## 1 LSB = 7 bytes in the FIFO. Max capacity without compression is 1.5KB 
+        ## NOTE currently setting it ~75% just as placeholder to give time to empty it before full. Can be tuned in future. 
+        self.bus.write_byte_data(self.TAD, 0x07, 0xA0)
+        ### FIFO_CTRL2 - 0x08 
+        STOP_ON_WTM =      0b0<<7 # Limits the depth to the watermark, leaving this off as our WM serves as warning 
+        FIFO_COMPR_RT_EN = 0b0<<6 # Disable compression 
+        ODR_CHG_EN =       0b0<<4 # Batch ODR CHANGE sensor in FIFO 
+        UNCOMPR_RATE =    0b00<<1 # Configure compression algorithm 
+        self.bus.write_byte_data(self.TAD, 0x08, STOP_ON_WTM&FIFO_COMPR_RT_EN&ODR_CHG_EN&UNCOMPR_RATE) # other bits must be 0 
+        ### FIFO_CTRL3 - 0x09 
+        ## Controls write frequency in FIFO for gyro and accel 
+        ## keeping the same freq as the selected ODR 
+        value = self.ODR_from_HZ[data_freq]<<4 | self.ODR_from_HZ[data_freq]
+        self.bus.write_byte_data(self.TAD, 0x09, value)
+        ### FIFO_CTRL4 - 0x0A 
+        ## Controls timestamp, temperature, EIS batching and FIFO mode 
+        DEC_TS_BATCH = 0b01<<6 # Batching timestamps, decimation 1 # NOTE confirm
+        ODR_T_BATCH = 0b00<<4  # Not batching temp 
+        G_EIS_FIFO_EN = 0b0<<3 # Not batching EIS 
+        FIFO_MODE = 0b001      # FIFO mode (stops when full) 
+        self.bus.write_byte_data(self.TAD, 0x0A, DEC_TS_BATCH&ODR_T_BATCH&G_EIS_FIFO_EN&FIFO_MODE)
+        ### INT1_CTRL and INT2_CTRL - 0x0D and 0x0E 
+        ## Can be used to enable interrupts on INT1 when FIFO full
+        ## NOTE currently unused 
+    
+    def FIFO_past_WTM(self)->bool: 
+        """Checks if the FIFO filling is equal to or greater than the set watermark"""
+        return bool(self.bus.read_byte_data(self.TAD, 0x1C) & 0x80) # FIFO_STATUS2 register 
+
     def get_temp(self): 
         """
         Reads the current temperature according to the 0x20 and 0x21 registers. 
@@ -198,13 +229,22 @@ class LSM6DSV320X:
         return int.from_bytes(raw_bytes, 'little')*21.7
 
 with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
-    print(imu.bus.read_byte_data(imu.TAD, 0x12))
+    
     import time 
     import math
     a = time.perf_counter() 
+    last_ts = imu.get_timestamp()*1e-6 # just for testing, this timestamp is not guaranteed to align with any readings because of interface
+    speeds = (0,0,0) 
+    pos = (0,0,0) 
+    angles = (0,0,0)
     while time.perf_counter()-a < 5: 
-        x,y,z = (accel*0.00980665 for accel in imu.get_x_y_z_accel()) # in m/s2 
-        p,r,yaw = (mdps/1000 for mdps in imu.get_pitch_roll_yaw_speeds()) # in deg/s 
-        print(f"{x=:.2f}, {y=:.2f}, {z=:.2f}, mag: {math.sqrt(x*x + y*y + z*z)/9.81:.1f}g           |           {p=:.0f} {r=:.0f}, {y=:.0f} ")
-        print(imu.get_timestamp())
+        raw_accels, raw_ws, ts = imu.get_x_y_z_accel(), imu.get_pitch_roll_yaw_speeds(), imu.get_timestamp()*1e-6
+        accels = tuple(accel*0.00980665 for accel in raw_accels) # in m/s2 
+        w_rates = tuple(mdps/1000 for mdps in raw_ws) # in deg/s 
+        dt = ts - last_ts
+        speeds = tuple( (accels[i]*dt)+speeds[i] for i in range(3))
+        pos = tuple( (((accels[i]*dt)+speeds[i])*dt) + pos[i] for i in range(3))
+        angles = tuple(w_rates[i]*dt + angles[i] for i in range(3))
+
+        print(f"{pos=}  |  {speeds=}  | {accels=}  | {angles=}  | {w_rates=}")
         time.sleep(0.15) 
