@@ -186,47 +186,42 @@ class LSM6DSV320X:
 
     def read_FIFO(self)->dict: 
         """
-        TODO 
-        NOTE Check & test
+        Reads all of the data present in the FIFO. 
+
+        The FIFO can hold up to 256 words of uncompressed 6 byte data (1536bytes). A FIFO word is 7 bytes, but the 1 byte of TAG info is stored separately.
+        
+        RETURNS:
+        - A dict of shape {sample_idx: {'accel': (accel_data), 'gyro': (gyro_data), 'timestamp': timestamp}}
+            - NOTE accel_data in mg's, gyro_data in mdps and timestamp in BYTES (so that deltas can be calculated before converting twice) 
         """
-        # NOTE first draft of result formatting: dict of sensor timeslot (TAG_CNT) -> accel, gyro and timestamp data
-        # So each element of the main dict is a time-coherent sample:  {tag_cnt: {'accel': accel_data, 'gyro': gyro_data, 'timestamp': ts}}
         results = {} 
         previous_tag_cnt = None # Used to group samples that belong together temporally 
-        current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls
-        ### Checking DIFF_FIFO in FIFO_STATUS1 and FIFO_STATUS2 registers to know how much data is in it 
-        ## DIFF_FIFO[8:0] is spread between the two registers and gives the number of words (7bytes) that are in FIFO 
+        current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
+        ### Checking DIFF_FIFO which is split between FIFO_STATUS1 and FIFO_STATUS2 registers 
+        ## It gives the number of words (1 word = 7 bytes) that are in FIFO 
         diff_FIFO = ((self.bus.read_byte_data(self.TAD, 0x1C)&0x01)<<8) | self.bus.read_byte_data(self.TAD, 0x1B) 
-        print(f"There are {diff_FIFO} words in FIFO!")
-        ### Reading FIFO_DATA_OUT_TAG and DATA registers (FIFO automatically wraps around with block read)
-        # Size to read: 7 bytes per word * diff_FIFO words in FIFO 
-        # NOTE: read_i2c_block_data reads a maximum of 32bytes at a time, so we read in 4-word (28bytes) bursts as possible 
+        ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
         residual_words = diff_FIFO 
         while residual_words>0: 
-            n_words = min(4, residual_words) # read in chunks of 4 until we can't 
+            n_words = min(4, residual_words) # read in chunks of 4 until we can't. read_i2c_block_data can read max of 32 bytes at a time
             FIFO_data = self.bus.read_i2c_block_data(self.TAD, 0x78, 7*n_words) 
             for i in range(n_words): 
-                ## For each word in the data, determine what type it is an deconstruct it accordingly
+                ## For each word in the data, determine what type it is and deconstruct it accordingly
                 word = FIFO_data[i*7:(i+1)*7]
-                tag_type =  word[0] >> 3 # 5 MSBs 
+                tag_type =  word[0] >> 3       # 5 MSBs 
                 tag_cnt  = (word[0]>>1) & 0b11 # Bits 1 and 2 
-
                 # Detect transition to new FIFO timeslot 
-                # NOTE this assumes that *any* change in TAG_CNT corresponds to a new timeslot (verified through testing) 
+                # this assumes that *any* change in TAG_CNT corresponds to a new timeslot (verified through testing) 
                 # in other words, TAG_CNT can only increase by units of 1, sequentially, until it wraps after 3 
                 if previous_tag_cnt is not None and tag_cnt != previous_tag_cnt: 
                     current_sample_idx += 1 
-
                 # Create dict for this sample if it doesn't exist yet 
                 if current_sample_idx not in results: 
                     results[current_sample_idx] = {} 
-
-                results[current_sample_idx]["tag_cnt"] = tag_cnt  # NOTE TODO to remove, for debugging 
-                
+                # Extract and save data 
                 X_data = (word[2]<<8) | word[1]
                 Y_data = (word[4]<<8) | word[3]
                 Z_data = (word[6]<<8) | word[5]
-
                 if tag_type==0x01: # According to table 232, p.114 datasheet 
                     results[current_sample_idx]['gyro'] = (unsigned_to_signed(X_data)*self.LSB_TO_MDPS, 
                                                 unsigned_to_signed(Y_data)*self.LSB_TO_MDPS, 
