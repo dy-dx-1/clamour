@@ -146,9 +146,14 @@ class LSM6DSV320X:
         current = self.bus.read_byte_data(self.TAD, 0x50) 
         TIMESTAMP_EN = 1<<6 
         self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
+
+        ### Configuring FIFO 
+        self.fifo_config(data_freq = ODR_rate) 
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
 
     def fifo_config(self, data_freq:int): 
+        ### We'll reset the FIFO on init to ensure it starts back up, else it gets disabled after 1 read
+        self.bus.write_byte_data(self.TAD, 0x0A, 0) # register CTRL4
         ### FIFO_CTRL1 - 0x07 
         ## 1 LSB = 7 bytes in the FIFO. Max capacity without compression is 1.5KB 
         ## NOTE currently setting it ~75% just as placeholder to give time to empty it before full. Can be tuned in future. 
@@ -158,7 +163,7 @@ class LSM6DSV320X:
         FIFO_COMPR_RT_EN = 0b0<<6 # Disable compression 
         ODR_CHG_EN =       0b0<<4 # Batch ODR CHANGE sensor in FIFO 
         UNCOMPR_RATE =    0b00<<1 # Configure compression algorithm 
-        self.bus.write_byte_data(self.TAD, 0x08, STOP_ON_WTM&FIFO_COMPR_RT_EN&ODR_CHG_EN&UNCOMPR_RATE) # other bits must be 0 
+        self.bus.write_byte_data(self.TAD, 0x08, STOP_ON_WTM|FIFO_COMPR_RT_EN|ODR_CHG_EN|UNCOMPR_RATE) # other bits must be 0 
         ### FIFO_CTRL3 - 0x09 
         ## Controls write frequency in FIFO for gyro and accel 
         ## keeping the same freq as the selected ODR 
@@ -167,10 +172,10 @@ class LSM6DSV320X:
         ### FIFO_CTRL4 - 0x0A 
         ## Controls timestamp, temperature, EIS batching and FIFO mode 
         DEC_TS_BATCH = 0b01<<6 # Batching timestamps, decimation 1 # NOTE confirm
-        ODR_T_BATCH = 0b00<<4  # Not batching temp 
+        ODR_T_BATCH =  0b00<<4 # Not batching temp 
         G_EIS_FIFO_EN = 0b0<<3 # Not batching EIS 
         FIFO_MODE = 0b001      # FIFO mode (stops when full) 
-        self.bus.write_byte_data(self.TAD, 0x0A, DEC_TS_BATCH&ODR_T_BATCH&G_EIS_FIFO_EN&FIFO_MODE)
+        self.bus.write_byte_data(self.TAD, 0x0A, DEC_TS_BATCH|ODR_T_BATCH|G_EIS_FIFO_EN|FIFO_MODE)
         ### INT1_CTRL and INT2_CTRL - 0x0D and 0x0E 
         ## Can be used to enable interrupts on INT1 when FIFO full
         ## NOTE currently unused 
@@ -178,6 +183,65 @@ class LSM6DSV320X:
     def FIFO_past_WTM(self)->bool: 
         """Checks if the FIFO filling is equal to or greater than the set watermark"""
         return bool(self.bus.read_byte_data(self.TAD, 0x1C) & 0x80) # FIFO_STATUS2 register 
+
+    def read_FIFO(self)->dict: 
+        """
+        TODO 
+        NOTE Check & test
+        """
+        # NOTE first draft of result formatting: dict of sensor timeslot (TAG_CNT) -> accel, gyro and timestamp data
+        # So each element of the main dict is a time-coherent sample:  {tag_cnt: {'accel': accel_data, 'gyro': gyro_data, 'timestamp': ts}}
+        results = {} 
+        previous_tag_cnt = None # Used to group samples that belong together temporally 
+        current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls
+        ### Checking DIFF_FIFO in FIFO_STATUS1 and FIFO_STATUS2 registers to know how much data is in it 
+        ## DIFF_FIFO[8:0] is spread between the two registers and gives the number of words (7bytes) that are in FIFO 
+        diff_FIFO = ((self.bus.read_byte_data(self.TAD, 0x1C)&0x01)<<8) | self.bus.read_byte_data(self.TAD, 0x1B) 
+        print(f"There are {diff_FIFO} words in FIFO!")
+        ### Reading FIFO_DATA_OUT_TAG and DATA registers (FIFO automatically wraps around with block read)
+        # Size to read: 7 bytes per word * diff_FIFO words in FIFO 
+        # NOTE: read_i2c_block_data reads a maximum of 32bytes at a time, so we read in 4-word (28bytes) bursts as possible 
+        residual_words = diff_FIFO 
+        while residual_words>0: 
+            n_words = min(4, residual_words) # read in chunks of 4 until we can't 
+            FIFO_data = self.bus.read_i2c_block_data(self.TAD, 0x78, 7*n_words) 
+            for i in range(n_words): 
+                ## For each word in the data, determine what type it is an deconstruct it accordingly
+                word = FIFO_data[i*7:(i+1)*7]
+                tag_type =  word[0] >> 3 # 5 MSBs 
+                tag_cnt  = (word[0]>>1) & 0b11 # Bits 1 and 2 
+
+                # Detect transition to new FIFO timeslot 
+                # NOTE this assumes that *any* change in TAG_CNT corresponds to a new timeslot (verified through testing) 
+                # in other words, TAG_CNT can only increase by units of 1, sequentially, until it wraps after 3 
+                if previous_tag_cnt is not None and tag_cnt != previous_tag_cnt: 
+                    current_sample_idx += 1 
+
+                # Create dict for this sample if it doesn't exist yet 
+                if current_sample_idx not in results: 
+                    results[current_sample_idx] = {} 
+
+                results[current_sample_idx]["tag_cnt"] = tag_cnt  # NOTE TODO to remove, for debugging 
+                
+                X_data = (word[2]<<8) | word[1]
+                Y_data = (word[4]<<8) | word[3]
+                Z_data = (word[6]<<8) | word[5]
+
+                if tag_type==0x01: # According to table 232, p.114 datasheet 
+                    results[current_sample_idx]['gyro'] = (unsigned_to_signed(X_data)*self.LSB_TO_MDPS, 
+                                                unsigned_to_signed(Y_data)*self.LSB_TO_MDPS, 
+                                                unsigned_to_signed(Z_data)*self.LSB_TO_MDPS)  
+                elif tag_type==0x02: 
+                    results[current_sample_idx]['accel'] = (unsigned_to_signed(X_data)*self.LSB_TO_MG, 
+                                                 unsigned_to_signed(Y_data)*self.LSB_TO_MG, 
+                                                 unsigned_to_signed(Z_data)*self.LSB_TO_MG)  
+                elif tag_type==0x04: 
+                    results[current_sample_idx]['timestamp'] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
+                else: 
+                    print(f"unknown type in FIFO!: {hex(tag_type)}")
+                previous_tag_cnt = tag_cnt
+            residual_words -= n_words 
+        return results
 
     def get_temp(self): 
         """
@@ -237,7 +301,9 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
     speeds = (0,0,0) 
     pos = (0,0,0) 
     angles = (0,0,0)
-    while time.perf_counter()-a < 5: 
+    print(f"{imu.FIFO_past_WTM()=}")
+    while time.perf_counter()-a < 0.5: 
+        """
         raw_accels, raw_ws, ts = imu.get_x_y_z_accel(), imu.get_pitch_roll_yaw_speeds(), imu.get_timestamp()*1e-6
         accels = tuple(accel*0.00980665 for accel in raw_accels) # in m/s2 
         w_rates = tuple(mdps/1000 for mdps in raw_ws) # in deg/s 
@@ -248,3 +314,11 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
 
         print(f"{pos=}  |  {speeds=}  | {accels=}  | {angles=}  | {w_rates=}")
         time.sleep(0.15) 
+        """
+        pass 
+    r = imu.read_FIFO() 
+
+    print([d['tag_cnt'] for d in r.values()])
+    
+    print(f"{imu.FIFO_past_WTM()=}")
+
