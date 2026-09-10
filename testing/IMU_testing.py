@@ -1,13 +1,29 @@
 import smbus2
 from typing import Literal 
+import numpy as np
+import csv 
 
-def unsigned_to_signed(value:int)->int: 
+def uint16_to_int16(value:int)->int: 
     """
     Converts an unsigned 2-byte int to a signed int, following two's complement 
     """ 
     return value - 0x10000 if value & 0x8000 else value
 
 class LSM6DSV320X: 
+    ### Calibration values for accel and gyro 
+    ### NOTE THESE ARE SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE DONE ON! (2026-09-10)
+    ### PRELIMINARY VALUES! 
+    # units are in mgs and mdps. format is x,y,z 
+    # calibrated_measure = scale_factor @ (raw_measure-bias)
+    accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
+                                   [0.006256910346063383,    1.0018358510192535,   0.0],
+                                   [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
+    accel_bias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
+    gyro_bias  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
+    gyro_scale_factor  =  np.array([[1,0,0],
+                                    [0,1,0],
+                                    [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others. 
+    ### Datasheet config info 
     # ODR bit value to set for a desired rate in Hz 
     # These values apply for the CTRL1 and CTRL2 registers (accel and gyro) 
     # NOTE Not all rates are compatible with all modes 
@@ -87,6 +103,20 @@ class LSM6DSV320X:
             self.bus.close() 
         except: 
             pass
+
+    def convert_accel_bytes_to_mgs(self, x:int, y:int, z:int)->np.ndarray: 
+        """Convert packed unsigned 16-bit XYZ words to signed, calibrated, mgs in vector format."""
+        accel = self.LSB_TO_MG * np.array([uint16_to_int16(x), 
+                                           uint16_to_int16(y),
+                                           uint16_to_int16(z)])
+        return self.accel_scale_factor @ (accel-self.accel_bias) 
+
+    def convert_gyro_bytes_to_mdps(self, pitch:int, roll:int, yaw:int)->np.ndarray: 
+        """Convert packed unsigned 16-bit XYZ words to signed, calibrated, mdps in vector format."""
+        gyro = self.LSB_TO_MDPS * np.array([uint16_to_int16(pitch), 
+                                            uint16_to_int16(roll),
+                                            uint16_to_int16(yaw)])
+        return self.gyro_scale_factor @ (gyro - self.gyro_bias) 
 
     def validate_connection(self): 
         """
@@ -191,7 +221,7 @@ class LSM6DSV320X:
         The FIFO can hold up to 256 words of uncompressed 6 byte data (1536bytes). A FIFO word is 7 bytes, but the 1 byte of TAG info is stored separately.
         
         RETURNS:
-        - A dict of shape {sample_idx: {'accel': (accel_data), 'gyro': (gyro_data), 'timestamp': timestamp}}
+        - A dict of shape {sample_idx: {'accel': accel_data, 'gyro': gyro_data, 'timestamp': timestamp}}
             - NOTE accel_data in mg's, gyro_data in mdps and timestamp in BYTES (so that deltas can be calculated before converting twice) 
         """
         results = {} 
@@ -223,13 +253,9 @@ class LSM6DSV320X:
                 Y_data = (word[4]<<8) | word[3]
                 Z_data = (word[6]<<8) | word[5]
                 if tag_type==0x01: # According to table 232, p.114 datasheet 
-                    results[current_sample_idx]['gyro'] = (unsigned_to_signed(X_data)*self.LSB_TO_MDPS, 
-                                                unsigned_to_signed(Y_data)*self.LSB_TO_MDPS, 
-                                                unsigned_to_signed(Z_data)*self.LSB_TO_MDPS)  
+                    results[current_sample_idx]['gyro'] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data)
                 elif tag_type==0x02: 
-                    results[current_sample_idx]['accel'] = (unsigned_to_signed(X_data)*self.LSB_TO_MG, 
-                                                 unsigned_to_signed(Y_data)*self.LSB_TO_MG, 
-                                                 unsigned_to_signed(Z_data)*self.LSB_TO_MG)  
+                    results[current_sample_idx]['accel'] = self.convert_accel_bytes_to_mgs(X_data, Y_data, Z_data)
                 elif tag_type==0x04: 
                     results[current_sample_idx]['timestamp'] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
                 else: 
@@ -246,9 +272,9 @@ class LSM6DSV320X:
         # The info is 2 bytes. Each stored in 0x20 and 0x21 respectively, with 0x20 being the lower one. 
         # read_word_data reads 2 bytes and treats the first one as the lower one, so no further rearranging needed. 
         raw = self.bus.read_word_data(self.TAD, 0x20) 
-        return unsigned_to_signed(raw) / 256 + 25 # Units based on p.16 of user manual 
+        return uint16_to_int16(raw) / 256 + 25 # Units based on p.16 of user manual 
 
-    def get_pitch_roll_yaw_speeds(self)->tuple[float, float, float]: 
+    def get_pitch_roll_yaw_speeds(self)->np.ndarray: 
         """
         Gets the raw angular rate (in mdps) for the:
         - X (pitch) axis from the 0x22 and 0x23 registers. 
@@ -258,14 +284,13 @@ class LSM6DSV320X:
         **The conversion units used depend on the selected gyro dps bandwidth.** 
         """
         data = self.bus.read_i2c_block_data(self.TAD, 0x22, 6)
-        pitch = unsigned_to_signed(data[0] | (data[1] << 8)) 
-        roll  = unsigned_to_signed(data[2] | (data[3] << 8)) 
-        yaw   = unsigned_to_signed(data[4] | (data[5] << 8)) 
-        return pitch*self.LSB_TO_MDPS, roll*self.LSB_TO_MDPS, yaw*self.LSB_TO_MDPS
+        return self.convert_gyro_bytes_to_mdps(pitch = data[0] | (data[1] << 8),
+                                               roll  = data[2] | (data[3] << 8),
+                                               yaw   = data[4] | (data[5] << 8))
 
-    def get_x_y_z_accel(self)->tuple[float, float, float]:
+    def get_x_y_z_accel(self)->np.ndarray:
         """
-        Gets the raw linear acceleration (in mg) for the:
+        Gets the raw linear acceleration **(in mg)** for the:
         - X axis from the 0x28 and 0x29 registers. 
         - Y axis from the 0x2A and 0x2B registers. 
         - Z axis from the 0x2C and 0x2D registers. 
@@ -273,10 +298,9 @@ class LSM6DSV320X:
         **The conversion units used depend on the configured accelerometer scale.**         
         """
         data = self.bus.read_i2c_block_data(self.TAD, 0x28, 6)
-        x = unsigned_to_signed(data[0] | (data[1] << 8))
-        y = unsigned_to_signed(data[2] | (data[3] << 8))
-        z = unsigned_to_signed(data[4] | (data[5] << 8))
-        return x * self.LSB_TO_MG, y * self.LSB_TO_MG, z * self.LSB_TO_MG
+        return self.convert_accel_bytes_to_mgs(x = data[0] | (data[1] << 8),
+                                               y = data[2] | (data[3] << 8),
+                                               z = data[4] | (data[5] << 8)) 
 
     def get_timestamp(self)->int: 
         """
@@ -288,16 +312,17 @@ class LSM6DSV320X:
         return int.from_bytes(raw_bytes, 'little')*21.7
 
 with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
-    
+
     import time 
     import math
     a = time.perf_counter() 
-    last_ts = imu.get_timestamp()*1e-6 # just for testing, this timestamp is not guaranteed to align with any readings because of interface
     speeds = (0,0,0) 
     pos = (0,0,0) 
     angles = (0,0,0)
-    print(f"{imu.FIFO_past_WTM()=}")
-    while time.perf_counter()-a < 0.5: 
+    #print(f"{imu.FIFO_past_WTM()=}")
+
+    calib_data = [] 
+    while time.perf_counter()-a < 15: 
         """
         raw_accels, raw_ws, ts = imu.get_x_y_z_accel(), imu.get_pitch_roll_yaw_speeds(), imu.get_timestamp()*1e-6
         accels = tuple(accel*0.00980665 for accel in raw_accels) # in m/s2 
@@ -310,10 +335,7 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
         print(f"{pos=}  |  {speeds=}  | {accels=}  | {angles=}  | {w_rates=}")
         time.sleep(0.15) 
         """
-        pass 
-    r = imu.read_FIFO() 
-
-    print([d['tag_cnt'] for d in r.values()])
-    
-    print(f"{imu.FIFO_past_WTM()=}")
+        ac = imu.get_x_y_z_accel()
+        print(f"{np.linalg.norm(ac)}  |  "  , ac, "   |   ",  imu.get_pitch_roll_yaw_speeds())
+        time.sleep(0.15) 
 
