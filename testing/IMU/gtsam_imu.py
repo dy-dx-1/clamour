@@ -12,7 +12,7 @@ pim_params.setGyroscopeCovariance((1e-3)**2 * np.eye(3))
 pim_params.setAccelerometerCovariance((1e-3)**2 * np.eye(3))
 pim_params.setIntegrationCovariance((1e-7)**2 * np.eye(3))
 # Defining IMU biaises 
-accBias = np.array( [0.0, 0.0, 0.0])
+accBias = np.array( [0.0, 0.0, 0.0]) # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
 gyroBias = np.array([0.0, 0.0, 0.0])
 imu_bias = gtsam.imuBias.ConstantBias(accBias, gyroBias)
 # Creating preintegration object 
