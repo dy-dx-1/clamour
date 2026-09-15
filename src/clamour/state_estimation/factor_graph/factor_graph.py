@@ -10,7 +10,6 @@ anchors = Anchors()
 ## Units in cm, like the rest of the graph
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([5, 5, 5]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
-ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # currently using constant velocity so very loose (except on z cause expect less mvt that way)
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 
 class FactorGraph: 
@@ -106,23 +105,6 @@ class FactorGraph:
             print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')
             return False 
 
-    def constant_velocity_model(self, previous_pose: gt.Pose3)->tuple: 
-        """
-        Supposes a constant velocity to estimate the motion of the next step. 
-        NOTE: When using the velocity in self.x to compute the expected delta, the result is in the global reference frame. 
-        However, BetweenFactor expects a relative movement between poses, in the local frame of the body. 
-        If yaw is fixed at 0, this doesn't matter, because this simple model doesn't introduce rotation and the frames stay aligned. 
-        However, at any other yaw, the global expected delta needs to be mapped into the local frame to be properly applied. 
-        Ex: If the yaw is fixed at 90deg and we compute a movement of (5,0,0) in the global frame, if we don't map it to the relative frame
-        then BetweenFactor will apply the 5 value to the local 'x' axis, which would result in global mvt along 'y'. 
-        """
-        # Expected delta in the global reference frame 
-        delta_world = gt.Point3(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)
-        # Mapping it to the local frame so BetweenFactor can be applied 
-        # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
-        delta_body = previous_pose.rotation().unrotate(delta_world)
-        return delta_body
-
     def add_ranging_data(self, state_symbol, state_id, graph, initial_values, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple]): 
         """
         Add anchor and tag ranging data of a new state to the graph. Does not add an initial belief to our own state. 
@@ -189,6 +171,43 @@ class FactorGraph:
         # Make sure to clear out preintegration values for the next run 
         self.pim.resetIntegration()
 
+    def add_constant_velocity_link(self, graph, initial_values, current_state_symbol, current_state_id): 
+        """
+        Uses a constant velocity model to loosely link states with a BetweenFactorPose 
+        NOTE TODO The function is ready to use but I haven't configured support to switch to it 
+        Leaving it here to facilitate deploying the code on non-IMU platforms in the future if needed. 
+        """
+        def constant_velocity_model(self, previous_pose): 
+            """
+            Supposes a constant velocity to estimate the motion of the next step. 
+            NOTE: When using the velocity in self.x to compute the expected delta, the result is in the global reference frame. 
+            However, BetweenFactor expects a relative movement between poses, in the local frame of the body. 
+            If yaw is fixed at 0, this doesn't matter, because this simple model doesn't introduce rotation and the frames stay aligned. 
+            However, at any other yaw, the global expected delta needs to be mapped into the local frame to be properly applied. 
+            Ex: If the yaw is fixed at 90deg and we compute a movement of (5,0,0) in the global frame, if we don't map it to the relative frame
+            then BetweenFactor will apply the 5 value to the local 'x' axis, which would result in global mvt along 'y'. 
+            """
+            # Expected delta in the global reference frame 
+            delta_world = gt.Point3(self.x[1]*self.dt, self.x[3]*self.dt, self.x[5]*self.dt)
+            # Mapping it to the local frame so BetweenFactor can be applied 
+            # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
+            delta_body = previous_pose.rotation().unrotate(delta_world)
+            return delta_body
+        ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # ~~~constant velocity so very loose (except on z cause expect less mvt that way)
+        x = current_state_symbol
+        ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
+        # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
+        # which would directly be ~equivalent to blindly trilaterating and discarding each step. 
+        # Having even a loose motion model allows us to link states and smooth the global trajectory, for example, correcting sudden bad trilaterations due to NLOS. 
+        # Any information is useful information to include, as long as it's even slightly relevant, as it will affect the joint posterior. 
+        x_prev = gt.symbol('x', current_state_id-1) # fetching past state (corresponding to the current value of self.x)
+        previous_pose = gt.Pose3(gt.Rot3.Ypr(self.get_yaw(), 0, 0), gt.Point3(*self.get_position().data)) # NOTE when doing a more complex model, should fetch the pose with results.atPose3()
+        # Connecting to previous state through a motion model 
+        delta_local_frame = constant_velocity_model(previous_pose) # Supposing constant velocity, what would be the local vector to the new state?
+        mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )    # NOTE simple constant velocity model keeps yaw constant
+        graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
+        initial_values.insert(x, previous_pose.compose(mvt))
+
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
     def get_position(self)->Coordinates:  
         """
@@ -222,19 +241,8 @@ class FactorGraph:
         current_state_id = self.state_counter
         x = gt.symbol('x', current_state_id)         
 
-        ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
-        # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
-        # which would directly be ~equivalent to blindly trilaterating and discarding each step. 
-        # Having even a loose motion model allows us to link states and smooth the global trajectory, for example, correcting sudden bad trilaterations due to NLOS. 
-        # Any information is useful information to include, as long as it's even slightly relevant, as it will affect the joint posterior. 
-        # NOTE TODO BEFORE REMOVING CONSIDER KEEPING A FUNCTION FOR THIS IN CASE WANT TO USE CLAMOUR WITHOUT IMU! 
-        x_prev = gt.symbol('x', current_state_id-1) # fetching past state (corresponding to the current value of self.x)
-        previous_pose = gt.Pose3(gt.Rot3.Ypr(self.get_yaw(), 0, 0), gt.Point3(*self.get_position().data)) # NOTE when doing a more complex model, should fetch the pose with results.atPose3()
-        # Connecting to previous state through a motion model 
-        delta_local_frame = self.constant_velocity_model(previous_pose) # Supposing constant velocity, what would be the local vector to the new state?
-        mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame ) # NOTE simple constant velocity model keeps yaw constant
-        graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
-        initial_values.insert(x, previous_pose.compose(mvt))
+        ## Linking states together 
+        self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
 
         ## Adding ranges 
         self.add_ranging_data(x, current_state_id, graph, initial_values, anchors_ranging_data, tags_ranging_data) 
