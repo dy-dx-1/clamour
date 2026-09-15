@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 ### Setting up preintegration -----------------
 # pim: preintegrated measurements 
 # define Z axis pointing up. factor will handle gravity internally 
-pim_params = gtsam.PreintegrationParams.MakeSharedU(9.81)
+pim_params = gtsam.PreintegrationCombinedParams.MakeSharedU(9.81)
 # Some arbitrary noise sigmas for accel, gyro and numerical integration
 pim_params.setGyroscopeCovariance((1e-3)**2 * np.eye(3))
 pim_params.setAccelerometerCovariance((1e-3)**2 * np.eye(3))
@@ -16,14 +16,16 @@ accBias = np.array( [0.0, 0.0, 0.0]) # NOTE biases will be SUBSTRACTED from read
 gyroBias = np.array([0.0, 0.0, 0.0])
 imu_bias = gtsam.imuBias.ConstantBias(accBias, gyroBias)
 # Creating preintegration object 
-# requires sensor cov, initial biais estimate (will be estimated afterwards), optinal transform bodyPsensor for IMU-body frame if needed
-pim = gtsam.PreintegratedImuMeasurements(pim_params, imu_bias)
+# requires sensor cov, initial biais estimate (drift will be estimated afterwards)
+# Using combined version as we'll use CombinedImuFactor later
+pim = gtsam.PreintegratedCombinedMeasurements(pim_params, imu_bias)
 
 ### Integrating raw IMU data -----------------
 accel_reading = np.array([1.0, 0.0, 9.81]) # accelerating 1m/s^2 forward, z up 
 gyro_reading  = np.array([0.0, 0.0, 0.0]) # NOTE CHECK IF FORCE FLOAT 
 dt = 0.01 # 100Hz 
 for _ in range(100): # for 1s, at 100Hz, moving fwd at 1m/s^2 
+    # integrateMeasurement also has an optional arg: bodyPsensor for IMU-body frame transform if needed
     pim.integrateMeasurement(accel_reading, gyro_reading, dt)
 
 ### Building graph -----------------
@@ -42,12 +44,10 @@ initial.insert(X(0), gtsam.Pose3())
 initial.insert(V(0), np.zeros(3))
 initial.insert(B(0), imu_bias)
 
-# IMU Factor between state 0 and 1 
-# NOTE THIS IS WHAT WE SHOULD COMPARE AFTERWARDS! DIFFERENT TYPES 
-imu_factor = gtsam.ImuFactor(X(0), V(0), X(1), V(1), B(0), pim)
+# Using CombinedImuFactor, which removes the need of an independent BetweenFactor to track the bias 
+# while keeping taking into account correlations between bias drift and IMU predictions 
+imu_factor = gtsam.CombinedImuFactor(X(0), V(0), X(1), V(1), B(0), B(1), pim)
 graph.add(imu_factor)
-# Bias random walk factor: we set it so bias doesn't change much between states (we expect it to change very slowly)
-graph.add(gtsam.BetweenFactorConstantBias(B(0), B(1), gtsam.imuBias.ConstantBias(), bias_noise))
 
 # Initial guess for state 1 (using IMU's own prediction as starting point) 
 # using NavState as it encodes pose + velocity, which we need to track with the imu 
