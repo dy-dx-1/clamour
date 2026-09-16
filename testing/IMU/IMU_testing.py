@@ -12,8 +12,8 @@ def uint16_to_int16(value:int)->int:
 class LSM6DSV320X: 
     ### Measurement noise 
     ## Values to be used in setAccelerometerCovariance/setGyroscopeCovariance after conversion to FG optimization units
-    accel_bias_covar = 60**2  # From datasheet, units are (micro_g**2)*s. Matches expected format by GTSAM 
-    gyro_bias_covar  = 3.8**2 # From datasheet, units are (mdps**2)*s. Matches expected format by GTSAM  
+    accel_measurement_covar = 60**2  # From datasheet, units are (micro_g**2)*s. Matches expected format by GTSAM 
+    gyro_measurement_covar  = 3.8**2 # From datasheet, units are (mdps**2)*s. Matches expected format by GTSAM  
     ### Calibration values for accel and gyro 
     ### NOTE THESE ARE PRELIMINARY VALUES & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
     # units are in mgs and mdps. format is x,y,z 
