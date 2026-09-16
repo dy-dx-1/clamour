@@ -11,6 +11,7 @@ anchors = Anchors()
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([5, 5, 5]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
+IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
 
 class FactorGraph: 
     def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float): 
@@ -82,7 +83,9 @@ class FactorGraph:
         # TODO we are expecting a 3x3 np matrix for all of these. Floats for each element. 
         pim_params.setAccelerometerCovariance(accel_covar)
         pim_params.setGyroscopeCovariance(gyro_covar)
-        pim_params.setIntegrationCovariance(integration_covar)
+        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) # this is the uncertainty due to modeling errors in the integration from accel->v->p
+        pim_params.setBiasAccCovariance(accel_bias_covar) 
+        pim_params.setBiasOmegaCovariance(gyro_bias_covar) 
         # Defining IMU bias and setting a prior
         # The IMU calibration isn't perfect, this prior serves to anchor our confidence in it 
         # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve. This gives it it's reference starting point. 

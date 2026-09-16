@@ -10,9 +10,12 @@ def uint16_to_int16(value:int)->int:
     return value - 0x10000 if value & 0x8000 else value
 
 class LSM6DSV320X: 
+    ### Measurement noise 
+    ## Values to be used in setAccelerometerCovariance/setGyroscopeCovariance after conversion to FG optimization units
+    accel_bias_covar = 60**2  # From datasheet, units are (micro_g**2)*s. Matches expected format by GTSAM 
+    gyro_bias_covar  = 3.8**2 # From datasheet, units are (mdps**2)*s. Matches expected format by GTSAM  
     ### Calibration values for accel and gyro 
-    ### NOTE THESE ARE SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
-    ### PRELIMINARY VALUES! 
+    ### NOTE THESE ARE PRELIMINARY VALUES & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
     # units are in mgs and mdps. format is x,y,z 
     # calibrated_measure = scale_factor @ (raw_measure-bias)
     accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
@@ -28,6 +31,13 @@ class LSM6DSV320X:
     ## as GTSAM will need these non-compensated values so it can apply the compensation with it's own bias 
     accel_bias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
     gyro_bias  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
+    ### Bias random walk covariance needs to be estimated with Allan variance analysis 
+    ## NOTE currently (16sept 2026) setting it to reasonable temporary values. 
+    ## Will be enough to validate IMU integration since we don't dead-reckon for long without range factors to correct 
+    ## In the future, can do proper calibration / variance analysis to fix this 
+    # To be used in GTSAM setBiasAccCovariance/setBiasOmegaCovariance
+    accel_bias_random_walk_covar =  0.032**2 # Guessed placeholders, units: (mg**2)/s
+    gyro_bias_random_walk_covar =   5.73**2  # Guessed placeholders, units: (mdps**2)/s
     ### Datasheet config info 
     # ODR bit value to set for a desired rate in Hz 
     # These values apply for the CTRL1 and CTRL2 registers (accel and gyro) 
