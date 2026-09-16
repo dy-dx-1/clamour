@@ -22,7 +22,7 @@ pim = gtsam.PreintegratedCombinedMeasurements(pim_params, imu_bias)
 
 ### Integrating raw IMU data -----------------
 accel_reading = np.array([1.0, 0.0, 9.81]) # accelerating 1m/s^2 forward, z up 
-gyro_reading  = np.array([0.0, 0.0, 0.0]) # NOTE CHECK IF FORCE FLOAT 
+gyro_reading  = np.array([0.0, 0.0, 0.0]) 
 dt = 0.01 # 100Hz 
 for _ in range(100): # for 1s, at 100Hz, moving fwd at 1m/s^2 
     # integrateMeasurement also has an optional arg: bodyPsensor for IMU-body frame transform if needed

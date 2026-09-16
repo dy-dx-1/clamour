@@ -28,7 +28,7 @@ class FactorGraph:
         self.dt = None 
         
         # Graph trackers 
-        self._state_counter = 0   # Keeps track of how many state nodes have been added to the graph
+        self._state_counter = -1   # Keeps track of how many state nodes have been added to the graph
         self.seen_anchors = set() # Keeps track of the anchors we have previously seen, to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
         self.pim  = self.create_imu_pim_obj() # PreintegratedCombinedMeasurements object. Is used for IMU pre-integration. 
@@ -66,13 +66,13 @@ class FactorGraph:
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)))
         ### POSITION LOCK 
-        self.add_ranging_data(x0, state_key, graph, initial_values, anchors_range_data, [])
+        self.add_ranging_data(x0, state_key, graph, initial_values, anchors_range_data, tags_ranging_data=[])
         ### GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
         current_state_estimate = self.isam.calculateEstimate().atPose3(x0) 
         self.x = np.array([current_state_estimate.x(), 0, current_state_estimate.y(), 0, current_state_estimate.z(), 0, yaw_prior, 0])
 
-    def create_imu_pim_obj(self, gyro_covar, accel_covar, integration_covar, gyro_bias, accel_bias, imu_bias): 
+    def create_imu_pim_obj(self, state_key, graph, initial, gyro_covar, accel_covar, integration_covar, gyro_bias, accel_bias): 
         """
         Creates a gtsam.PreintegratedCombinedMeasurements object, which will be used to do IMU pre-integration with the CombinedImuFactor
         """
@@ -83,10 +83,16 @@ class FactorGraph:
         pim_params.setAccelerometerCovariance(accel_covar)
         pim_params.setGyroscopeCovariance(gyro_covar)
         pim_params.setIntegrationCovariance(integration_covar)
-        # Defining IMU biaises 
+        # Defining IMU bias and setting a prior
+        # The IMU calibration isn't perfect, this prior serves to anchor our confidence in it 
+        # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve. This gives it it's reference starting point. 
+        # TODO currently here, but some restructuring for clarity might be needed? harmonize with insert_init_prior? 
         # TODO we are expecting np.array([X, Y, Z]) for each. Floats for each. 
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
         imu_bias = gt.imuBias.ConstantBias(accel_bias, gyro_bias)
+        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_BIAS_NOISE)) # define noise in the imu class 
+        initial.insert(gt.symbol('b', state_key), imu_bias) 
+
         # Creating the preintegration object 
         # Using combined version as we'll use CombinedImuFactor later
         return gt.PreintegratedCombinedMeasurements(pim_params, imu_bias)
@@ -166,7 +172,7 @@ class FactorGraph:
         predicted_state = self.pim.predict(prev_state, imu_bias) 
         initial_values.insert(state_symbol, predicted_state.pose())
         initial_values.insert(velocity_symbol, predicted_state.velocity())
-        initial_values.insert(bias_symbol, imu_bias)
+        initial_values.insert(bias_symbol, imu_bias) #TODO check if pim of combined values can automatically use up to date estimation for imu bias for it's pred? just a thought 
 
         # Make sure to clear out preintegration values for the next run 
         self.pim.resetIntegration()
@@ -230,6 +236,7 @@ class FactorGraph:
         Called whenever we get new ranges from anchors or tags to add to the factor graph. 
         NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model. 
         """
+        # TODO replace current_state by new state to make it clearer? 
         if not self.validate_update(timestamp): 
             # If the timestamp is not valid, don't use this data for an update
             return 
