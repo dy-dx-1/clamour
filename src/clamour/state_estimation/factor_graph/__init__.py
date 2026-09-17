@@ -1,1 +1,1 @@
-from .factor_graph import PoseGraph
+from .factor_graph import FactorGraph

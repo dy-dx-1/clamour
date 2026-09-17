@@ -10,19 +10,34 @@ def uint16_to_int16(value:int)->int:
     return value - 0x10000 if value & 0x8000 else value
 
 class LSM6DSV320X: 
+    ### Measurement noise 
+    ## Values to be used in setAccelerometerCovariance/setGyroscopeCovariance after conversion to FG optimization units
+    accel_measurement_covar = 60**2  # From datasheet, units are (micro_g**2)*s. Matches expected format by GTSAM 
+    gyro_measurement_covar  = 3.8**2 # From datasheet, units are (mdps**2)*s. Matches expected format by GTSAM  
     ### Calibration values for accel and gyro 
-    ### NOTE THESE ARE SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE DONE ON! (2026-09-10)
-    ### PRELIMINARY VALUES! 
+    ### NOTE THESE ARE PRELIMINARY VALUES & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
     # units are in mgs and mdps. format is x,y,z 
     # calibrated_measure = scale_factor @ (raw_measure-bias)
     accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
                                    [0.006256910346063383,    1.0018358510192535,   0.0],
                                    [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
-    accel_bias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
-    gyro_bias  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
     gyro_scale_factor  =  np.array([[1,0,0],
                                     [0,1,0],
                                     [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others. 
+    ### NOTE Bias drifts over time due to several external factors. GTSAM will automatically track and estimate 
+    ## the change in bias over time through the FG. These values are therefore only destined to be used for 
+    ## bias initialization. One should let GTSAM handle it afterwards. 
+    ## This is why convert_accel_bytes_to_mgs and convert_gyro_bytes_to_mdps have params that allow to not return bias compensated values
+    ## as GTSAM will need these non-compensated values so it can apply the compensation with it's own bias 
+    accel_bias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
+    gyro_bias  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
+    ### Bias random walk covariance needs to be estimated with Allan variance analysis 
+    ## NOTE currently (16sept 2026) setting it to reasonable temporary values. 
+    ## Will be enough to validate IMU integration since we don't dead-reckon for long without range factors to correct 
+    ## In the future, can do proper calibration / variance analysis to fix this 
+    # To be used in GTSAM setBiasAccCovariance/setBiasOmegaCovariance
+    accel_bias_random_walk_covar =  0.032**2 # Guessed placeholders, units: (mg**2)/s
+    gyro_bias_random_walk_covar =   5.73**2  # Guessed placeholders, units: (mdps**2)/s
     ### Datasheet config info 
     # ODR bit value to set for a desired rate in Hz 
     # These values apply for the CTRL1 and CTRL2 registers (accel and gyro) 
@@ -104,19 +119,25 @@ class LSM6DSV320X:
         except: 
             pass
 
-    def convert_accel_bytes_to_mgs(self, x:int, y:int, z:int)->np.ndarray: 
-        """Convert packed unsigned 16-bit XYZ words to signed, calibrated, mgs in vector format."""
+    def convert_accel_bytes_to_mgs(self, x:int, y:int, z:int, apply_bias:bool)->np.ndarray: 
+        """
+        Convert packed unsigned 16-bit XYZ words to signed, calibrated, mgs in vector format.
+        Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the ConstantBias on it's end)
+        """
         accel = self.LSB_TO_MG * np.array([uint16_to_int16(x), 
                                            uint16_to_int16(y),
                                            uint16_to_int16(z)])
-        return self.accel_scale_factor @ (accel-self.accel_bias) 
+        return self.accel_scale_factor @ (accel-self.accel_bias) if apply_bias else self.accel_scale_factor @ accel
 
-    def convert_gyro_bytes_to_mdps(self, pitch:int, roll:int, yaw:int)->np.ndarray: 
-        """Convert packed unsigned 16-bit XYZ words to signed, calibrated, mdps in vector format."""
+    def convert_gyro_bytes_to_mdps(self, pitch:int, roll:int, yaw:int, apply_bias:bool)->np.ndarray: 
+        """
+        Convert packed unsigned 16-bit XYZ words to signed, calibrated, mdps in vector format.
+        Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the bias on it's end)
+        """
         gyro = self.LSB_TO_MDPS * np.array([uint16_to_int16(pitch), 
                                             uint16_to_int16(roll),
                                             uint16_to_int16(yaw)])
-        return self.gyro_scale_factor @ (gyro - self.gyro_bias) 
+        return self.gyro_scale_factor @ (gyro - self.gyro_bias) if apply_bias else self.gyro_scale_factor @ gyro
 
     def validate_connection(self): 
         """
@@ -214,11 +235,13 @@ class LSM6DSV320X:
         """Checks if the FIFO filling is equal to or greater than the set watermark"""
         return bool(self.bus.read_byte_data(self.TAD, 0x1C) & 0x80) # FIFO_STATUS2 register 
 
-    def read_FIFO(self)->dict: 
+    def read_FIFO(self, apply_bias:bool)->dict: 
         """
         Reads all of the data present in the FIFO. 
 
         The FIFO can hold up to 256 words of uncompressed 6 byte data (1536bytes). A FIFO word is 7 bytes, but the 1 byte of TAG info is stored separately.
+        
+        Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the ConstantBias on it's end)
         
         RETURNS:
         - A dict of shape {sample_idx: {'accel': accel_data, 'gyro': gyro_data, 'timestamp': timestamp}}
@@ -253,9 +276,9 @@ class LSM6DSV320X:
                 Y_data = (word[4]<<8) | word[3]
                 Z_data = (word[6]<<8) | word[5]
                 if tag_type==0x01: # According to table 232, p.114 datasheet 
-                    results[current_sample_idx]['gyro'] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data)
+                    results[current_sample_idx]['gyro'] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x02: 
-                    results[current_sample_idx]['accel'] = self.convert_accel_bytes_to_mgs(X_data, Y_data, Z_data)
+                    results[current_sample_idx]['accel'] = self.convert_accel_bytes_to_mgs(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x04: 
                     results[current_sample_idx]['timestamp'] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
                 else: 
@@ -274,7 +297,7 @@ class LSM6DSV320X:
         raw = self.bus.read_word_data(self.TAD, 0x20) 
         return uint16_to_int16(raw) / 256 + 25 # Units based on p.16 of user manual 
 
-    def get_pitch_roll_yaw_speeds(self)->np.ndarray: 
+    def get_pitch_roll_yaw_speeds(self, apply_bias=True)->np.ndarray: 
         """
         Gets the raw angular rate (in mdps) for the:
         - X (pitch) axis from the 0x22 and 0x23 registers. 
@@ -282,25 +305,29 @@ class LSM6DSV320X:
         - Z (yaw)   axis from the 0x26 and 0x27 registers. 
 
         **The conversion units used depend on the selected gyro dps bandwidth.** 
+
+        Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the ConstantBias on it's end)
         """
         data = self.bus.read_i2c_block_data(self.TAD, 0x22, 6)
         return self.convert_gyro_bytes_to_mdps(pitch = data[0] | (data[1] << 8),
                                                roll  = data[2] | (data[3] << 8),
-                                               yaw   = data[4] | (data[5] << 8))
+                                               yaw   = data[4] | (data[5] << 8), apply_bias=apply_bias)
 
-    def get_x_y_z_accel(self)->np.ndarray:
+    def get_x_y_z_accel(self, apply_bias=True)->np.ndarray:
         """
         Gets the raw linear acceleration **(in mg)** for the:
         - X axis from the 0x28 and 0x29 registers. 
         - Y axis from the 0x2A and 0x2B registers. 
         - Z axis from the 0x2C and 0x2D registers. 
 
-        **The conversion units used depend on the configured accelerometer scale.**         
+        **The conversion units used depend on the configured accelerometer scale.**   
+
+        Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the ConstantBias on it's end)
         """
         data = self.bus.read_i2c_block_data(self.TAD, 0x28, 6)
         return self.convert_accel_bytes_to_mgs(x = data[0] | (data[1] << 8),
                                                y = data[2] | (data[3] << 8),
-                                               z = data[4] | (data[5] << 8)) 
+                                               z = data[4] | (data[5] << 8), apply_bias=apply_bias) 
 
     def get_timestamp(self)->int: 
         """

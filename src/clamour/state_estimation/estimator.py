@@ -5,7 +5,7 @@ from typing import Literal
 from multiprocessing.synchronize import Lock
 
 from .ekf import CustomEKF
-from .factor_graph import PoseGraph
+from .factor_graph import FactorGraph
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
 from ..interfaces import Tag, Coordinates
@@ -81,7 +81,7 @@ class StateEstimator:
                         # For the EKF, incorporating ranging data with >3 anchors will directly trigger a trilateration update
                         self.estimator.incorporate_ranging_data(msg.timestamp, msg.anchors_ranging_data, msg.tags_ranging_data, raw_yaw)
                     elif self.estimator_type == 'FG':
-                        self.estimator = PoseGraph(msg.anchors_ranging_data, raw_yaw, msg.timestamp)
+                        self.estimator = FactorGraph(msg.anchors_ranging_data, raw_yaw, msg.timestamp)
                         # Not calling incorporate_ranging_data yet, as need to update timestamp first 
                         # however should add a way to set factors in init as using directly incorporate_... will add a BetweenFactor
                         # separate adding functions inside incorporate and just put the ones adding the anchors and tags inside of the init part? 
