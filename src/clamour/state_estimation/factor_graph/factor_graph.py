@@ -32,7 +32,7 @@ class FactorGraph:
         self._state_counter = -1   # Keeps track of how many state nodes have been added to the graph
         self.seen_anchors = set() # Keeps track of the anchors we have previously seen, to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
-        self.pim  = self.create_imu_pim_obj() # PreintegratedCombinedMeasurements object. Is used for IMU pre-integration. 
+        self.pim  = self.create_imu_pim_obj() # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
 
         # Creating prior factor that locks rotation and position at initial estimate
         self.insert_init_prior(prior_yaw, anchors_range_data) 
@@ -83,7 +83,7 @@ class FactorGraph:
         # TODO we are expecting a 3x3 np matrix for all of these. Floats for each element. 
         pim_params.setAccelerometerCovariance(accel_covar)
         pim_params.setGyroscopeCovariance(gyro_covar)
-        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) # this is the uncertainty due to modeling errors in the integration from accel->v->p
+        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) # Uncertainty due to modeling errors in the integration from accel->v->p
         pim_params.setBiasAccCovariance(accel_bias_covar) 
         pim_params.setBiasOmegaCovariance(gyro_bias_covar) 
         # Defining IMU bias and setting a prior

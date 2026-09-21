@@ -3,6 +3,50 @@ from typing import Literal
 import numpy as np
 import csv 
 
+######################## DATASHEET CONFIGURATION BITS FOR IMU ########################
+# ODR bit value to set for a desired rate in Hz 
+# Applies for the CTRL1 and CTRL2 registers (accel and gyro) 
+# NOTE Not all rates are compatible with all modes 
+# Although high-performance mode is compatible with all rates
+# Currently only supporting high-perf so it's ok, but careful in the future 
+ODR_FROM_HZ = {1.875: 0b0001,
+                7.5:   0b0010, 
+                15:    0b0011,
+                30:    0b0100,
+                60:    0b0101,
+                120:   0b0110,
+                240:   0b0111,
+                480:   0b1000,
+                960:   0b1001,
+                1920:  0b1010,
+                3840:  0b1011,
+                7680:  0b1100}
+
+# CTRL6 bits to set depending on desired DPS range for the Gyro 
+# Bit in position 4 is needed for correct operation of device (see p.69)
+GYRO_DPS_SCALE_BITS = {250:  0b1001, 
+                        500:  0b1010,
+                        1000: 0b1011, 
+                        2000: 0b1100, 
+                        4000: 0b1101}
+
+# CTRL8 bits to set depending on accelerometer scale in gs 
+ACCEL_SCALE_BITS = {2:  0b00, 
+                    4:  0b01, 
+                    8:  0b10, 
+                    16: 0b11}
+
+# CONVERSION FACTORS mg/LSB and mdps/LSB (p.12) DEPENDING ON SCALES 
+GYRO_SCALE_CONVERSION = {250:  8.75, 
+                            500:  17.50,
+                            1000: 35, 
+                            2000: 70, 
+                            4000: 140}
+ACCEL_SCALE_CONVERSION = {2:  0.061, 
+                            4:  0.122, 
+                            8:  0.244, 
+                            16: 0.488}
+
 def uint16_to_int16(value:int)->int: 
     """
     Converts an unsigned 2-byte int to a signed int, following two's complement 
@@ -10,78 +54,35 @@ def uint16_to_int16(value:int)->int:
     return value - 0x10000 if value & 0x8000 else value
 
 class LSM6DSV320X: 
-    ### Measurement noise 
-    ## Values to be used in setAccelerometerCovariance/setGyroscopeCovariance after conversion to FG optimization units
-    accel_measurement_covar = 60**2  # From datasheet, units are (micro_g**2)*s. Matches expected format by GTSAM 
-    gyro_measurement_covar  = 3.8**2 # From datasheet, units are (mdps**2)*s. Matches expected format by GTSAM  
-    ### Calibration values for accel and gyro 
-    ### NOTE THESE ARE PRELIMINARY VALUES & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
-    # units are in mgs and mdps. format is x,y,z 
-    # calibrated_measure = scale_factor @ (raw_measure-bias)
+    ### ACCEL/GYRO COVARIANCE  
+    # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
+    # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
+    accel_covar_density_mg = 60**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (micro_g**2)*s 
+    gyro_covar_density_mdps  = 3.8**2 # Units: (mdps**2)*s
+    # Bias random walk covariance - PLACEHOLDER VALUES - TO BE ESTIMATED WITH ALLAN VARIANCE ANALYSIS 
+    # As of 21sept 2026, placeholders as it'll be enough to validate IMU integration. We don't dead-reckon for long without range factors to correct. 
+    # GTSAM expects these values to be /s as it will *s during pre-integration 
+    # To be used in GTSAM setBiasAccCovariance/setBiasOmegaCovariance
+    accel_bias_random_walk_covar_mg =  0.032**2   # Guessed placeholders, units: (mg**2)/s
+    gyro_bias_random_walk_covar_mdps =   5.73**2  # Guessed placeholders, units: (mdps**2)/s
+
+    ### ACCEL/GYRO CALIBRATION VALUES
+    ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
+    ## Units are in mgs and mdps. Format is x,y,z. Match the equation: calibrated_measure = scale_factor @ (raw_measure-bias)
+    # Scale Factor (always used internally) 
     accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
                                    [0.006256910346063383,    1.0018358510192535,   0.0],
                                    [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
     gyro_scale_factor  =  np.array([[1,0,0],
                                     [0,1,0],
                                     [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others. 
-    ### NOTE Bias drifts over time due to several external factors. GTSAM will automatically track and estimate 
-    ## the change in bias over time through the FG. These values are therefore only destined to be used for 
-    ## bias initialization. One should let GTSAM handle it afterwards. 
-    ## This is why convert_accel_bytes_to_mgs and convert_gyro_bytes_to_mdps have params that allow to not return bias compensated values
-    ## as GTSAM will need these non-compensated values so it can apply the compensation with it's own bias 
+    # Bias (Fixed initial value, does not consider bias drift) 
+    # If using GTSAM, use these values to initialize bias tracking & let the FG handle drift-estimation afterwards 
+    # convert_accel_bytes_to_mgs() and convert_gyro_bytes_to_mdps() have params to return or not bias compensated values for this. 
+    # as GTSAM will use non-compensated values so it can apply it's own estimated bias 
     accel_bias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
     gyro_bias  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
-    ### Bias random walk covariance needs to be estimated with Allan variance analysis 
-    ## NOTE currently (16sept 2026) setting it to reasonable temporary values. 
-    ## Will be enough to validate IMU integration since we don't dead-reckon for long without range factors to correct 
-    ## In the future, can do proper calibration / variance analysis to fix this 
-    # To be used in GTSAM setBiasAccCovariance/setBiasOmegaCovariance
-    accel_bias_random_walk_covar =  0.032**2 # Guessed placeholders, units: (mg**2)/s
-    gyro_bias_random_walk_covar =   5.73**2  # Guessed placeholders, units: (mdps**2)/s
-    ### Datasheet config info 
-    # ODR bit value to set for a desired rate in Hz 
-    # These values apply for the CTRL1 and CTRL2 registers (accel and gyro) 
-    # NOTE Not all rates are compatible with all modes 
-    # Although high-performance mode is compatible with all rates
-    # Currently only supporting high-perf so it's ok, but careful in the future 
-    ODR_from_HZ = {1.875: 0b0001,
-                   7.5:   0b0010, 
-                   15:    0b0011,
-                   30:    0b0100,
-                   60:    0b0101,
-                   120:   0b0110,
-                   240:   0b0111,
-                   480:   0b1000,
-                   960:   0b1001,
-                   1920:  0b1010,
-                   3840:  0b1011,
-                   7680:  0b1100}
-
-    # CTRL6 bits to set depending on desired DPS range for the Gyro 
-    # Bit in position 4 is needed for correct operation of device (see p.69)
-    GYRO_DPS_SCALE_BITS = {250:  0b1001, 
-                           500:  0b1010,
-                           1000: 0b1011, 
-                           2000: 0b1100, 
-                           4000: 0b1101}
-
-    # CTRL8 bits to set depending on accelerometer scale in gs 
-    ACCEL_SCALE_BITS = {2:  0b00, 
-                        4:  0b01, 
-                        8:  0b10, 
-                        16: 0b11}
-
-    # CONVERSION FACTORS mg/LSB and mdps/LSB (p.12) DEPENDING ON SCALES 
-    GYRO_SCALE_CONVERSION = {250:  8.75, 
-                             500:  17.50,
-                             1000: 35, 
-                             2000: 70, 
-                             4000: 140}
-    ACCEL_SCALE_CONVERSION = {2:  0.061, 
-                              4:  0.122, 
-                              8:  0.244, 
-                              16: 0.488}
-
+    
     def __init__(self, ODR_rate:Literal['7.5', 15, 30, 60, 120, 240, 480, 960, 1920, 3840, 7680], accelerometer_scale:Literal[2,4,8,16], gyro_dps_scale: Literal[250,500,1000,2000,4000],
                  SDO_state:bool,  i2c_bus:int=1): 
         """
@@ -89,8 +90,13 @@ class LSM6DSV320X:
 
         IMPORTANT CONSIDERATIONS: 
         - ALWAYS USE WITH A CONTEXT MANAGER 
-        - Currently only supporting high performance mode accel/gyro
-        - Ensure arg values are properly selected according to manual. No internal safeguards. 
+        - Only supporting high performance mode accel/gyro
+        - On instanciation, ensure args are defined according to manual. No internal safeguards. 
+        - Accel/gyro values are always returned in **mg** and **mdps** units 
+            - Values are always scale-corrected
+            - Bias correction is optional so they can be applied by an external estimator if desired (ex: GTSAM). See class attributes.
+        - Remember that accel/gyro scale factor, bias and bias random walk covar all are HARDWARE UNIT SPECIFIC. 
+            - NOTE TODO: Should shift these from class attributes to facilitate per-unit definition? 
 
         ARGS: 
         - ODR_rate: Output Data Rate in Hz (must match High Perf mode see p.65 manual)
@@ -173,14 +179,14 @@ class LSM6DSV320X:
 
         ### CTRL6 (0x15) Gyro bandwidth 
         lpf1_bw = 0b0000 # NOTE low passfilter tuning NOT DONE, this is default 
-        fs_g    = self.GYRO_DPS_SCALE_BITS[gyro_scale] 
-        self.LSB_TO_MDPS = self.GYRO_SCALE_CONVERSION[gyro_scale]
+        fs_g    = GYRO_DPS_SCALE_BITS[gyro_scale] 
+        self.LSB_TO_MDPS = GYRO_SCALE_CONVERSION[gyro_scale]
         self.bus.write_byte_data(self.TAD, 0x15, lpf1_bw<<4|fs_g)
 
         ### CTRL8 (0x17) Accelerometer scale 
         # NOTE currently not touching HP_LPF2_XL_BW_2 
-        self.LSB_TO_MG = self.ACCEL_SCALE_CONVERSION[accel_scale]
-        fs_xl = self.ACCEL_SCALE_BITS[accel_scale] 
+        self.LSB_TO_MG = ACCEL_SCALE_CONVERSION[accel_scale]
+        fs_xl = ACCEL_SCALE_BITS[accel_scale] 
         self.bus.write_byte_data(self.TAD, 0x17, fs_xl) 
 
         ### Accelerometer control reg 1 - CTRL1 - 0x10 
@@ -188,7 +194,7 @@ class LSM6DSV320X:
         ### Gyroscope control reg 2 - CTRL2 - 0x11 
         # The 4 MSBs will all be 0 as long as we only support high-perf mode
         mode = 0b0000 # NOTE ONLY SUPPORTING HIGH-PERF MODE CURRENTLY 
-        ODR_bits = self.ODR_from_HZ[ODR_rate]
+        ODR_bits = ODR_FROM_HZ[ODR_rate]
         self.bus.write_byte_data(self.TAD, 0x10, mode<<4 | ODR_bits)
         self.bus.write_byte_data(self.TAD, 0x11, mode<<4 | ODR_bits)
 
@@ -218,7 +224,7 @@ class LSM6DSV320X:
         ### FIFO_CTRL3 - 0x09 
         ## Controls write frequency in FIFO for gyro and accel 
         ## keeping the same freq as the selected ODR 
-        value = self.ODR_from_HZ[data_freq]<<4 | self.ODR_from_HZ[data_freq]
+        value = ODR_FROM_HZ[data_freq]<<4 | ODR_FROM_HZ[data_freq]
         self.bus.write_byte_data(self.TAD, 0x09, value)
         ### FIFO_CTRL4 - 0x0A 
         ## Controls timestamp, temperature, EIS batching and FIFO mode 
