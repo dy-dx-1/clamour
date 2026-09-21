@@ -2,6 +2,7 @@ import smbus2
 from typing import Literal 
 import numpy as np
 import csv 
+import time
 
 ######################## DATASHEET CONFIGURATION BITS FOR IMU ########################
 # ODR bit value to set for a desired rate in Hz 
@@ -107,6 +108,8 @@ class LSM6DSV320X:
         """
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
+        from collections import Counter # TODO remove for debug 
+        self.tag_tally = Counter() 
         if not self.validate_connection(): 
             raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
         else:
@@ -228,10 +231,10 @@ class LSM6DSV320X:
         self.bus.write_byte_data(self.TAD, 0x09, value)
         ### FIFO_CTRL4 - 0x0A 
         ## Controls timestamp, temperature, EIS batching and FIFO mode 
-        DEC_TS_BATCH = 0b01<<6 # Batching timestamps, decimation 1 # NOTE confirm
+        DEC_TS_BATCH = 0b01<<6 # Batching timestamps, decimation 1 
         ODR_T_BATCH =  0b00<<4 # Not batching temp 
         G_EIS_FIFO_EN = 0b0<<3 # Not batching EIS 
-        FIFO_MODE = 0b001      # FIFO mode (stops when full) 
+        FIFO_MODE = 0b110      # Continuous mode (overwrites oldest data when full) 
         self.bus.write_byte_data(self.TAD, 0x0A, DEC_TS_BATCH|ODR_T_BATCH|G_EIS_FIFO_EN|FIFO_MODE)
         ### INT1_CTRL and INT2_CTRL - 0x0D and 0x0E 
         ## Can be used to enable interrupts on INT1 when FIFO full
@@ -240,6 +243,13 @@ class LSM6DSV320X:
     def FIFO_past_WTM(self)->bool: 
         """Checks if the FIFO filling is equal to or greater than the set watermark"""
         return bool(self.bus.read_byte_data(self.TAD, 0x1C) & 0x80) # FIFO_STATUS2 register 
+
+    def get_FIFO_count(self)->int: 
+        """Returns the number of words in the FIFO"""
+        ### Checking DIFF_FIFO which is split between FIFO_STATUS1 and FIFO_STATUS2 registers 
+        ## It gives the number of words (1 word = 7 bytes) that are in FIFO 
+        lo, st2 = self.bus.read_i2c_block_data(self.TAD, 0x1B, 2)  # STATUS1+STATUS2 together
+        return min(((st2 & 0x01) << 8) | lo, 256)
 
     def read_FIFO(self, apply_bias:bool)->dict: 
         """
@@ -256,9 +266,8 @@ class LSM6DSV320X:
         results = {} 
         previous_tag_cnt = None # Used to group samples that belong together temporally 
         current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
-        ### Checking DIFF_FIFO which is split between FIFO_STATUS1 and FIFO_STATUS2 registers 
-        ## It gives the number of words (1 word = 7 bytes) that are in FIFO 
-        diff_FIFO = ((self.bus.read_byte_data(self.TAD, 0x1C)&0x01)<<8) | self.bus.read_byte_data(self.TAD, 0x1B) 
+        ### Checking how many words are in the FIFO 
+        diff_FIFO = self.get_FIFO_count() 
         ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
         residual_words = diff_FIFO 
         while residual_words>0: 
@@ -281,7 +290,11 @@ class LSM6DSV320X:
                 X_data = (word[2]<<8) | word[1]
                 Y_data = (word[4]<<8) | word[3]
                 Z_data = (word[6]<<8) | word[5]
-                if tag_type==0x01: # According to table 232, p.114 datasheet 
+                self.tag_tally[tag_type] += 1  # TODO remove, for debug 
+                if tag_type==0x00: # FIFO empty (can happen due to read timing differences), stop reading 
+                    residual_words = 0 
+                    break 
+                elif tag_type==0x01: # According to table 232, p.114 datasheet 
                     results[current_sample_idx]['gyro'] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x02: 
                     results[current_sample_idx]['accel'] = self.convert_accel_bytes_to_mgs(X_data, Y_data, Z_data, apply_bias)
@@ -345,30 +358,38 @@ class LSM6DSV320X:
         return int.from_bytes(raw_bytes, 'little')*21.7
 
 with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
-
-    import time 
-    import math
-    a = time.perf_counter() 
-    speeds = (0,0,0) 
-    pos = (0,0,0) 
-    angles = (0,0,0)
-    #print(f"{imu.FIFO_past_WTM()=}")
-
-    calib_data = [] 
-    while time.perf_counter()-a < 15: 
-        """
-        raw_accels, raw_ws, ts = imu.get_x_y_z_accel(), imu.get_pitch_roll_yaw_speeds(), imu.get_timestamp()*1e-6
-        accels = tuple(accel*0.00980665 for accel in raw_accels) # in m/s2 
-        w_rates = tuple(mdps/1000 for mdps in raw_ws) # in deg/s 
-        dt = ts - last_ts
-        speeds = tuple( (accels[i]*dt)+speeds[i] for i in range(3))
-        pos = tuple( (((accels[i]*dt)+speeds[i])*dt) + pos[i] for i in range(3))
-        angles = tuple(w_rates[i]*dt + angles[i] for i in range(3))
-
-        print(f"{pos=}  |  {speeds=}  | {accels=}  | {angles=}  | {w_rates=}")
-        time.sleep(0.15) 
-        """
-        ac = imu.get_x_y_z_accel()
-        print(f"{np.linalg.norm(ac)}  |  "  , ac, "   |   ",  imu.get_pitch_roll_yaw_speeds())
-        time.sleep(0.15) 
-
+    data = [("timestamp", "accel", "gyro")]
+    # Recording data to for straight line test
+    input("Press any key to start recording")
+    print("You may start moving. Press ctrl-c to stop and save data")
+    t1 = time.perf_counter() 
+    # Clearing previous stored data in FIFO to begin
+    imu.read_FIFO(apply_bias=False) 
+    imu.tag_tally.clear() 
+    try: 
+        while True: 
+            # At 120Hz, the 1.5KB FIFO will fill in ~0.7s 
+            # 1536bytes /3 elements per reading (timestamp, accel, gyro) / 6bytes per reading = ~85 readings total 
+            # 85readings/120 readings per sec = 0.7s to fill 
+            if imu.get_FIFO_count()>=170:
+                fifo = imu.read_FIFO(apply_bias=False) 
+                # Getting only the full triplets of data from the dict
+                fifo_formatted = [(data_dict['timestamp'], data_dict['accel'], data_dict['gyro']) for data_dict in fifo.values() 
+                                  if {'accel', 'gyro', 'timestamp'}<=data_dict.keys()]
+                data.extend(fifo_formatted)
+            time.sleep(0.07) # Giving CPU time to breathe  
+    except KeyboardInterrupt: 
+        print("\nCTRL-C detected, stopping loop") 
+        # Need to do a final read to get the data that we may have missed during the keyboard interrupt
+        fifo = imu.read_FIFO(apply_bias=False) 
+        # Getting only the full triplets of data from the dict
+        fifo_formatted = [(data_dict['timestamp'], data_dict['accel'], data_dict['gyro']) for data_dict in fifo.values() 
+                            if {'accel', 'gyro', 'timestamp'}<=data_dict.keys()]
+        data.extend(fifo_formatted)
+    # Now have a list of all the data available in this form [("timestamp", "accel", "gyro"), ...] 
+    # Save it to csv 
+    with open("straight_line.csv", 'w', newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerows(data) 
+        print(f"Data saved to CSV. Experiment lasted: {(time.perf_counter()-t1):.1f}")
+        print(f"{imu.tag_tally=}")
