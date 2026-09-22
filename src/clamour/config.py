@@ -21,7 +21,7 @@ SMART_TX_POWER = True      # Enable or disable smart TX power - Only works for 6
 TX_POWER_CONFIG = None     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
 ### State estimation control 
-ESTIMATOR_TYPE = "FG"     # EKF or FG (Factor Graph) 
+ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph) 
 
 ### Output control 
 ## Terminal
@@ -35,11 +35,9 @@ SAVE_TO_CSV = False     # Save localization data to csv or not
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be >0 and <=10. Coordinates are in cm. 
-# temp NOTE A2 with broken usb is ID 2 
-ANCHORS = ({'id': 2, 'level': 0, 'x': 210, 'y': 32, 'z': 67}, 
-           {'id': 3, 'level': 0, 'x': -35, 'y': 130, 'z': 177},
-           {'id': 4, 'level': 0, 'x': 225, 'y': 350, 'z': 106},
-           {'id': 5, 'level': 0, 'x': 0, 'y': 0, 'z': 90}) 
+ANCHORS = ({'id': 1, 'level': 0, 'x': 22.3, 'y': 45.8, 'z': 219}, 
+           {'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 219},
+           {'id': 5, 'level': 0, 'x': 79.3, 'y': 297.1, 'z': 219}) 
 
 
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 
