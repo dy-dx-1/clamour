@@ -248,10 +248,10 @@ class LSM6DSV320X:
         self.bus.write_byte_data(self.TAD, 0x0A, 0) # register CTRL4
         ### FIFO_CTRL1 - 0x07 
         ## 1 LSB = 7 bytes in the FIFO. Max capacity without compression is 1.5KB 
-        ## NOTE currently setting it ~75% just as placeholder to give time to empty it before full. Can be tuned in future. 
-        self.bus.write_byte_data(self.TAD, 0x07, 0xA0)
+        ## NOTE currently setting it ~50% just as placeholder to give time to empty it before full. Can be tuned in future. 
+        self.bus.write_byte_data(self.TAD, 0x07, 0x6B)
         ### FIFO_CTRL2 - 0x08 
-        STOP_ON_WTM =      0b0<<7 # Limits the depth to the watermark, leaving this off as our WM serves as warning 
+        STOP_ON_WTM =      0b0<<7 # Limits the depth to the watermark, leaving this off as our WTM serves as warning 
         FIFO_COMPR_RT_EN = 0b0<<6 # Disable compression 
         ODR_CHG_EN =       0b0<<4 # Batch ODR CHANGE sensor in FIFO 
         UNCOMPR_RATE =    0b00<<1 # Configure compression algorithm 
@@ -408,7 +408,7 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
             if imu.get_FIFO_count()>=170:
                 fifo = imu.read_FIFO(apply_bias=False) 
                 data.extend(fifo)
-            time.sleep(0.07) # Giving CPU time to breathe  
+            time.sleep(0.05) # Giving CPU time to breathe  
     except KeyboardInterrupt: 
         print("\nCTRL-C detected, stopping loop") 
         # Need to do a final read to get the data that we may have missed during the keyboard interrupt

@@ -3,17 +3,22 @@ import gtsam
 from gtsam.symbol_shorthand import B, V, X
 from matplotlib import pyplot as plt
 
+GRAVITY_METERS_PER_SECOND_SQUARED = 9.81
+TIMESTAMP_TICK_SECONDS = 21.7e-6
+MG_TO_METERS_PER_SECOND_SQUARED = GRAVITY_METERS_PER_SECOND_SQUARED * 1e-3
+MDPS_TO_RADIANS_PER_SECOND = np.pi / (180.0 * 1000.0)
+
 ### Setting up preintegration -----------------
 # pim: preintegrated measurements 
 # define Z axis pointing up. factor will handle gravity internally 
-pim_params = gtsam.PreintegrationCombinedParams.MakeSharedU(9.81)
+pim_params = gtsam.PreintegrationCombinedParams.MakeSharedU(GRAVITY_METERS_PER_SECOND_SQUARED)
 # Some arbitrary noise sigmas for accel, gyro and numerical integration
-pim_params.setGyroscopeCovariance((1e-3)**2 * np.eye(3))
-pim_params.setAccelerometerCovariance((1e-3)**2 * np.eye(3))
+pim_params.setGyroscopeCovariance((3.8 * MDPS_TO_RADIANS_PER_SECOND)**2 * np.eye(3))
+pim_params.setAccelerometerCovariance((60 * MG_TO_METERS_PER_SECOND_SQUARED)**2 * np.eye(3))
 pim_params.setIntegrationCovariance((1e-7)**2 * np.eye(3))
 # Defining IMU biaises 
-accBias = np.array( [0.0, 0.0, 0.0]) # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
-gyroBias = np.array([0.0, 0.0, 0.0])
+accBias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])*MG_TO_METERS_PER_SECOND_SQUARED # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
+gyroBias = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])*MDPS_TO_RADIANS_PER_SECOND
 imu_bias = gtsam.imuBias.ConstantBias(accBias, gyroBias)
 # Creating preintegration object 
 # requires sensor cov, initial biais estimate (drift will be estimated afterwards)
@@ -21,19 +26,56 @@ imu_bias = gtsam.imuBias.ConstantBias(accBias, gyroBias)
 pim = gtsam.PreintegratedCombinedMeasurements(pim_params, imu_bias)
 
 ### Integrating raw IMU data -----------------
-accel_reading = np.array([1.0, 0.0, 9.81]) # accelerating 1m/s^2 forward, z up 
-gyro_reading  = np.array([0.0, 0.0, 0.0]) 
-dt = 0.01 # 100Hz 
-for _ in range(100): # for 1s, at 100Hz, moving fwd at 1m/s^2 
-    # integrateMeasurement also has an optional arg: bodyPsensor for IMU-body frame transform if needed
-    pim.integrateMeasurement(accel_reading, gyro_reading, dt)
+import csv
+positions = []
+position_timestamps = []
+# IMU_testing.py saves timestamp ticks, mg, and mdps. GTSAM expects seconds, m/s^2, and rad/s respectively.
+previous_timestamp = None
+prev_state = gtsam.NavState(gtsam.Pose3(), np.zeros(3))
+with open("straight_line.csv", newline="", encoding="utf-8") as csv_file:
+    reader = csv.reader(csv_file)
+    next(reader, None)  # Skip the timestamp, accel, gyro header.
+    for row in reader:
+        timestamp, accel, gyro = row
+        if not timestamp or not accel or not gyro:
+            continue  # Preserve the CSV export's incomplete-sample handling.
+        timestamp = int(timestamp)
+        accel_reading = np.fromstring(accel.strip("[]"), sep=" ")
+        gyro_reading = np.fromstring(gyro.strip("[]"), sep=" ")
+        if accel_reading.size != 3 or gyro_reading.size != 3:
+            raise ValueError(f"Invalid IMU vector in CSV row: {row}")
+        if previous_timestamp is not None:
+            dt = (timestamp - previous_timestamp) * TIMESTAMP_TICK_SECONDS
+            if dt <= 0:
+                raise ValueError(f"Non-increasing IMU timestamp in CSV row: {row}")
+            pim.integrateMeasurement(
+                accel_reading * MG_TO_METERS_PER_SECOND_SQUARED,
+                gyro_reading * MDPS_TO_RADIANS_PER_SECOND,
+                dt,
+            )
+            positions.append(pim.predict(prev_state, imu_bias).pose().translation())
+            position_timestamps.append(timestamp * TIMESTAMP_TICK_SECONDS)
+        previous_timestamp = timestamp
+
+if positions:
+    position_values = np.asarray(positions)
+    plt.plot(position_timestamps, position_values[:, 0], label="X")
+    plt.plot(position_timestamps, position_values[:, 1], label="Y")
+    plt.plot(position_timestamps, position_values[:, 2], label="Z")
+    plt.xlabel("Timestamp (s)")
+    plt.ylabel("Position (m)")
+    plt.title("Estimated Position Over Time")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("positions.png")
 
 ### Building graph -----------------
 graph = gtsam.NonlinearFactorGraph() 
 initial = gtsam.Values() 
 
 pose_noise = gtsam.noiseModel.Diagonal.Sigmas(np.array([0.01]*3 + [0.01]*3))
-vel_noise = gtsam.noiseModel.Isotropic.Sigma(3, 0.1)
+vel_noise = gtsam.noiseModel.Isotropic.Sigma(3, 0.01)
 bias_noise = gtsam.noiseModel.Isotropic.Sigma(6, 0.001)
 
 # Priors state 0 
@@ -54,8 +96,10 @@ graph.add(imu_factor)
 prev_state = gtsam.NavState(gtsam.Pose3(), np.zeros(3))
 predicted_state = pim.predict(prev_state, imu_bias)
 initial.insert(X(1), predicted_state.pose())
-initial.insert(V(1), predicted_state.velocity())
+initial.insert(V(1), np.zeros(3))
 initial.insert(B(1), imu_bias)
+# Adding zero velocity prior at the end to check if closes better in straight line test (23sept) 
+graph.add(gtsam.PriorFactorVector(V(1), np.zeros(3), vel_noise))
 # NOTE after creating IMU factor, clear out preintegration values 
 pim.resetIntegration()
 
