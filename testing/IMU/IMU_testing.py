@@ -108,8 +108,6 @@ class LSM6DSV320X:
         """
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
-        from collections import Counter # TODO remove for debug 
-        self.tag_tally = Counter() 
         if not self.validate_connection(): 
             raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
         else:
@@ -128,25 +126,59 @@ class LSM6DSV320X:
         except: 
             pass
 
+    @staticmethod
+    def _apply_scalar_calibration(x:float, y:float, z:float, bias:np.ndarray,
+                                  scale_factor:np.ndarray, apply_bias:bool)->np.ndarray:
+        """
+        Apply bias correction and a 3x3 scale-factor matrix without NumPy matrix multiplication.
+
+        FIFO conversion runs once per sensor-axis sample. Scalar arithmetic avoids creating an intermediate 
+        input vector and dispatching a small matrix multiplication for every sample. 
+        While remaining equivalent to the equation calibrated_measure = scale_factor @ (raw_measure-bias)
+        """
+        if apply_bias:
+            x -= bias[0]
+            y -= bias[1]
+            z -= bias[2]
+
+        calibrated_x = (scale_factor[0, 0] * x +
+                        scale_factor[0, 1] * y +
+                        scale_factor[0, 2] * z)
+        calibrated_y = (scale_factor[1, 0] * x +
+                        scale_factor[1, 1] * y +
+                        scale_factor[1, 2] * z)
+        calibrated_z = (scale_factor[2, 0] * x +
+                        scale_factor[2, 1] * y +
+                        scale_factor[2, 2] * z)
+        return np.array([calibrated_x, calibrated_y, calibrated_z])
+
     def convert_accel_bytes_to_mgs(self, x:int, y:int, z:int, apply_bias:bool)->np.ndarray: 
         """
         Convert packed unsigned 16-bit XYZ words to signed, calibrated, mgs in vector format.
         Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the ConstantBias on it's end)
         """
-        accel = self.LSB_TO_MG * np.array([uint16_to_int16(x), 
-                                           uint16_to_int16(y),
-                                           uint16_to_int16(z)])
-        return self.accel_scale_factor @ (accel-self.accel_bias) if apply_bias else self.accel_scale_factor @ accel
+        return self._apply_scalar_calibration(
+            self.LSB_TO_MG * uint16_to_int16(x),
+            self.LSB_TO_MG * uint16_to_int16(y),
+            self.LSB_TO_MG * uint16_to_int16(z),
+            self.accel_bias,
+            self.accel_scale_factor,
+            apply_bias,
+        )
 
     def convert_gyro_bytes_to_mdps(self, pitch:int, roll:int, yaw:int, apply_bias:bool)->np.ndarray: 
         """
         Convert packed unsigned 16-bit XYZ words to signed, calibrated, mdps in vector format.
         Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the bias on it's end)
         """
-        gyro = self.LSB_TO_MDPS * np.array([uint16_to_int16(pitch), 
-                                            uint16_to_int16(roll),
-                                            uint16_to_int16(yaw)])
-        return self.gyro_scale_factor @ (gyro - self.gyro_bias) if apply_bias else self.gyro_scale_factor @ gyro
+        return self._apply_scalar_calibration(
+            self.LSB_TO_MDPS * uint16_to_int16(pitch),
+            self.LSB_TO_MDPS * uint16_to_int16(roll),
+            self.LSB_TO_MDPS * uint16_to_int16(yaw),
+            self.gyro_bias,
+            self.gyro_scale_factor,
+            apply_bias,
+        )
 
     def validate_connection(self): 
         """
@@ -251,7 +283,7 @@ class LSM6DSV320X:
         lo, st2 = self.bus.read_i2c_block_data(self.TAD, 0x1B, 2)  # STATUS1+STATUS2 together
         return min(((st2 & 0x01) << 8) | lo, 256)
 
-    def read_FIFO(self, apply_bias:bool)->dict: 
+    def read_FIFO(self, apply_bias:bool)->list[tuple]: 
         """
         Reads all of the data present in the FIFO. 
 
@@ -260,10 +292,12 @@ class LSM6DSV320X:
         Set **apply_bias** to False to NOT correct for bias (ex: if using GTSAM, the FG will apply the ConstantBias on it's end)
         
         RETURNS:
-        - A dict of shape {sample_idx: {'accel': accel_data, 'gyro': gyro_data, 'timestamp': timestamp}}
-            - NOTE accel_data in mg's, gyro_data in mdps and timestamp in BYTES (so that deltas can be calculated before converting twice) 
+        - A list of tuples in the form [(timestamp, accel_data, gyro_data), ...]
+            - Missing data for a sample is returned as None.
+            - accel_data is in mg's, gyro_data is in mdps and timestamp is in BYTES
+                (so that deltas can be calculated before converting twice).
         """
-        results = {} 
+        samples = []
         previous_tag_cnt = None # Used to group samples that belong together temporally 
         current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
         ### Checking how many words are in the FIFO 
@@ -283,28 +317,29 @@ class LSM6DSV320X:
                 # in other words, TAG_CNT can only increase by units of 1, sequentially, until it wraps after 3 
                 if previous_tag_cnt is not None and tag_cnt != previous_tag_cnt: 
                     current_sample_idx += 1 
-                # Create dict for this sample if it doesn't exist yet 
-                if current_sample_idx not in results: 
-                    results[current_sample_idx] = {} 
                 # Extract and save data 
                 X_data = (word[2]<<8) | word[1]
                 Y_data = (word[4]<<8) | word[3]
                 Z_data = (word[6]<<8) | word[5]
-                self.tag_tally[tag_type] += 1  # TODO remove, for debug 
                 if tag_type==0x00: # FIFO empty (can happen due to read timing differences), stop reading 
                     residual_words = 0 
                     break 
-                elif tag_type==0x01: # According to table 232, p.114 datasheet 
-                    results[current_sample_idx]['gyro'] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data, apply_bias)
+                # Ensuring that a sample exists for this current_sample_idx 
+                # While loop behaves as an if, but is more robust in case of an unexpected >1 idx jump 
+                while current_sample_idx >= len(samples):
+                    samples.append([None, None, None])
+                sample = samples[current_sample_idx]
+                if tag_type==0x01: # According to p.114 datasheet 
+                    sample[2] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x02: 
-                    results[current_sample_idx]['accel'] = self.convert_accel_bytes_to_mgs(X_data, Y_data, Z_data, apply_bias)
+                    sample[1] = self.convert_accel_bytes_to_mgs(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x04: 
-                    results[current_sample_idx]['timestamp'] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
+                    sample[0] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
                 else: 
                     print(f"unknown type in FIFO!: {hex(tag_type)}")
                 previous_tag_cnt = tag_cnt
             residual_words -= n_words 
-        return results
+        return [tuple(sample) for sample in samples]
 
     def get_temp(self): 
         """
@@ -365,7 +400,6 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
     t1 = time.perf_counter() 
     # Clearing previous stored data in FIFO to begin
     imu.read_FIFO(apply_bias=False) 
-    imu.tag_tally.clear() 
     try: 
         while True: 
             # At 120Hz, the 1.5KB FIFO will fill in ~0.7s 
@@ -373,23 +407,16 @@ with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_st
             # 85readings/120 readings per sec = 0.7s to fill 
             if imu.get_FIFO_count()>=170:
                 fifo = imu.read_FIFO(apply_bias=False) 
-                # Getting only the full triplets of data from the dict
-                fifo_formatted = [(data_dict['timestamp'], data_dict['accel'], data_dict['gyro']) for data_dict in fifo.values() 
-                                  if {'accel', 'gyro', 'timestamp'}<=data_dict.keys()]
-                data.extend(fifo_formatted)
+                data.extend(fifo)
             time.sleep(0.07) # Giving CPU time to breathe  
     except KeyboardInterrupt: 
         print("\nCTRL-C detected, stopping loop") 
         # Need to do a final read to get the data that we may have missed during the keyboard interrupt
         fifo = imu.read_FIFO(apply_bias=False) 
-        # Getting only the full triplets of data from the dict
-        fifo_formatted = [(data_dict['timestamp'], data_dict['accel'], data_dict['gyro']) for data_dict in fifo.values() 
-                            if {'accel', 'gyro', 'timestamp'}<=data_dict.keys()]
-        data.extend(fifo_formatted)
+        data.extend(fifo)
     # Now have a list of all the data available in this form [("timestamp", "accel", "gyro"), ...] 
     # Save it to csv 
     with open("straight_line.csv", 'w', newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         writer.writerows(data) 
-        print(f"Data saved to CSV. Experiment lasted: {(time.perf_counter()-t1):.1f}")
-        print(f"{imu.tag_tally=}")
+        print(f"Data saved to CSV. Experiment lasted: {(time.perf_counter()-t1):.2f}")
