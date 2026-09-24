@@ -1,11 +1,24 @@
 """
-Continuously positions a DW1000 tag and dynamically plots the position in matplotlib.
+Continuously positions a DW1000 tag and dynamically plots the position in matplotlib using WebAgg.
+
+TO USE THE SCRIPT:
+1. Open SSH Tunnel from main machine and forward port 8988
+ssh -L 8988:localhost:8988 pi@raspberrypi_ip
+2. Run the script on the pi 
+3. Open a webbrowser on the main machine and go to http://localhost:8988/
+4. Use ctrl-c to stop
 """
 import sys
 from pathlib import Path
 import time 
 import numpy as np 
+
+# --- CRITICAL: Must be set before importing pyplot ---
+import matplotlib
+matplotlib.use("WebAgg")
 import matplotlib.pyplot as plt
+# ----------------------------------------------------
+
 from scipy.optimize import least_squares
 
 # Add parent directory to sys.path
@@ -17,8 +30,8 @@ from src.clamour.interfaces.bitcraze_tag import BitcrazeTag
 from src.clamour.interfaces.anchors import Anchors 
 
 ### CONFIGURATION PARAMETERS
-# NOTE anchors correspond to config.py 
-REFRESH_RATE = 1 # Hz 
+# NOTE: anchors correspond to config.py 
+REFRESH_RATE = 1  # Hz (Change this if you want to push toward higher frequencies)
 
 
 def trilaterate(anchor_positions, distances, initial_position=None):
@@ -48,20 +61,22 @@ anchor_positions = np.array(
 )
 
 plt.ion()
-figure, axis = plt.subplots()
-axis.set_title("Dynamic DW1000 tag position")
+figure, axis = plt.subplots(figsize=(6, 6))
+axis.set_title("Dynamic DW1000 tag position (WebAgg)")
 axis.set_xlabel("X (cm)")
 axis.set_ylabel("Y (cm)")
-axis.plot(anchor_positions[:, 0], anchor_positions[:, 1], "b*", markersize=10)
+axis.plot(anchor_positions[:, 0], anchor_positions[:, 1], "b*", markersize=10, label="Anchors")
 axis.set_aspect("equal", adjustable="datalim")
-trajectory_line, = axis.plot([], [], "r-", linewidth=1.5)
+trajectory_line, = axis.plot([], [], "r-", linewidth=1.5, label="Trajectory")
 position_points, = axis.plot([], [], "ro", markersize=4)
+axis.legend()
 trajectory = []
 
 with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrate=6.8,
                 preamble_length=128, preamble_code=9,
                 smart_tx_power=True, tx_power_settings=None) as tag:
     try:
+        print("WebAgg server starting... Access via your local browser through the SSH tunnel.")
         while plt.fignum_exists(figure.number):
             # Collect all successful ranges before attempting this cycle's update.
             measured_positions = []
@@ -85,8 +100,8 @@ with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrat
             figure.canvas.draw_idle()
             figure.canvas.flush_events()
             plt.pause(1 / REFRESH_RATE)
+            
     except KeyboardInterrupt:
-        pass
+        print("\nStopping live plot...")
     finally:
         plt.close(figure)
-
