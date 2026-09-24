@@ -58,7 +58,7 @@ class LSM6DSV320X:
     ### ACCEL/GYRO COVARIANCE  
     # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
     # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
-    accel_covar_density_mg = 60**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (micro_g**2)*s 
+    accel_covar_density_mg = 0.060**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (mg**2)*s 
     gyro_covar_density_mdps  = 3.8**2 # Units: (mdps**2)*s
     # Bias random walk covariance - PLACEHOLDER VALUES - TO BE ESTIMATED WITH ALLAN VARIANCE ANALYSIS 
     # As of 21sept 2026, placeholders as it'll be enough to validate IMU integration. We don't dead-reckon for long without range factors to correct. 
@@ -392,31 +392,37 @@ class LSM6DSV320X:
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
         return int.from_bytes(raw_bytes, 'little')*21.7
 
-with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
-    data = [("timestamp", "accel", "gyro")]
-    # Recording data to for straight line test
-    input("Press any key to start recording")
-    print("You may start moving. Press ctrl-c to stop and save data")
-    t1 = time.perf_counter() 
-    # Clearing previous stored data in FIFO to begin
-    imu.read_FIFO(apply_bias=False) 
-    try: 
-        while True: 
-            # At 120Hz, the 1.5KB FIFO will fill in ~0.7s 
-            # 1536bytes /3 elements per reading (timestamp, accel, gyro) / 6bytes per reading = ~85 readings total 
-            # 85readings/120 readings per sec = 0.7s to fill 
-            if imu.get_FIFO_count()>=170:
-                fifo = imu.read_FIFO(apply_bias=False) 
-                data.extend(fifo)
-            time.sleep(0.05) # Giving CPU time to breathe  
-    except KeyboardInterrupt: 
-        print("\nCTRL-C detected, stopping loop") 
-        # Need to do a final read to get the data that we may have missed during the keyboard interrupt
-        fifo = imu.read_FIFO(apply_bias=False) 
-        data.extend(fifo)
-    # Now have a list of all the data available in this form [("timestamp", "accel", "gyro"), ...] 
-    # Save it to csv 
-    with open("straight_line.csv", 'w', newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerows(data) 
-        print(f"Data saved to CSV. Experiment lasted: {(time.perf_counter()-t1):.2f}")
+if __name__=="__main__":
+    with LSM6DSV320X(ODR_rate=120, accelerometer_scale=2, gyro_dps_scale=500, SDO_state=False) as imu: 
+        data = [("timestamp", "accel", "gyro")]
+        # Recording data to for straight line test
+        try:
+            print("Ready to record, press ctrl-c to start")
+            while True:
+                pass
+        except KeyboardInterrupt: 
+            pass 
+        print("RECORDING! Press ctrl-c to stop and save data")
+        t1 = time.perf_counter() 
+        # Clearing previous stored data in FIFO to begin
+        imu.read_FIFO(apply_bias=False) 
+        try: 
+            while True: 
+                # At 120Hz, the 1.5KB FIFO will fill in ~0.7s 
+                # 1536bytes /3 elements per reading (timestamp, accel, gyro) / 6bytes per reading = ~85 readings total 
+                # 85readings/120 readings per sec = 0.7s to fill 
+                if imu.get_FIFO_count()>=170:
+                    fifo = imu.read_FIFO(apply_bias=False) 
+                    data.extend(fifo)
+                time.sleep(0.05) # Giving CPU time to breathe  
+        except KeyboardInterrupt: 
+            print("\nCTRL-C detected, stopping loop") 
+            # Need to do a final read to get the data that we may have missed during the keyboard interrupt
+            fifo = imu.read_FIFO(apply_bias=False) 
+            data.extend(fifo)
+        # Now have a list of all the data available in this form [("timestamp", "accel", "gyro"), ...] 
+        # Save it to csv 
+        with open("straight_line.csv", 'w', newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerows(data) 
+            print(f"Data saved to CSV. Experiment lasted: {(time.perf_counter()-t1):.2f}")
