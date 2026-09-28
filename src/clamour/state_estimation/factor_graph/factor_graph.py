@@ -2,8 +2,7 @@ import gtsam as gt
 import numpy as np 
 
 from ...custom_terminal import print 
-from ...interfaces import Coordinates 
-from ...interfaces import Anchors 
+from ...interfaces import Anchors, Coordinates
 
 anchors = Anchors()
 ### Defining noise models 
@@ -14,12 +13,29 @@ ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
 
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float): 
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float, 
+                 imu_accel_initial_bias:np.ndarray, imu_gyro_initial_bias, 
+                 imu_accel_initial_bias_cov:np.ndarray, imu_gyro_initial_bias_cov:np.ndarray, 
+                 imu_accel_cov:float, imu_gyro_cov:float, 
+                 imu_accel_walk_cov: float, imu_gyro_walk_cov: float): 
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
-        - prior_yaw: prior yaw value on initialization 
+        - prior_yaw: prior yaw value on initialization **[rad]** 
         - timestamp: timestamp of the initial data, will serve as reference for subsequent updates to calculate dt 
+        - imu_accel_initial_bias: initial guess of accelerometer bias vector (1x3) 
+        - imu_gyro_initial_bias: initial guess of gyroscope bias vector (1x3)
+        - imu_accel_initial_bias_cov: covariance of initial bias guess (how much calibration output varied) 
+        - imu_gyro_initial_bias_cov:  covariance of initial bias guess (how much calibration output varied)
+        - imu_accel_walk_cov: covariance of bias random walk **units: cm^2 * 1/s**
+        - imu_gyro_walk_cov: covariance of bias random walk  **units: cm^2 * 1/s**
+        - imu_accel_cov: covariance of measurement values **units: cm^2 * s**
+        - imu_gyro_cov: covariance of measurement values  **units: cm^2 * s**
+        NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
+        NOTE on units: 
+        - All angle units are **radians** 
+        - All spatial units are **cm-based**
+            - The graph doesn't care about this unit as long as it's fully internally consistent, but enforcing cm until we have proper code-wide documentation and unit standardisation to be safer. (For example, gravity vector in graph should be updated if change of units)
         """
         self.last_measurement_time = timestamp   # Will be updated during subsequent call of validate_update by incorporate_ranging_data 
         self.dt = None 
