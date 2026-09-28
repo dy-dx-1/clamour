@@ -2,11 +2,11 @@
 It is intended to be passed to a ContextManagedQueue as a pickled class + dictionary tuple.
 The state information passed within the message will be used to choose which sound to play next."""
 
-from ..interfaces import Coordinates
+from ..interfaces import Pose
 
 class SoundMessage:
-    def __init__(self, coordinates: Coordinates):
-        self.coordinates = coordinates
+    def __init__(self, pose: Pose):
+        self.pose = pose
 
     @staticmethod
     def save(message):

@@ -4,7 +4,7 @@ from multiprocessing.synchronize import Lock
 from time import perf_counter, time
 import struct
 
-from .interfaces import Tag, Coordinates, Neighborhood, SlotAssignment
+from .interfaces import Tag, Neighborhood, SlotAssignment
 from .tdma.timing import NB_TASK_SLOTS
 from .contextManagedQueue import ContextManagedQueue
 from .tdma.states.constants import State

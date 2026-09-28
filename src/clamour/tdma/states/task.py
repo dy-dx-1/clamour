@@ -3,7 +3,7 @@ from time import perf_counter, sleep
 from typing import TYPE_CHECKING
 
 from ...custom_terminal import print 
-from ...interfaces import Tag, Coordinates, Anchors
+from ...interfaces import Tag, Anchors
 from ..neighborhood import Neighborhood
 from ..slot_assignment import SlotAssignment
 from ..timing import Timing

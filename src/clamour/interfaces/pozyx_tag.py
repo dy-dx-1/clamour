@@ -1,5 +1,5 @@
 from .tag import Tag
-from .containers import Coordinates, Angles
+from .containers import Pose
 from .anchors import Anchors
 from ..custom_terminal import print 
 import struct 
@@ -14,7 +14,7 @@ from pypozyx import DeviceCoordinates as pozyxDeviceCoordinates
 from pypozyx import DeviceList as pozyxDeviceList
 from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
-ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known anchors 
+ALL_ANCHORS = Anchors().anchors_dict # Dict {id: Pose()} of all the known anchors
 
 def get_pozyx_id(pozyx:PozyxSerial) -> int:
     """
@@ -149,7 +149,7 @@ class PozyxTag(Tag):
             devices = [device_id for device_id in devices if not PozyxTag.is_anchor(device_id)]
         elif discovery_type == "anchor":
             devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
-            # Coordinates is our general version, needs to be formatted to pypozyx version 
+            # Pose is our general version and needs formatting for pypozyx.
             for id in devices: 
                 x = ALL_ANCHORS[id].x * 10
                 y = ALL_ANCHORS[id].y * 10
@@ -204,11 +204,11 @@ class PozyxTag(Tag):
             status = 0 
             print(f"PozyxTag.getCoordinates: {str(s)}", 'error', 'loc') 
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
-        return Coordinates(int(coords_container.x / 10), int(coords_container.y / 10), int(coords_container.z / 10)) # Convert Pozyx hardware units to cm
+        return Pose(coords_container.x / 10, coords_container.y / 10, coords_container.z / 10) # Convert Pozyx hardware units to cm
 
     @coordinates.setter
-    def coordinates(self, new_coords:Coordinates): 
-        pozyx_coords = pozyxCoordinates(int(new_coords.x * 10), int(new_coords.y * 10), int(new_coords.z * 10))
+    def coordinates(self, new_pose: Pose):
+        pozyx_coords = pozyxCoordinates(new_pose.x * 10, new_pose.y * 10, new_pose.z * 10)
         self._pozyx_serial.setCoordinates(pozyx_coords)
     
     @property
@@ -221,7 +221,7 @@ class PozyxTag(Tag):
             print(f"PozyxTag.getEulerAngles_deg: {str(s)}", 'error', 'loc') 
         
         if status == POZYX_SUCCESS: 
-            return Angles(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
+            return Pose(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
         else: 
             self.printCurrentError('PozyxTag.orientation')
             return None
@@ -239,11 +239,11 @@ class PozyxTag(Tag):
             print(f"PozyxTag.trilaterate_position: {str(s)}", 'error', 'loc')
 
         if status == POZYX_SUCCESS: 
-            return Coordinates(int(pos.x / 10), int(pos.y / 10), int(pos.z / 10))
+            return Pose(pos.x / 10, pos.y / 10, pos.z / 10)
         else: 
             return None 
 
-    def ranging(self, target_id) -> tuple[int|None, Coordinates|None]: 
+    def ranging(self, target_id) -> tuple[int | None, Pose | None]:
         range_measure = DeviceRange() 
         try: 
             status = self._pozyx_serial.doRanging(target_id, range_measure)

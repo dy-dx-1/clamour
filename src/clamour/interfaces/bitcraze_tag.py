@@ -1,7 +1,7 @@
 from ..custom_terminal import print 
 
 from .tag import Tag
-from .containers import Coordinates, Angles
+from .containers import Pose
 from .dw_1000 import DW1000
 from .anchors import Anchors
 
@@ -10,7 +10,7 @@ from typing import Literal
 import time  
 import struct
 
-ALL_ANCHORS = Anchors().anchors_dict # Dict {id:Coordinates()} of all the known anchors 
+ALL_ANCHORS = Anchors().anchors_dict # Dict {id: Pose()} of all the known anchors
 
 SPEED_OF_LIGHT = 299_792_458
 ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
@@ -55,8 +55,7 @@ class BitcrazeTag(Tag):
 
         self._active_tags = dict()      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 
-        self._pos = Coordinates()       # Tag position and associated covariance
-        self._orientation = Angles() 
+        self._pose = Pose()             # Tag position, orientation, and covariance
 
         self.EXPECTED_RANGING_HEADER = RANGING_BC_HEADER + list(self.tag_id.to_bytes(6, 'little')) + [0xCF, 0xBC] # the header message that we expect for ranging requests sent to this tag. Generated here to avoid regenerating it every time.
 
@@ -226,7 +225,7 @@ class BitcrazeTag(Tag):
                 covariance = np.array([[0,0,0],[0,0,0],[0,0,0]])
             try:                 
                 neighbor_info = REPORT_NEIGHBOR_INFO.pack(
-                    *coordinates.data,
+                    *coordinates.coordinates,
                     covariance[0][0], covariance[1][1], covariance[2][2],
                     covariance[0][1], covariance[0][2], covariance[1][2],
                 )
@@ -271,19 +270,19 @@ class BitcrazeTag(Tag):
     
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     @property
-    def coordinates(self)->Coordinates: 
-        return self._pos
+    def coordinates(self) -> Pose:
+        return self._pose
     
     @coordinates.setter 
-    def coordinates(self, new_coords:Coordinates): 
-        self._pos = new_coords 
+    def coordinates(self, new_pose: Pose):
+        self._pose = new_pose
 
     @property
-    def orientation(self):
-        return self._orientation
+    def orientation(self) -> Pose:
+        return self._pose
 
     @staticmethod
-    def extract_report_neighbor_info(report_msg:list) -> Coordinates|None:
+    def extract_report_neighbor_info(report_msg:list) -> Pose|None:
         """
         Takes in a TWR report from a neighboring tag and extracts the embedded neighbor position and covariance info from it. 
         If the neighbor didn't share covar (ex: too early), we ignore him and return None. 
@@ -293,18 +292,16 @@ class BitcrazeTag(Tag):
         x, y, z, xx, yy, zz, xy, xz, yz = REPORT_NEIGHBOR_INFO.unpack(bytes(report_msg[payload_start:payload_end]))
         if xx==0: # This is our sign that the neighbor didn't have covar info as it will never be exactly 0 
             return None 
-        neighbor_coords = Coordinates(x, y, z)
-        neighbor_coords.update_covar((xx, yy, zz, xy, xz, yz))
-        return neighbor_coords
+        return Pose(x, y, z, covar=(xx, yy, zz, xy, xz, yz))
 
-    def compute_range(self, target_id:int)->tuple[int|None, Coordinates|None]: 
+    def compute_range(self, target_id:int) -> tuple[int | None, Pose | None]:
         """
-        Computes the distance in cm between the tag and another device. If the other device is a tag, also returns the tag's Coordinates object (which also holds covar)
+        Computes the distance in cm between the tag and another device. If the other device is a tag, also returns its Pose (which also holds covar).
         
         TODO: a more thorough testing of timeouts to actually figure out what is a good reliable value 
         RETURNS: 
         - Measured distance in cm if successful, None if not
-        - Coordinates position of the target, if it's a tag    
+        - Pose of the target, if it's a tag
         """
         if self.is_anchor(target_id): 
             ANTENNA_TICK_DELAY = ANTENNA_TICK_DELAY_ANCHORS
@@ -344,8 +341,8 @@ class BitcrazeTag(Tag):
                 target_coords = self.extract_report_neighbor_info(report) # if neighbor doesn't give position AND covar, this is None 
         return distance, target_coords
 
-    def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
-        # TODO add to docstring, returns range, target position Coordinates if it's a tag only
+    def ranging(self, target_id:int) -> tuple[int | None, Pose | None]:
+        # TODO add to docstring, returns range and target Pose if it is a tag.
         # NOTE leaving as separate function in case want to avg/median measurements here 
         distance, target_pos = self.compute_range(target_id) 
         return distance, target_pos

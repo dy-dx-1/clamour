@@ -4,7 +4,7 @@ This allows the code to be hardware agnostic.
 All tag classes should follow this blueprint to work with the rest of the codebase.
 """
 from abc import ABC, abstractmethod
-from .containers import Coordinates, Angles
+from .containers import Pose
 from typing import Literal
 
 class Tag(ABC):
@@ -123,35 +123,35 @@ class Tag(ABC):
 
     @property
     @abstractmethod
-    def coordinates(self) -> Coordinates: 
+    def coordinates(self) -> Pose:
         """
         The last-known position and covariance of the tag. 
         """
 
     @coordinates.setter 
     @abstractmethod
-    def coordinates(self, new_coords:Coordinates) -> None: 
+    def coordinates(self, new_pose: Pose) -> None:
         pass
 
     @property
-    def orientation(self) -> Angles: 
+    def orientation(self) -> Pose:
         """ 
         Gets the current orientation of the tag in degrees. 
         
         RETURNS: 
-            - Angles object of the current orientation (heading, roll, pitch)
+            - Pose object containing the current orientation (heading, roll, pitch)
         """
 
     @abstractmethod
-    def ranging(self, target_id:int) -> tuple[int|None, Coordinates|None]: 
+    def ranging(self, target_id:int) -> tuple[int|None, Pose|None]:
         """
         Calculates a UWB range measurement in cm between the tag and another device. 
-        If the target is another tag, also returns that tag's Coordinates, which holds position and covariance. 
+        If the target is another tag, also returns that tag's Pose, which holds position and covariance.
         
         ARGS:
             - target_id: ID of the target device (int) 
         
         RETURNS:
             - distance in cm or None
-            - Coordinates of the other tag if it is one 
+            - Pose of the other tag if it is one
         """

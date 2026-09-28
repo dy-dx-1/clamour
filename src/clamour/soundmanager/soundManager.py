@@ -4,7 +4,7 @@ from random import randint
 from time import sleep
 import sys, os
 
-from ..interfaces import Coordinates
+from ..interfaces import Pose
 from ..contextManagedQueue import ContextManagedQueue
 from ..contextManagedProcess import ContextManagedProcess
 from ..messages.soundMessage import SoundMessage
@@ -37,9 +37,9 @@ class SoundManager(object):
 
         print(len(self.xyz_files))
 
-    def build_file_name(self, coordinates: Coordinates) -> str:
+    def build_file_name(self, pose: Pose) -> str:
         # return "X838_Y-2156_Z1959.flac" for testing sound 
-        return self.xyz_files.get(self.convert_coordinates_to_indexes(coordinates), "")
+        return self.xyz_files.get(self.convert_coordinates_to_indexes(pose), "")
 
     def sound_player(self, track):
         # loop trough the channel to find an available one and use it to play the track
@@ -65,10 +65,10 @@ class SoundManager(object):
                     break
 
     @staticmethod
-    def convert_coordinates_to_indexes(coordinates: Coordinates):
-        return "{}_{}_{}".format(int(round((coordinates.x - ORIGIN[0]) / 3)),
-                     int(round((coordinates.y - ORIGIN[1]) / 3)),
-                     int(round((coordinates.z - ORIGIN[2]) / 3)))
+    def convert_coordinates_to_indexes(pose: Pose):
+        return "{}_{}_{}".format(int(round((pose.x - ORIGIN[0]) / 3)),
+                     int(round((pose.y - ORIGIN[1]) / 3)),
+                     int(round((pose.z - ORIGIN[2]) / 3)))
 
     def build_play_list(self):
         """This function switches the different stats and call the sound that must be played."""
@@ -79,7 +79,7 @@ class SoundManager(object):
 
         self.sound_player(self.pattern_chord)
 
-    def cyclic_call(self, position: Coordinates):
+    def cyclic_call(self, position: Pose):
         self.pattern_chord = self.build_file_name(position)
     
         if (position.x != 0 or position.y != 0 or position.z != 0) and self.pattern_chord:
@@ -95,9 +95,9 @@ class SoundManager(object):
         while True:
             if not self.sound_queue.empty():
                 message = SoundMessage.load(*self.sound_queue.get_nowait())
-                scaled_position = Coordinates(message.coordinates.x,
-                                              message.coordinates.y,
-                                              min(message.coordinates.z, 225))
+                scaled_position = Pose(message.pose.x,
+                                       message.pose.y,
+                                       min(message.pose.z, 225))
                 self.cyclic_call(scaled_position)
             else:
                 sleep(0.01) # NOTE: added to reduce CPU load, confirm
@@ -106,7 +106,7 @@ class SoundManager(object):
         for posX in range(-200, 200, 4):
             for posY in range(-200, 200, 4):
                 print(posX, posY, 189)
-                self.cyclic_call(Coordinates(posX, posY, 189))
+                self.cyclic_call(Pose(posX, posY, 189))
                 sleep(0.4)
 
 

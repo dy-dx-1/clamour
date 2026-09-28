@@ -84,7 +84,7 @@ with BitcrazeTag(tag_id=11, dw1000_bus=0, dw1000_cs=0, channel=2, PRF=64, bitrat
             for anchor_id, anchor_pos in anchors.items():
                 distance, _ = tag.compute_range(anchor_id)
                 if distance is not None:
-                    measured_positions.append(anchor_pos.data[:2])
+                    measured_positions.append(anchor_pos.coordinates[:2])
                     measured_distances.append(distance)
 
             if len(measured_positions) >= 3:

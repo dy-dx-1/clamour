@@ -8,7 +8,7 @@ from time import sleep, time
 
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
-from ..interfaces import Tag, Coordinates
+from ..interfaces import Tag, Pose
 from .ekf import CustomEKF, DT_THRESHOLD
 from ..contextManagedQueue import ContextManagedQueue
 from ..messages.updateMessage import UpdateMessage
@@ -135,9 +135,9 @@ class EKFManager:
         elif msg.update_type == UpdateType.TOPOLOGY:
             return msg.topology,
         elif msg.update_type == UpdateType.CUSTOM_POSE:
-            return Coordinates(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp
+            return Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp
 
-    def infer_coordinates(self, measured_yaw: float) -> Coordinates:# NOTE READY TO DELETE 
+    def infer_coordinates(self, measured_yaw: float) -> Pose:# NOTE READY TO DELETE
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
         Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
 
@@ -147,19 +147,19 @@ class EKFManager:
         delta_position_y = step_length * math.sin(math.radians(self.correct_yaw(measured_yaw)))
 
         # The pedometer cannot measure height; we assumed it is constant.
-        return Coordinates(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
+        return Pose(self.ekf.x[0] + delta_position_x, self.ekf.x[2] + delta_position_y, self.ekf.x[4])
 
     def correct_yaw(self, measured_yaw: float) -> float:# NOTE READY TO DELETE 
         new_yaw = measured_yaw - self.yaw_offset
         return new_yaw if new_yaw > 0 else 360 + new_yaw
 
-    def validate_new_state(self, new_coordinates: Coordinates) -> bool:# NOTE READY TO DELETE
+    def validate_new_state(self, new_pose: Pose) -> bool:# NOTE READY TO DELETE
         """Makes sure the proposed coordinates stay within the same room or a logically accessible room."""
 
-        if self.current_room.within_bounds(new_coordinates):
+        if self.current_room.within_bounds(new_pose):
             return True
 
-        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates, self.floorplan.rooms)
+        new_neighbor = self.current_room.within_neighbor_bounds(new_pose, self.floorplan.rooms)
         if new_neighbor is not None:
             print("Changed room.", 'info', 'loc')
             self.current_room = self.floorplan.rooms[new_neighbor]
@@ -173,7 +173,7 @@ class EKFManager:
     def update_neighbors(self, neighbors: dict):# NOTE READY TO DELETE
         self.last_know_neighbors = neighbors
 
-    def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Coordinates, yaw: float) -> None:# NOTE READY TO DELETE
+    def save_to_csv(self, timestamp: float, message: UpdateMessage, coordinates: Pose, yaw: float) -> None:# NOTE READY TO DELETE
         if not SAVE_TO_CSV: 
             return 
         if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:

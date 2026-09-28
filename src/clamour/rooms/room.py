@@ -2,7 +2,7 @@ import numpy as np
 from math import sqrt, sin, cos
 from typing import Union
 
-from ..interfaces import Coordinates
+from ..interfaces import Pose
 
 
 class Room:
@@ -29,26 +29,26 @@ class Room:
     def add_neighbor(self, neighbor: 'Room') -> None:
         self.neighbors.append(neighbor)
 
-    def within_bounds(self, world_coordinates: Coordinates) -> bool:
+    def within_bounds(self, world_coordinates: Pose) -> bool:
         local_coordinates = self.transform_to_local_coordinates(world_coordinates)
         return (-self.x_lim[0] <= local_coordinates.x <= self.x_lim[1]) \
             and (-self.y_lim[0] <= local_coordinates.y <= self.y_lim[1])
 
-    def transform_to_local_coordinates(self, world_coordinates: Coordinates):
+    def transform_to_local_coordinates(self, world_coordinates: Pose) -> Pose:
         # World coordinates need to be transformed to 2D homogeneous (x, y, 1)
 
-        homogeneous_xy_coordinates = Coordinates(world_coordinates[0], world_coordinates[1], 1)
-        return Coordinates(*np.matmul(np.linalg.inv(self.transformation_matrix), homogeneous_xy_coordinates))
+        homogeneous_xy_coordinates = np.array([world_coordinates.x, world_coordinates.y, 1])
+        return Pose(*np.matmul(np.linalg.inv(self.transformation_matrix), homogeneous_xy_coordinates))
 
-    def within_neighbor_bounds(self, coordinate: Coordinates, rooms: dict) -> Union[str, None]:
+    def within_neighbor_bounds(self, pose: Pose, rooms: dict) -> Union[str, None]:
         for neighbor in self.neighbors:
-            if rooms[neighbor].within_bounds(coordinate):
+            if rooms[neighbor].within_bounds(pose):
                 return rooms[neighbor].label
 
         return None
 
-    def distance(self, coordinates: Coordinates):
-        return sqrt((self.x - coordinates.x)**2 + (self.y - coordinates.y)**2)
+    def distance(self, pose: Pose):
+        return sqrt((self.x - pose.x)**2 + (self.y - pose.y)**2)
 
     def __repr__(self):
         return "(" + str(self.label) + ": " + str(self.x) + ", " + str(self.y) + ")"

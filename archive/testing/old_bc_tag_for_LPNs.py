@@ -1,5 +1,5 @@
 from .tag import Tag
-from .containers import Coordinates, Angles, DeviceCoordinates
+from .containers import Pose, DeviceCoordinates
 
 from typing import Literal
 from pathlib import Path
@@ -226,33 +226,33 @@ class BitcrazeTag(Tag):
             coord_list: List of ints [x, y, z] representing the position of the tag
         """
 
-    def getCoordinates(self) -> Coordinates | None: 
+    def getCoordinates(self) -> Pose | None:
         """
         Gets the coordinates of the device. 
         Does not trigger positioning, only retrieves last known coordinates. 
 
         Returns:
-            Coordinates object of the last known position 
+            Pose object of the last known position
         """
 
-    def getOrientation(self) -> Angles | None: 
-        """ 
+    def getOrientation(self) -> Pose | None:
+        """
         Gets the current orientation of the tag in degrees. 
         
         Returns:
-            Angles object of the current orientation (heading, roll, pitch)
+            Pose object containing the current orientation (heading, roll, pitch)
         """
 
-    def doPositioning(self) -> Coordinates | None:
+    def doPositioning(self) -> Pose | None:
         """
         Positions the tag in space with UWB ranging. 
         This function computes and stores the position in the tag's memory. 
 
         Returns:
-            Coordinates object with the position or None
+            Pose object with the position or None
         """
 
-    def doRanging(self, target_id:int) -> Coordinates | None: 
+    def doRanging(self, target_id:int) -> Pose | None:
         """
         Calculates a UWB range measurement between the tag and another device. 
         
@@ -260,5 +260,5 @@ class BitcrazeTag(Tag):
             target_id: ID of the target device (int) 
         
         Returns:
-            Coordinates object with the position or None
-        """ 
+            Pose object with the position or None
+        """

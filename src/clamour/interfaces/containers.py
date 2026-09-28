@@ -1,124 +1,119 @@
-""" 
-This file defines many objects that serve to transport info from the tag to Clamour. 
-"""
-import numpy as np 
+"""Containers that transport spatial and angular tag state within Clamour."""
 
-class Coordinates: 
+import numpy as np
+
+
+class Pose:
+    """A tag pose with spatial coordinates, Euler angles, and spatial covariance.
+
+    Spatial coordinates ``x``, ``y``, and ``z`` are expressed in centimetres;
+    ``heading``, ``roll``, and ``pitch`` are expressed in degrees. All six values
+    are stored and returned as integers because the supported interfaces cannot
+    provide more precision.
+
+    Covariance is ``None`` by default. To initialize it, pass a six-item tuple
+    in the same order accepted by :meth:`update_covar`::
+
+        Pose(x=10, y=20, z=30, covar=(xx, yy, zz, xy, xz, yz))
+
+    The covariance describes the spatial coordinates and is stored as a 3x3
+    integer matrix in cm^2.
     """
-    Container for x, y, z coordinates (in cm) and associated covariance (cm^2), if available.
 
-    ALL ELEMENTS MUST BE INTEGERS. 
+    def __init__(self, x: int = 0, y: int = 0, z: int = 0,
+                 heading: int = 0, roll: int = 0, pitch: int = 0,
+                 covar: tuple[int, int, int, int, int, int] | None = None):
+        self._coordinates = [int(x), int(y), int(z)]
+        self._angles = [int(heading), int(roll), int(pitch)]
+        self._covar = None
+        if covar is not None:
+            self.update_covar(covar)
 
-    Covariance is None by default, can be initialized as a 3x3 array of ints or updated with update_covar() method.  
-    """ 
-    def __init__(self, x:int=0, y:int=0, z:int=0, covar:np.ndarray=None): 
-        self._data = [int(x),int(y),int(z)] 
-        self._covar = covar # Trusting user reads the docstring 
-    
     def __repr__(self):
-        return f"Coordinates: ({self.x}, {self.y}, {self.z}) | Covar: {self._covar}"
+        return (f"Pose: ({self.x}, {self.y}, {self.z}) | "
+                f"({self.heading}, {self.roll}, {self.pitch}) | Covar: {self._covar}")
+
+    def __str__(self):
+        return f"Heading: {self.heading}, Roll: {self.roll}, Pitch: {self.pitch}"
 
     @property
-    def data(self)->list[int,int,int]:
-        """
-        Position in [x,y,z] format
-        """
-        return self._data
+    def coordinates(self) -> list[int]:
+        """Spatial coordinates in ``[x, y, z]`` centimetres."""
+        return self._coordinates
 
     @property
-    def covar(self)->np.ndarray|None: 
-        """
-        3x3 covariance matrix on the position, if available. ALL ELEMENTS MUST BE INTS. 
-        """
+    def angles(self) -> list[int]:
+        """Euler angles in ``[heading, roll, pitch]`` degrees."""
+        return self._angles
+
+    @property
+    def covar(self) -> np.ndarray | None:
+        """The 3x3 integer spatial covariance matrix in cm^2, if available."""
         return self._covar
 
     @covar.setter
-    def covar(self, new_matrix:np.ndarray): 
-        """
-        3x3 covariance matrix on the position, if available 
-        [xx, xy, xz]
-        [xy, yy, yz] 
-        [xz, yz, zz]
-        """
+    def covar(self, new_matrix: np.ndarray):
         self._covar = new_matrix
-    
-    def update_covar(self, covariances:tuple[int,int,int,int,int,int]): 
-        """
-        Update the 3x3 covar matrix by passing the covariance of each distinct element in a tuple containing:
-        - xx
-        - yy
-        - zz
-        - xy
-        - xz
-        - yz
-        """
-        xx, yy, zz, xy, xz, yz = covariances
-        self._covar = np.array([[int(xx), int(xy), int(xz)], 
-                                [int(xy), int(yy), int(yz)], 
-                                [int(xz), int(yz), int(zz)]])
 
-    def load(self, data:list):
-        """ Updates the XYZ object with new data in format [x,y,z], all ints"""
-        self._data = data 
+    def update_covar(self, covariances: tuple[int, int, int, int, int, int]):
+        """Set covariance from ``(xx, yy, zz, xy, xz, yz)``."""
+        xx, yy, zz, xy, xz, yz = covariances
+        self._covar = np.array([
+            [int(xx), int(xy), int(xz)],
+            [int(xy), int(yy), int(yz)],
+            [int(xz), int(yz), int(zz)],
+        ])
+
+    def load(self, coordinates: list[int], angles: list[int] | None = None):
+        """Replace spatial coordinates and, optionally, Euler angles."""
+        self._coordinates = [int(value) for value in coordinates]
+        if angles is not None:
+            self._angles = [int(value) for value in angles]
 
     @property
     def x(self):
-        return self._data[0] 
+        return self._coordinates[0]
 
     @x.setter
     def x(self, value):
-        self._data[0] = value 
+        self._coordinates[0] = int(value)
 
     @property
     def y(self):
-        return self._data[1] 
+        return self._coordinates[1]
 
     @y.setter
     def y(self, value):
-        self._data[1] = value 
+        self._coordinates[1] = int(value)
 
     @property
     def z(self):
-        return self._data[2] 
+        return self._coordinates[2]
 
     @z.setter
     def z(self, value):
-        self._data[2] = value 
-
-class Angles:
-    """
-    Container for Euler angles as heading(yaw), roll, and pitch (in degrees).
-    """
-
-    def __init__(self, heading=0, roll=0, pitch=0):
-        self._data = [heading, roll, pitch]
-
-    def load(self, data):
-        self._data = data
-
-    def __str__(self):
-        return f'Heading: {self.heading}, Roll: {self.roll}, Pitch: {self.pitch}'
+        self._coordinates[2] = int(value)
 
     @property
     def heading(self):
-        return self._data[0] 
+        return self._angles[0]
 
     @heading.setter
     def heading(self, value):
-        self._data[0] = value 
+        self._angles[0] = int(value)
 
     @property
     def roll(self):
-        return self._data[1] 
+        return self._angles[1]
 
     @roll.setter
     def roll(self, value):
-        self._data[1] = value 
+        self._angles[1] = int(value)
 
     @property
     def pitch(self):
-        return self._data[2] 
+        return self._angles[2]
 
     @pitch.setter
     def pitch(self, value):
-        self._data[2] = value 
+        self._angles[2] = int(value)

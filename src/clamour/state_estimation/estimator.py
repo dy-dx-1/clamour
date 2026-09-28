@@ -8,7 +8,7 @@ from .ekf import CustomEKF
 from .factor_graph import FactorGraph
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
-from ..interfaces import Tag, Coordinates
+from ..interfaces import Tag, Pose
 from ..contextManagedQueue import ContextManagedQueue
 from ..messages.updateMessage import UpdateMessage
 from ..messages.soundMessage import SoundMessage
@@ -110,7 +110,7 @@ class StateEstimator:
                 case UpdateType.TOPOLOGY:  
                     self.update_neighbors(msg.topology) 
                 case UpdateType.CUSTOM_POSE: # TODO remove / replace by IMU factor? 
-                    self.estimator.custom_odometry_update(Coordinates(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp) 
+                    self.estimator.custom_odometry_update(Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp)
             
             self.publish_state(msg) 
 
@@ -135,7 +135,7 @@ class StateEstimator:
     def update_neighbors(self, neighbors: dict):
         self.last_know_neighbors = neighbors
 
-    def pedometer_yaw_to_coords(self, measured_yaw: float) -> Coordinates:
+    def pedometer_yaw_to_coords(self, measured_yaw: float) -> Pose:
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
         Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
 
@@ -145,7 +145,7 @@ class StateEstimator:
         delta_position_y = step_length * math.sin(math.radians(self.correct_yaw(measured_yaw)))
 
         # The pedometer cannot measure height; we assumed it is constant.
-        return Coordinates(self.estimator.x[0] + delta_position_x, self.estimator.x[2] + delta_position_y, self.estimator.x[4])
+        return Pose(self.estimator.x[0] + delta_position_x, self.estimator.x[2] + delta_position_y, self.estimator.x[4])
 
     def correct_yaw(self, measured_yaw: float) -> float:
         """
@@ -154,7 +154,7 @@ class StateEstimator:
         new_yaw = measured_yaw - self.yaw_offset
         return new_yaw if new_yaw >= 0 else 360 + new_yaw 
 
-    def validate_new_state(self, new_coordinates: Coordinates) -> bool:
+    def validate_new_state(self, new_pose: Pose) -> bool:
         """
         Makes sure the proposed coordinates stay within the same room or a logically accessible room.
         TODO NOTE: This is currently unused, previously, there was a commented check in process_latest_state_info
@@ -162,10 +162,10 @@ class StateEstimator:
         with this information. 
         2026-08-12 
         """
-        if self.current_room.within_bounds(new_coordinates):
+        if self.current_room.within_bounds(new_pose):
             return True
 
-        new_neighbor = self.current_room.within_neighbor_bounds(new_coordinates, self.floorplan.rooms)
+        new_neighbor = self.current_room.within_neighbor_bounds(new_pose, self.floorplan.rooms)
         if new_neighbor is not None:
             print("Changed room.", 'info', 'loc')
             self.current_room = self.floorplan.rooms[new_neighbor]

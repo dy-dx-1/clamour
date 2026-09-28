@@ -34,7 +34,7 @@ SAVE_TO_CSV = False     # Save localization data to csv or not
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
-# Anchor IDs are expected to be >0 and <=10. Coordinates are in cm. 
+# Anchor IDs are expected to be >0 and <=10. Spatial coordinates are in cm.
 ANCHORS = ({'id': 1, 'level': 0, 'x': 22.3, 'y': 45.8, 'z': 219}, 
            {'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 219},
            {'id': 5, 'level': 0, 'x': 79.3, 'y': 297.1, 'z': 219}) 

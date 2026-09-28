@@ -1,5 +1,5 @@
 from .roomLoader import RoomLoader
-from ..interfaces import Coordinates
+from ..interfaces import Pose
 
 
 class NonexistentRoomException(Exception):
@@ -21,8 +21,8 @@ class Floorplan:
         else:
             raise NonexistentRoomException()
 
-    def closest_room_label(self, coordinates: Coordinates) -> str:
-        distances = {label: room.distance(coordinates) for label, room in self.rooms.items()}
+    def closest_room_label(self, pose: Pose) -> str:
+        distances = {label: room.distance(pose) for label, room in self.rooms.items()}
         return min(distances, key=distances.get)
 
     def __repr__(self) -> str:

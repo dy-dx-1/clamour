@@ -4,7 +4,7 @@ from numpy import array, asarray, ndarray, dot, eye, linalg
 from scipy.optimize import least_squares
 
 from .customOdometry import CustomOdometry
-from ...interfaces import Coordinates, Anchors
+from ...interfaces import Pose, Anchors
 
 anchors = Anchors()
 
@@ -46,15 +46,15 @@ class CustomEKF(ExtendedKalmanFilter):
         position = anchors.get_centroid_for(*[data[0] for data in anchor_data])
         self.x = array([position.x, 0, position.y, 0, position.z, 0, yaw, 0])
 
-    def get_position(self) -> Coordinates:
-        return Coordinates(self.x[0], self.x[2], self.x[4])
+    def get_position(self) -> Pose:
+        return Pose(self.x[0], self.x[2], self.x[4])
 
     def get_yaw(self) -> float:
         return self.x[6]
 
     def get_covars(self) -> tuple: 
         """
-        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Coordinates.update_covar method
+        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Pose.update_covar.
         """
         return (
             self.P[0, 0],
@@ -136,7 +136,7 @@ class CustomEKF(ExtendedKalmanFilter):
             print("CustomEKF.pre_update(): Received message with bad timestamp", 'error', 'loc')
         self.predict()
 
-    def custom_odometry_update(self, position: Coordinates, yaw: float, R, timestamp: float) -> None:
+    def custom_odometry_update(self, position: Pose, yaw: float, R, timestamp: float) -> None:
         print("CustomEKF.custom_odometry_update(): Custom odometry update", 'error', 'loc')
         self.pre_update(timestamp)
 
@@ -147,7 +147,7 @@ class CustomEKF(ExtendedKalmanFilter):
             R
         )
 
-    def pedometer_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
+    def pedometer_update(self, position: Pose, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
@@ -164,22 +164,22 @@ class CustomEKF(ExtendedKalmanFilter):
             anchor_pos = [] 
             anchor_dist = [] 
             for id, dist in anchors_ranging_data: 
-                anchor_pos.append(anchors.anchors_dict[id].data) # .data to extract the list version of the Coordinates object 
+                anchor_pos.append(anchors.anchors_dict[id].coordinates)
                 anchor_dist.append(dist) 
             # Residual function (Error = Calculated Distance - Measured Distance)
             def equations(position):
                 calculated_distances =linalg.norm(anchor_pos - position, axis=1)
                 return calculated_distances - anchor_dist
             # Solving with Non-linear Least Squares (Levenberg-Marquardt)
-            raw_pos = least_squares(equations, array(self.get_position().data), method='lm')
-            self.trilateration_update(Coordinates(raw_pos.x[0], raw_pos.x[1], raw_pos.x[2]), raw_yaw, timestamp)
+            raw_pos = least_squares(equations, array(self.get_position().coordinates), method='lm')
+            self.trilateration_update(Pose(raw_pos.x[0], raw_pos.x[1], raw_pos.x[2]), raw_yaw, timestamp)
 
         else: # Not enough anchors for trilateration; add multiple ranging updates 
             print("ADDING RANGE UPDATES", 'ok', 'loc')
             print(f"{anchors_ranging_data}", 'ok', 'loc')
             print(f"{tags_ranging_data}", 'ok', 'loc')
             for id, z in anchors_ranging_data: 
-                formatted_dist = Coordinates(z, 0,0) 
+                formatted_dist = Pose(z, 0, 0)
                 formatted_target_pos = array([[anchors.anchors_dict[id].x, anchors.anchors_dict[id].y, anchors.anchors_dict[id].z]]) 
                 # NOTE 2026-08-17, in the past, neighbor positions were casted with atleast_2d. 
                 # If conversion problems arise, try to add it to formatted_target_pos / see jacobian methods 
@@ -190,18 +190,18 @@ class CustomEKF(ExtendedKalmanFilter):
                 # Originally the code didn't support adding ranges from neighbors with changing covariance (seemingly at least) 
                 # since EKF is being phased out, I am not implementing it now, this is just to check everything works 
                 # and keep 'some' functionality 2026-08-25
-                formatted_dist = Coordinates(z, 0,0) 
+                formatted_dist = Pose(z, 0, 0)
                 formatted_target_pos = array([[n_pos.x, n_pos.y, n_pos.z]])
                 self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)
 
-    def trilateration_update(self, position: Coordinates, yaw: float, timestamp: float) -> None:
+    def trilateration_update(self, position: Pose, yaw: float, timestamp: float) -> None:
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_trilateration, self.R_trilateration)
 
-    def ranging_update(self, distance: Coordinates, yaw: float, timestamp: float, neighbor_position: ndarray) -> None:
+    def ranging_update(self, distance: Pose, yaw: float, timestamp: float, neighbor_position: ndarray) -> None:
         self.pre_update(timestamp)
 
         super(CustomEKF, self).update(asarray([distance.x, distance.y, distance.z, yaw]),

@@ -2,7 +2,7 @@ import gtsam as gt
 import numpy as np 
 
 from ...custom_terminal import print 
-from ...interfaces import Anchors, Coordinates
+from ...interfaces import Anchors, Pose
 
 anchors = Anchors()
 ### Defining noise models 
@@ -136,13 +136,13 @@ class FactorGraph:
         - graph: Factor Graph object 
         - initial_values: Values object related to the graph 
         - anchors_ranging_data: list of measurements [(anchor_id, range), ...] 
-        - tags_ranging_data: list of measurements [(neighbor_id, neighbor_Coordinates, range), ...] 
+        - tags_ranging_data: list of measurements [(neighbor_id, neighbor_pose, range), ...]
         """
         print(f"Adding anchors {anchors_ranging_data} ||| Tags {tags_ranging_data}", 'info', 'loc')
         # ANCHORS
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
-            anchor_pos = anchors.anchors_dict[id].data # List of the x, y, z coordinates in cm
+            anchor_pos = anchors.anchors_dict[id].coordinates # List of the x, y, z coordinates in cm
             if id not in self.seen_anchors:
                 # ONLY if we have never seen this anchor -> need to add a prior on it's position 
                 graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
@@ -153,7 +153,7 @@ class FactorGraph:
         for n_id, n_coords, z in tags_ranging_data:  
             # tags_ranging_data only contains tags that have known positions/covar (filtered at TASK level)
             # NOTE: in future, could be nice to add here or in TASK a filter for stale data based on timestamps 
-            n_pos, n_cov = n_coords.data, n_coords.covar  
+            n_pos, n_cov = n_coords.coordinates, n_coords.covar
             # Adding the other tag's position to the graph with a special ID that tracks his position and the time
             neighbor = gt.symbol('t', int(f'{n_id}000{state_id}')) 
             # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
@@ -228,15 +228,15 @@ class FactorGraph:
         initial_values.insert(x, self.state.compose(mvt))
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
-    def get_position(self)->Coordinates:  
+    def get_position(self) -> Pose:
         """
-        Current posterior position in Coordinates format. 
+        Current posterior position in Pose format.
         """
         position = self.state.t() # numpy array on the position 
-        return Coordinates(position[0], position[1], position[2])
+        return Pose(position[0], position[1], position[2])
     def get_covars(self)->tuple: 
         """
-        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Coordinates.update_covar method
+        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Pose.update_covar.
         """
         return self.covars 
     def get_yaw(self)->float:
@@ -246,7 +246,7 @@ class FactorGraph:
         rot = self.state.R().ypr() # 1D array [yaw, pitch, roll]
         return rot[0]
 
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Coordinates, int]], raw_yaw:float):
+    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Pose, int]], raw_yaw:float):
         """
         Called whenever we get new ranges from anchors or tags to add to the factor graph. 
         NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model. 
@@ -305,7 +305,7 @@ class FactorGraph:
         x_prev = gt.symbol('x', current_state_id - 1)
         previous_pose = gt.Pose3(
             gt.Rot3.Ypr(self.get_yaw(), 0, 0),
-            gt.Point3(*self.get_position().data),
+            gt.Point3(*self.get_position().coordinates),
         )
         zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
 

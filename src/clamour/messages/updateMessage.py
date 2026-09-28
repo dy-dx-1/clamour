@@ -1,4 +1,4 @@
-from ..interfaces import Coordinates
+from ..interfaces import Pose
 from .types import UpdateType
 
 class UpdateMessage:
@@ -21,14 +21,14 @@ class UpdateMessage:
     - synchronized_clock
     - offset
     - anchors_ranging_data: list of ranging to anchors in format (id, range_in_cm)
-    - tags_ranging_data: list of ranging to tags in format (TargetCoordinates, range_in_cm)
+    - tags_ranging_data: list of ranging to tags in format (target_pose, range_in_cm)
     - measured_yaw
     - slots 
     - topology: dict 
     """
     def __init__(self, update_type: UpdateType, timestamp: float,
                  synchronized_clock: float=0.0, offset: float=0.0,
-                 anchors_ranging_data: list[tuple[int, int]]|None = None, tags_ranging_data: list[tuple[Coordinates, int]]|None = None,
+                 anchors_ranging_data: list[tuple[int, int]]|None = None, tags_ranging_data: list[tuple[Pose, int]]|None = None,
                  measured_yaw: float=0.0,
                  slots: list=None, topology: dict=None):
         self.update_type = update_type
