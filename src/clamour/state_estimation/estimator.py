@@ -13,7 +13,6 @@ from ..contextManagedQueue import ContextManagedQueue
 from ..messages.updateMessage import UpdateMessage
 from ..messages.soundMessage import SoundMessage
 from ..messages.types import UpdateType
-from ..messages.poseMessage import PoseMessage
 from ..rooms import Floorplan
 
 ZERO_MVT_THRESHOLD = 2  # Seconds before a zero movement update must be done to avoid filter drift
@@ -28,7 +27,7 @@ class StateEstimator:
     - tag: Tag object to track 
     - tag_lock: Multiprocessing Lock for the tag
     - estimator_type: EKF or Factor Graph
-    - pose_callback: Function that takes a PoseMessage and prints it on pose update # TODO remove? just put inside? 
+    - pose_callback: Function that takes a Pose and prints it on pose update # TODO remove? just put inside?
     - communication_queue: Queue where pose updates / messages to process appear 
     - sound_queue: Optional, if a Queue is passed, will send updates to it to allow for sound playing 
     """
@@ -110,7 +109,7 @@ class StateEstimator:
                 case UpdateType.TOPOLOGY:  
                     self.update_neighbors(msg.topology) 
                 case UpdateType.CUSTOM_POSE: # TODO remove / replace by IMU factor? 
-                    self.estimator.custom_odometry_update(Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp)
+                    self.estimator.custom_odometry_update(Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.heading, msg.R, msg.timestamp)
             
             self.publish_state(msg) 
 
@@ -185,7 +184,7 @@ class StateEstimator:
             self.tag.pose = post_pos
             self.tag.pose.update_covar(self.estimator.get_covars()) # update_covar casts to int automatically
  
-        self.pose_callback(PoseMessage(post_pos.x, post_pos.y, post_pos.z, post_yaw))
+        self.pose_callback(Pose(post_pos.x, post_pos.y, post_pos.z, heading=post_yaw))
 
         if SAVE_TO_CSV: 
             self.save_to_csv(message)

@@ -1,4 +1,5 @@
-from clamour import Clamour, CustomOdometry, PoseMessage
+from clamour import Clamour, CustomOdometry
+from clamour.interfaces import Pose
 from cognifly.cognifly_controller.cognifly_controller import CogniflyController, PoseEstimator
 
 class ClamourPoseEstimator(PoseEstimator):
@@ -34,7 +35,7 @@ class ClamourPoseEstimator(PoseEstimator):
         return self._get_last_calculated_output()
     
     def _updateFlightControllerOdometry(self, x, y, z, yaw):
-        self.fcOdometry.update_pose(PoseMessage(x, y, z, yaw))
+        self.fcOdometry.update_pose(Pose(x, y, z, heading=yaw))
 
     def _get_last_calculated_output(self):
         return (
@@ -48,7 +49,7 @@ class ClamourPoseEstimator(PoseEstimator):
             self.velocity_yaw
         )
 
-    def _on_new_pose(self, pose: PoseMessage):
+    def _on_new_pose(self, pose: Pose):
         self.current_x = pose.x
         self.velocity_x = self.current_x - self.last_x
         self.last_x = self.current_x
@@ -61,10 +62,10 @@ class ClamourPoseEstimator(PoseEstimator):
         self.velocity_z = self.current_z - self.last_z
         self.last_z = self.current_z
 
-        self.current_yaw = pose.yaw
+        self.current_yaw = pose.heading
         self.velocity_yaw = self.current_yaw - self.last_yaw
         self.last_yaw = self.current_yaw
-        print("New pose coming in! X: ", pose.x, "Y: ", pose.y, "Z: ", pose.z, "Yaw: ", pose.yaw)
+        print("New pose coming in! X: ", pose.x, "Y: ", pose.y, "Z: ", pose.z, "Yaw: ", pose.heading)
 
 
 if __name__ == '__main__':

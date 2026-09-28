@@ -5,14 +5,14 @@ import sys
 from clamour.clamour import Clamour
 from clamour.contextManagedQueue import ContextManagedQueue
 from clamour.custom_terminal import print
-from clamour.messages import PoseMessage
+from clamour.interfaces import Pose
 
 
-def on_new_pose_estimated(pose_msg: PoseMessage) -> None:
+def on_new_pose_estimated(pose: Pose) -> None:
     print(
         text=(
-            f"Pose estimated: x: {pose_msg.x}, y: {pose_msg.y}, "
-            f"z: {pose_msg.z}, yaw: {pose_msg.yaw}"
+            f"Pose estimated: x: {pose.x}, y: {pose.y}, "
+            f"z: {pose.z}, yaw: {pose.heading}"
         ),
         status="info",
         type="loc",

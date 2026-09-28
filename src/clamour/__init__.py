@@ -1,4 +1,4 @@
-__all__ = ["Clamour", "PoseMessage", "ContextManagedQueue"]
+__all__ = ["Clamour", "Pose", "ContextManagedQueue"]
 
 
 def Clamour(*args, **kwargs):
@@ -6,9 +6,9 @@ def Clamour(*args, **kwargs):
     return _Clamour(*args, **kwargs)
 
 
-def PoseMessage(*args, **kwargs):
-    from .messages import PoseMessage as _PoseMessage
-    return _PoseMessage(*args, **kwargs)
+def Pose(*args, **kwargs):
+    from .interfaces.containers import Pose as _Pose
+    return _Pose(*args, **kwargs)
 
 
 def ContextManagedQueue(*args, **kwargs):

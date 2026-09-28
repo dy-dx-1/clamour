@@ -6,7 +6,7 @@ from .tdma_node import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
 #from .pedometer import Pedometer
-from .messages.poseMessage import PoseMessage
+from .interfaces import Pose
 from .messages.customOdometryMessage import CustomOdometryMessage
 from .runnableProcess import RunnableProcess
 from .soundmanager import SoundManager
@@ -83,7 +83,7 @@ class Clamour:
         clamour_process = ContextManagedProcess(target=self.start, args=[sound, pose_callback, self.communication_queue])
         clamour_process.start()
 
-    def _on_custom_pose_update(self, custom_odometry: CustomOdometry, pose: PoseMessage, timestamp: float):
+    def _on_custom_pose_update(self, custom_odometry: CustomOdometry, pose: Pose, timestamp: float):
         if(self.communication_queue is not None):
             message = CustomOdometryMessage(pose, custom_odometry.get_R(), timestamp)
             self.communication_queue.put(CustomOdometryMessage.save(message))

@@ -1,8 +1,8 @@
-from .poseMessage import PoseMessage
+from ..interfaces import Pose
 from .types import UpdateType
 
 class CustomOdometryMessage:
-    def __init__(self, pose: PoseMessage, R, timestamp: float):
+    def __init__(self, pose: Pose, R, timestamp: float):
         self.pose = pose
         self.R = R
         self.timestamp = timestamp

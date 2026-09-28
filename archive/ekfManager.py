@@ -14,7 +14,7 @@ from ..contextManagedQueue import ContextManagedQueue
 from ..messages.updateMessage import UpdateMessage
 from ..messages.soundMessage import SoundMessage
 from ..messages.types import UpdateType
-from ..messages.poseMessage import PoseMessage
+from ..interfaces.containers import Pose
 from ..rooms import Floorplan
 
 class EKFManager:
@@ -74,7 +74,7 @@ class EKFManager:
                     self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
                     
                     self.save_to_csv(message.timestamp, message, self.ekf.get_position(), self.ekf.get_yaw())
-                    poseMsg = PoseMessage(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, self.ekf.get_yaw())
+                    poseMsg = Pose(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, heading=self.ekf.get_yaw())
                     self.pose_callback(poseMsg)
             else:
                 sleep(0.001)
@@ -113,7 +113,7 @@ class EKFManager:
             
             self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
 
-            poseMsg = PoseMessage(coordinates.x, coordinates.y, coordinates.z, yaw)
+            poseMsg = Pose(coordinates.x, coordinates.y, coordinates.z, heading=yaw)
             self.pose_callback(poseMsg)
 
             if self.sound:
@@ -135,7 +135,7 @@ class EKFManager:
         elif msg.update_type == UpdateType.TOPOLOGY:
             return msg.topology,
         elif msg.update_type == UpdateType.CUSTOM_POSE:
-            return Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.yaw, msg.R, msg.timestamp
+            return Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.heading, msg.R, msg.timestamp
 
     def infer_coordinates(self, measured_yaw: float) -> Pose:# NOTE READY TO DELETE
         """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
