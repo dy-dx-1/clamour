@@ -57,7 +57,7 @@ def trilaterate(anchor_positions, distances, initial_position=None):
 
 anchors = Anchors().anchors_dict
 anchor_positions = np.array(
-    [[anchor.x, anchor.y] for anchor in anchors.values()], dtype=float
+    [anchor[:2] for anchor in anchors.values()], dtype=float
 )
 
 plt.ion()

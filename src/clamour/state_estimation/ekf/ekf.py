@@ -44,7 +44,7 @@ class CustomEKF(ExtendedKalmanFilter):
         # anyways, in estimator.py, a subsequent call to incorporate_ranging_data will fix the position properly
         # we just need self.x to be a rough guess initially to provide a starting value for the non-linear optimization
         position = anchors.get_centroid_for(*[data[0] for data in anchor_data])
-        self.x = array([position.x, 0, position.y, 0, position.z, 0, yaw, 0])
+        self.x = array([position[0], 0, position[1], 0, position[2], 0, yaw, 0])
 
     def get_position(self) -> Pose:
         return Pose(self.x[0], self.x[2], self.x[4])
@@ -164,7 +164,7 @@ class CustomEKF(ExtendedKalmanFilter):
             anchor_pos = [] 
             anchor_dist = [] 
             for id, dist in anchors_ranging_data: 
-                anchor_pos.append(anchors.anchors_dict[id].coordinates)
+                anchor_pos.append(anchors.anchors_dict[id])
                 anchor_dist.append(dist) 
             # Residual function (Error = Calculated Distance - Measured Distance)
             def equations(position):
@@ -180,7 +180,7 @@ class CustomEKF(ExtendedKalmanFilter):
             print(f"{tags_ranging_data}", 'ok', 'loc')
             for id, z in anchors_ranging_data: 
                 formatted_dist = Pose(z, 0, 0)
-                formatted_target_pos = array([[anchors.anchors_dict[id].x, anchors.anchors_dict[id].y, anchors.anchors_dict[id].z]]) 
+                formatted_target_pos = array([anchors.anchors_dict[id]])
                 # NOTE 2026-08-17, in the past, neighbor positions were casted with atleast_2d. 
                 # If conversion problems arise, try to add it to formatted_target_pos / see jacobian methods 
                 self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)

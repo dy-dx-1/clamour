@@ -77,9 +77,9 @@ class FactorGraph:
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values() 
         graph.add(gt.PriorFactorPose3(x0, 
-                                      gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)), 
+                                      gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
-        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(throwaway_pos.x, throwaway_pos.y, throwaway_pos.z)))
+        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
         ### POSITION LOCK 
         self.add_ranging_data(x0, state_key, graph, initial_values, anchors_range_data, tags_ranging_data=[])
         ### GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
@@ -142,7 +142,7 @@ class FactorGraph:
         # ANCHORS
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
-            anchor_pos = anchors.anchors_dict[id].coordinates # List of the x, y, z coordinates in cm
+            anchor_pos = anchors.anchors_dict[id] # Tuple of the x, y, z coordinates in cm
             if id not in self.seen_anchors:
                 # ONLY if we have never seen this anchor -> need to add a prior on it's position 
                 graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))

@@ -14,7 +14,7 @@ from pypozyx import DeviceCoordinates as pozyxDeviceCoordinates
 from pypozyx import DeviceList as pozyxDeviceList
 from pypozyx import DeviceRange, EulerAngles, SingleRegister, Data, RXInfo
 
-ALL_ANCHORS = Anchors().anchors_dict # Dict {id: Pose()} of all the known anchors
+ALL_ANCHORS = Anchors().anchors_dict # Dict {id: (x, y, z)} of all the known anchors
 
 def get_pozyx_id(pozyx:PozyxSerial) -> int:
     """
@@ -151,9 +151,9 @@ class PozyxTag(Tag):
             devices = [device_id for device_id in devices if PozyxTag.is_anchor(device_id)]
             # Pose is our general version and needs formatting for pypozyx.
             for id in devices: 
-                x = ALL_ANCHORS[id].x * 10
-                y = ALL_ANCHORS[id].y * 10
-                z = ALL_ANCHORS[id].z * 10
+                x = ALL_ANCHORS[id][0] * 10
+                y = ALL_ANCHORS[id][1] * 10
+                z = ALL_ANCHORS[id][2] * 10
                 pozyx_obj = pozyxDeviceCoordinates(network_id=id, flag=1, pos = pozyxCoordinates(x, y, z) )
                 self._pozyx_serial.addDevice(pozyx_obj)
         elif discovery_type == "all": 

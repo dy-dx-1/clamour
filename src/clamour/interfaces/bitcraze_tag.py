@@ -10,7 +10,7 @@ from typing import Literal
 import time  
 import struct
 
-ALL_ANCHORS = Anchors().anchors_dict # Dict {id: Pose()} of all the known anchors
+ALL_ANCHORS = Anchors().anchors_dict # Dict {id: (x, y, z)} of all the known anchors
 
 SPEED_OF_LIGHT = 299_792_458
 ANTENNA_TICK_DELAY_ANCHORS = -16395 # Antenna delay to apply to anchor range measurements in ticks. This value was roughly calibrated 2026-06-24 (CalibratingAntennaDelay.xlsx) in my backyard. TODO better calib in future.  
