@@ -73,9 +73,9 @@ class EKFManager:
                     self.ekf = CustomEKF(message.measured_xyz, self.correct_yaw(message.measured_yaw))
                     self.ekf.trilateration_update(message.measured_xyz, self.correct_yaw(message.measured_yaw), message.timestamp)
                     
-                    self.save_to_csv(message.timestamp, message, self.ekf.get_position(), self.ekf.get_yaw())
-                    poseMsg = Pose(self.ekf.get_position().x, self.ekf.get_position().y, self.ekf.get_position().z, heading=self.ekf.get_yaw())
-                    self.pose_callback(poseMsg)
+                    pose = self.ekf.pose
+                    self.save_to_csv(message.timestamp, message, pose, pose.heading)
+                    self.pose_callback(pose)
             else:
                 sleep(0.001)
 
@@ -105,11 +105,12 @@ class EKFManager:
 
             try:
                 with self.tag_lock:
-                    self.tag.pose = self.ekf.get_position()
+                    self.tag.pose = self.ekf.pose
             except StructError as s:
                 print(f"EKFManager.process_latest_state_info(): {str(s)}", 'error', 'loc')
 
-            coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (self.ekf.get_position(), self.ekf.get_yaw())
+            pose = self.ekf.pose
+            coordinates, yaw = (update_info[0], update_info[1]) if message.update_type != UpdateType.TOPOLOGY else (pose, pose.heading)
             
             self.save_to_csv(self.ekf.last_measurement_time, message, coordinates, yaw)
 
@@ -117,7 +118,7 @@ class EKFManager:
             self.pose_callback(poseMsg)
 
             if self.sound:
-                sound_message = SoundMessage(self.ekf.get_position())
+                sound_message = SoundMessage(self.ekf.pose)
                 self.sound_queue.put(SoundMessage.save(sound_message))
 
         elif time() - self.ekf.last_measurement_time > DT_THRESHOLD:
@@ -168,7 +169,8 @@ class EKFManager:
         return False
 
     def generate_zero_update_info(self, timestamp: float) -> tuple:# NOTE READY TO DELETE
-        return self.ekf.get_position(), self.ekf.get_yaw(), timestamp
+        pose = self.ekf.pose
+        return pose, pose.heading, timestamp
 
     def update_neighbors(self, neighbors: dict):# NOTE READY TO DELETE
         self.last_know_neighbors = neighbors
@@ -177,6 +179,7 @@ class EKFManager:
         if not SAVE_TO_CSV: 
             return 
         if coordinates is not None and message.update_type != UpdateType.CUSTOM_POSE:
+            pose = self.ekf.pose
             csv_data = {
                 'tag_id': self.tag_id,
                 'timestamp': timestamp,
@@ -184,13 +187,13 @@ class EKFManager:
                 'offset': message.offset,
                 'update_type': message.update_type,
                 'coords_pos_x': coordinates.x,
-                'ekf_pos_x': self.ekf.get_position().x,
+                'ekf_pos_x': pose.x,
                 'coords_pos_y': coordinates.y,
-                'ekf_pos_y': self.ekf.get_position().y,
+                'ekf_pos_y': pose.y,
                 'coords_pos_z': coordinates.z,
-                'ekf_pos_z': self.ekf.get_position().z,
+                'ekf_pos_z': pose.z,
                 'raw_yaw': yaw,
-                'ekf_yaw': self.ekf.get_yaw(),
+                'ekf_yaw': pose.heading,
                 'ekf_covariance_matrix': linalg.det(self.ekf.P),
                 'slots': message.slots,
                 'two_hop_neighbors': self.last_know_neighbors

@@ -46,24 +46,19 @@ class CustomEKF(ExtendedKalmanFilter):
         position = anchors.get_centroid_for(*[data[0] for data in anchor_data])
         self.x = array([position[0], 0, position[1], 0, position[2], 0, yaw, 0])
 
-    def get_position(self) -> Pose:
-        return Pose(self.x[0], self.x[2], self.x[4])
-
-    def get_yaw(self) -> float:
-        return self.x[6]
-
-    def get_covars(self) -> tuple: 
-        """
-        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Pose.update_covar.
-        """
-        return (
+    @property
+    def pose(self) -> Pose:
+        """The posterior pose after running the estimator, or the last estimate if we didn't run it yet"""
+        pose = Pose(self.x[0], self.x[2], self.x[4], heading=self.x[6])
+        pose.update_covar((
             self.P[0, 0],
             self.P[2, 2],
             self.P[4, 4],
             self.P[0, 2],
             self.P[0, 4],
             self.P[2, 4],
-        )
+        ))
+        return pose
 
     def set_qf(self):
         # As we integrate to find position, we lose precision. Thus we trust x less than dx/dt, hence the dt*2 vs dt.
@@ -171,7 +166,7 @@ class CustomEKF(ExtendedKalmanFilter):
                 calculated_distances =linalg.norm(anchor_pos - position, axis=1)
                 return calculated_distances - anchor_dist
             # Solving with Non-linear Least Squares (Levenberg-Marquardt)
-            raw_pos = least_squares(equations, array(self.get_position().coordinates), method='lm')
+            raw_pos = least_squares(equations, array(self.pose.coordinates), method='lm')
             self.trilateration_update(Pose(raw_pos.x[0], raw_pos.x[1], raw_pos.x[2]), raw_yaw, timestamp)
 
         else: # Not enough anchors for trilateration; add multiple ranging updates 
@@ -215,9 +210,8 @@ class CustomEKF(ExtendedKalmanFilter):
         Indeed, if dt is too big, the process noise increase even if there was no change to the state."""
 
         self.pre_update(timestamp)
-        position = self.get_position() 
-        yaw = self.get_yaw() 
-        super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
+        pose = self.pose
+        super(CustomEKF, self).update(asarray([pose.x, pose.y, pose.z, pose.heading]),
                                       lambda _: self.observation_matrix,
                                       self.hx_zero_movement, self.R_zero_movement)
 

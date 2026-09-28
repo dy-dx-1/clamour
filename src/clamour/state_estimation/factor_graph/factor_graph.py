@@ -3,11 +3,12 @@ import numpy as np
 
 from ...custom_terminal import print 
 from ...interfaces import Anchors, Pose
+from ...config import ANCHOR_POS_UNCERTAINTY
 
 anchors = Anchors()
 ### Defining noise models 
 ## Units in cm, like the rest of the graph
-ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([5, 5, 5]) # uncertainty in anchor placement
+ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
@@ -85,6 +86,15 @@ class FactorGraph:
         ### GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
         post_pose = self.isam.calculateEstimate().atPose3(x0) 
+        covariance = self.isam.marginalCovariance(x0)
+        self.covars = (
+            covariance[3, 3],
+            covariance[4, 4],
+            covariance[5, 5],
+            covariance[3, 4],
+            covariance[3, 5],
+            covariance[4, 5],
+        )
         return gt.NavState(post_pose, np.zeros(3)) # NOTE TODO 0 velocity initialization - confirm if keep 
 
     def create_imu_pim_obj(self, state_key, graph, initial, gyro_covar, accel_covar, integration_covar, gyro_bias, accel_bias): 
@@ -228,23 +238,12 @@ class FactorGraph:
         initial_values.insert(x, self.state.compose(mvt))
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
-    def get_position(self) -> Pose:
-        """
-        Current posterior position in Pose format.
-        """
-        position = self.state.t() # numpy array on the position 
-        return Pose(position[0], position[1], position[2])
-    def get_covars(self)->tuple: 
-        """
-        Current covariance on the position in a tuple (xx, yy, zz, xy, xz, yz) to match Pose.update_covar.
-        """
-        return self.covars 
-    def get_yaw(self)->float:
-        """
-        Current posterior yaw
-        """
+    @property
+    def pose(self) -> Pose:
+        """The posterior pose after running the estimator, or the last estimate if we didn't run it yet"""
+        position = self.state.t()  # 1D array [x, y, z]
         rot = self.state.R().ypr() # 1D array [yaw, pitch, roll]
-        return rot[0]
+        return Pose(position[0], position[1], position[2], heading=rot[0], pitch=rot[1], roll=rot[2], covar=self.covars)
 
     def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Pose, int]], raw_yaw:float):
         """
@@ -303,9 +302,10 @@ class FactorGraph:
         current_state_id = self.state_counter
         x = gt.symbol('x', current_state_id)
         x_prev = gt.symbol('x', current_state_id - 1)
+        pose = self.pose
         previous_pose = gt.Pose3(
-            gt.Rot3.Ypr(self.get_yaw(), 0, 0),
-            gt.Point3(*self.get_position().coordinates),
+            gt.Rot3.Ypr(pose.heading, 0, 0),
+            gt.Point3(*pose.coordinates),
         )
         zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
 

@@ -114,7 +114,7 @@ class StateEstimator:
             self.publish_state(msg) 
 
             if self.sound_queue != None: 
-                sound_message = SoundMessage(self.estimator.get_position())
+                sound_message = SoundMessage(self.estimator.pose)
                 self.sound_queue.put(SoundMessage.save(sound_message))
 
         elif (time() - self.estimator.last_measurement_time) > ZERO_MVT_THRESHOLD: 
@@ -127,7 +127,7 @@ class StateEstimator:
             # which is not necessarily true, what if the tag kept moving, but simply didn't see anyone? 
             # Adding the IMU will render this obsolete. 
             self.estimator.zero_movement_update(self.estimator.last_measurement_time + ZERO_MVT_THRESHOLD) 
-            print(f"ZERO MOVEMENT UPDATE APPLIED, POSE: {self.estimator.get_position()}", 'ok', 'loc')
+            print(f"ZERO MOVEMENT UPDATE APPLIED, POSE: {self.estimator.pose}", 'ok', 'loc')
         else: 
             sleep(WAIT_TIME_DURING_INIT) 
 
@@ -178,13 +178,12 @@ class StateEstimator:
         - Prints out the current posterior from the estimator
         - Saves to CSV if configured to do so (config.py) 
         """
-        post_pos, post_yaw = self.estimator.get_position(), self.estimator.get_yaw()
+        pose = self.estimator.pose
 
         with self.tag_lock:
-            self.tag.pose = post_pos
-            self.tag.pose.update_covar(self.estimator.get_covars()) # update_covar casts to int automatically
+            self.tag.pose = pose
  
-        self.pose_callback(Pose(post_pos.x, post_pos.y, post_pos.z, heading=post_yaw))
+        self.pose_callback(pose)
 
         if SAVE_TO_CSV: 
             self.save_to_csv(message)
@@ -216,16 +215,17 @@ class StateEstimator:
         Since the answer to these questions may be clearer in the future, leaving it without raw position for now (2026-08-18). 
         """
         if message.update_type == UpdateType.RANGING: # TODO add compatibility to IMU in future 
+            pose = self.estimator.pose
             csv_data = {
                 'tag_id': self.tag.tag_id,
                 'timestamp': message.timestamp,
                 'synchronized_clock': message.synchronized_clock,
                 'offset': message.offset,
                 'update_type': message.update_type,
-                'estimator_x': self.estimator.get_position().x,
-                'estimator_y': self.estimator.get_position().y,
-                'estimator_z': self.estimator.get_position().z,
-                'estimator_yaw': self.estimator.get_yaw(),
+                'estimator_x': pose.x,
+                'estimator_y': pose.y,
+                'estimator_z': pose.z,
+                'estimator_yaw': pose.heading,
                 'covariance_matrix': "to implement", # previously: np.linalg.det(self.estimator.P)
                 'slots': message.slots,
                 'two_hop_neighbors': self.last_know_neighbors

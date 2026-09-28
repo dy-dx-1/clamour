@@ -38,6 +38,7 @@ SAVE_TO_CSV = False     # Save localization data to csv or not
 ANCHORS = ({'id': 1, 'level': 0, 'x': 22.3, 'y': 45.8, 'z': 219}, 
            {'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 219},
            {'id': 5, 'level': 0, 'x': 79.3, 'y': 297.1, 'z': 219}) 
+ANCHOR_POS_UNCERTAINTY = 5 # +- precision on the anchor's coordinates (cm) 
 
 
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 
