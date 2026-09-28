@@ -219,13 +219,13 @@ class BitcrazeTag(Tag):
             # Report consists of header + 5 bytes each for R1, T2, R3 (40bit clock timings) + tag position and covariance
             report = self.gen_twr_msg_header(requester_id, 'REPORT', twr_seq) + list(R1.to_bytes(5, 'little') + T2.to_bytes(5, 'little') + R3.to_bytes(5, 'little'))
             # The tag position and covariance is sent as 9 signed ints [x, y, z, xx, yy, zz, xy, xz, yz]
-            coordinates = self.coordinates
-            covariance = coordinates.covar
+            pose = self.pose
+            covariance = pose.covar
             if covariance is None: # If covar is not ready, we'll send 0s everywhere (impossible), if the other tag sees this they'll ignore our message
                 covariance = np.array([[0,0,0],[0,0,0],[0,0,0]])
             try:                 
                 neighbor_info = REPORT_NEIGHBOR_INFO.pack(
-                    *coordinates.coordinates,
+                    *pose.coordinates,
                     covariance[0][0], covariance[1][1], covariance[2][2],
                     covariance[0][1], covariance[0][2], covariance[1][2],
                 )
@@ -270,16 +270,16 @@ class BitcrazeTag(Tag):
     
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     @property
-    def coordinates(self) -> Pose:
+    def pose(self) -> Pose:
         return self._pose
     
-    @coordinates.setter 
-    def coordinates(self, new_pose: Pose):
+    @pose.setter
+    def pose(self, new_pose: Pose):
         self._pose = new_pose
 
     @property
     def orientation(self) -> Pose:
-        return self._pose
+        return self._pose.angles
 
     @staticmethod
     def extract_report_neighbor_info(report_msg:list) -> Pose|None:

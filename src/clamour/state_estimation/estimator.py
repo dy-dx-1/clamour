@@ -175,15 +175,16 @@ class StateEstimator:
 
     def publish_state(self, message: UpdateMessage): 
         """
-        - Saves the position and covariance in it's Tag object 
+        - Saves the pose and covariance in its Tag object
         - Prints out the current posterior from the estimator
         - Saves to CSV if configured to do so (config.py) 
         """
-        with self.tag_lock:
-            self.tag.coordinates = self.estimator.get_position() 
-            self.tag.coordinates.update_covar(self.estimator.get_covars()) # update_covar casts to int automatically 
+        post_pos, post_yaw = self.estimator.get_position(), self.estimator.get_yaw()
 
-        post_pos, post_yaw = self.estimator.get_position(), self.estimator.get_yaw() 
+        with self.tag_lock:
+            self.tag.pose = post_pos
+            self.tag.pose.update_covar(self.estimator.get_covars()) # update_covar casts to int automatically
+ 
         self.pose_callback(PoseMessage(post_pos.x, post_pos.y, post_pos.z, post_yaw))
 
         if SAVE_TO_CSV: 

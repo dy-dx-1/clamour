@@ -123,23 +123,21 @@ class Tag(ABC):
 
     @property
     @abstractmethod
-    def coordinates(self) -> Pose:
+    def pose(self) -> Pose:
         """
-        The last-known position and covariance of the tag. 
+        The last-known pose of the tag, including position and covariance.
         """
 
-    @coordinates.setter 
+    @pose.setter
     @abstractmethod
-    def coordinates(self, new_pose: Pose) -> None:
+    def pose(self, new_pose: Pose) -> None:
         pass
 
     @property
-    def orientation(self) -> Pose:
+    @abstractmethod
+    def orientation(self) -> list:
         """ 
-        Gets the current orientation of the tag in degrees. 
-        
-        RETURNS: 
-            - Pose object containing the current orientation (heading, roll, pitch)
+        Gets the current orientation of the tag [heading, roll, pitch] in degrees. 
         """
 
     @abstractmethod

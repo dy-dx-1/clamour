@@ -194,8 +194,8 @@ class PozyxTag(Tag):
 
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     @property
-    def coordinates(self):
-        # Not sure why pypozyx seems to only get the X position with this function. 
+    def pose(self) -> Pose:
+        # Not sure why pypozyx seems to only get the X position with getCoordinates().
         # If precision is way off in the future, look into this. 
         coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
         try:
@@ -206,8 +206,8 @@ class PozyxTag(Tag):
         assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
         return Pose(coords_container.x / 10, coords_container.y / 10, coords_container.z / 10) # Convert Pozyx hardware units to cm
 
-    @coordinates.setter
-    def coordinates(self, new_pose: Pose):
+    @pose.setter
+    def pose(self, new_pose: Pose):
         pozyx_coords = pozyxCoordinates(new_pose.x * 10, new_pose.y * 10, new_pose.z * 10)
         self._pozyx_serial.setCoordinates(pozyx_coords)
     
@@ -221,7 +221,7 @@ class PozyxTag(Tag):
             print(f"PozyxTag.getEulerAngles_deg: {str(s)}", 'error', 'loc') 
         
         if status == POZYX_SUCCESS: 
-            return Pose(heading=angles.heading, roll=angles.roll, pitch=angles.pitch)
+            return [angles.heading, angles.roll, angles.pitch]
         else: 
             self.printCurrentError('PozyxTag.orientation')
             return None
