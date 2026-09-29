@@ -109,7 +109,7 @@ class Task(TDMAState):
                                             offset=self.timing.logical_clock.offset,
                                             anchors_ranging_data=anchor_zs,
                                             tags_ranging_data=tag_zs,
-                                            yaw = self.tag.orientation.heading,
+                                            yaw = self.tag.pose.heading,
                                             topology= self.neighborhood.current_neighbors)
 
     def select_ranging_targets(self)->set:
