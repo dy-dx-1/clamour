@@ -336,6 +336,8 @@ class BitcrazeTag(Tag):
             T_rp2 = compute_clock_delta(T3, R2)
             tof_ticks = ((T_r1 * T_r2) - (T_rp1 * T_rp2)) / (T_r1+T_r2+T_rp1+T_rp2)
             distance = int((tof_ticks + ANTENNA_TICK_DELAY) * self._dw.TIME_UNIT * SPEED_OF_LIGHT * 100) # in cm
+            if distance<=0: 
+                distance = None 
             # We got the distance, if it's a tag, also extract it's position and covariance from the response 
             if not self.is_anchor(target_id) and len(report) == REPORT_HEADER_SIZE + REPORT_TIMESTAMP_SIZE + REPORT_NEIGHBOR_INFO.size:
                 target_coords = self.extract_report_neighbor_info(report) # if neighbor doesn't give position AND covar, this is None 
