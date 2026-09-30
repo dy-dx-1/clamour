@@ -105,7 +105,8 @@ if __name__ == "__main__":
         raise SystemExit(str(exc)) from exc
 
     with DW1000(0, 0, 2, 64, 6.8, 128, 9, True, None) as dw:
-        header = [0x41, 0xDC, 0x00, 0xCF, 0xBC] + list(ANCHOR_ID.to_bytes(6, 'little') + b'\xcf\xbc') + list(0xFFFFFFFFFFFF.to_bytes(6, 'little') + b'\xcf\xbc') + [LPP_SHORT_TAG]
+        header = [0x41, 0xDC, 0x00, 0xCF, 0xBC] + list(ANCHOR_ID.to_bytes(6, 'little') + b'\xcf\xbc') +\
+                    list((0).to_bytes(6, 'little') + b'\xcf\xbc') + [LPP_SHORT_TAG] # NOTE: SOURCE_ADDR SET TO 0, ELSE ANCHOR FIRMWARE WILL REJECT MODIFS WHEN IN TWR MODE!
         for cfg in config_messages:
             msg = header + cfg
             for _ in range(3):
