@@ -2,6 +2,7 @@
 Defines all configuration parameters for Clamour. 
 - Tag type and ID 
 - DW1000/UWB settings if applicable 
+- IMU selection
 - Terminal output control 
 - Saving output to CSV
 - Anchor definition 
@@ -22,6 +23,9 @@ TX_POWER_CONFIG = None     # Overwrites default TX power setting if different fr
 
 ### State estimation control 
 ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph) 
+
+### IMU control 
+IMU_TYPE = "LSM6DSV320X" 
 
 ### Output control 
 ## Terminal
