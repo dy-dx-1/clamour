@@ -27,7 +27,7 @@ ANCHOR_ID = 1
 # Configuration parameters; set to None to leave them unchanged
 ANCHOR_POS = (1, 1, 1)              # (x, y, z) in meters
 REBOOT = None                       # 1 = reboot to firmware, 2 = reboot to bootloader
-MODE = 3                            # 1 = TWR, 2 = TDOA2, 3 = TDOA3
+MODE = 1                            # 1 = TWR, 2 = TDOA2, 3 = TDOA3
 UWB_POWER = None      # (smart_tx_enabled, force_tx_enabled, tx_power_value)
 # NOTE: Careful with UWB settings - if you want to change it back, you will have to change the DW1000 settings below 
 # the DW1000 is config'ed by default to normal operation (0,0). 
