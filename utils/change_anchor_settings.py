@@ -27,11 +27,11 @@ ANCHOR_ID = 1
 # Configuration parameters; set to None to leave them unchanged
 ANCHOR_POS = (1, 1, 1)              # (x, y, z) in meters
 REBOOT = None                       # 1 = reboot to firmware, 2 = reboot to bootloader
-MODE = 1                            # 1 = TWR, 2 = TDOA2, 3 = TDOA3
-UWB_POWER = (0, 1, 0xFFFFFFFF)      # (smart_tx_enabled, force_tx_enabled, tx_power_value)
+MODE = 3                            # 1 = TWR, 2 = TDOA2, 3 = TDOA3
+UWB_POWER = None      # (smart_tx_enabled, force_tx_enabled, tx_power_value)
 # NOTE: Careful with UWB settings - if you want to change it back, you will have to change the DW1000 settings below 
 # the DW1000 is config'ed by default to normal operation (0,0). 
-UWB_RADIO = (0, 0)                  # (low_bitrate_enabled, long_preamble_enabled)
+UWB_RADIO = None                  # (low_bitrate_enabled, long_preamble_enabled)
 
 ######################################################################################################################
 LPP_SHORT_TAG = 0xF0
@@ -52,20 +52,6 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 from src.clamour.interfaces.dw_1000 import DW1000
-
-
-def build_destination_addr(anchor_id: int) -> list[int]:
-    return list(anchor_id.to_bytes(6, 'little') + b'\xcf\xbc')
-
-
-def build_source_addr() -> list[int]:
-    # Use an all-ones source address as padding to indicate an unspecified sender.
-    return list((0xFFFFFFFF).to_bytes(6, 'little') + b'\xcf\xbc')
-
-
-def build_header(anchor_id: int) -> list[int]:
-    return [0x41, 0xDC, 0x00, 0xCF, 0xBC] + build_destination_addr(anchor_id) + build_source_addr() + [LPP_SHORT_TAG]
-
 
 def build_uwb_power_payload(smart_tx_power: int, force_tx_power: int, tx_power: int) -> list[int]:
     smart_tx_power = int(bool(smart_tx_power)) & 0x01
@@ -119,7 +105,7 @@ if __name__ == "__main__":
         raise SystemExit(str(exc)) from exc
 
     with DW1000(0, 0, 2, 64, 6.8, 128, 9, True, None) as dw:
-        header = build_header(ANCHOR_ID)
+        header = [0x41, 0xDC, 0x00, 0xCF, 0xBC] + list(ANCHOR_ID.to_bytes(6, 'little') + b'\xcf\xbc') + list(0xFFFFFFFFFFFF.to_bytes(6, 'little') + b'\xcf\xbc') + [LPP_SHORT_TAG]
         for cfg in config_messages:
             msg = header + cfg
             for _ in range(3):
