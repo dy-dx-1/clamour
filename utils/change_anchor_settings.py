@@ -17,34 +17,34 @@ LPP_SHORT_UWB             0x04 -> [flags, tx_power[4 bytes]]
 LPP_SHORT_UWB_MODE        0x05 -> [flags]
 
 Flags are documented in the firmware as:
-- UWB: 000000__FORCE_TX_POWER_BIT__SMART_TX_POWER_BIT
+- UWB:      000000__FORCE_TX_POWER_BIT__SMART_TX_POWER_BIT
 - UWB_MODE: 000000__LONG_PREAMBLE_BIT__LOW_BITRATE_BIT
 """
-
+########################################## CONFIGURATION AREA - CHANGE THESE PARAMS ##########################################
 # Target anchor - unfortunately can't change ID remotely
 ANCHOR_ID = 4
 
 # Configuration parameters; set to None to leave them unchanged
-ANCHOR_POS = (1, 1, 1)              # (x, y, z) in meters
-REBOOT = None                       # 1 = reboot to firmware, 2 = reboot to bootloader
-MODE = 1                            # 1 = TWR, 2 = TDOA2, 3 = TDOA3
-UWB_POWER = None      # (smart_tx_enabled, force_tx_enabled, tx_power_value)
-# NOTE: Careful with UWB settings - if you want to change it back, you will have to change the DW1000 settings below 
-# the DW1000 is config'ed by default to normal operation (0,0). 
-UWB_RADIO = None                  # (low_bitrate_enabled, long_preamble_enabled)
+ANCHOR_POS = (1, 1, 1) # (x, y, z) 
+REBOOT = None          # 1 = reboot to firmware, 2 = reboot to bootloader
+MODE = 1               # 1 = TWR, 2 = TDOA2, 3 = TDOA3
+UWB_POWER = None       # (smart_tx_enabled, force_tx_enabled, 32bit_tx_power_value). Example: Force max power: (0, 1, 0xFFFFFFFF)
+# NOTE: Careful with UWB settings - if you want to change them back, you will have to change the DW1000 settings below 
+# the DW1000 is config'ed by default to match normal operation (0,0). 
+UWB_RADIO = None       # (low_bitrate_enabled, long_preamble_enabled)
 
-######################################################################################################################
+########################################## CODE - LOGIC BASED ON LOCO POSITIONING NODE FIRMWARE ##########################################
+import struct
+from pathlib import Path
+import sys
+import time
+
 LPP_SHORT_TAG = 0xF0
 LPP_SHORT_ANCHOR_POSITION = 0x01
 LPP_SHORT_REBOOT = 0x02
 LPP_SHORT_MODE = 0x03
 LPP_SHORT_UWB = 0x04
 LPP_SHORT_UWB_MODE = 0x05
-
-import struct
-from pathlib import Path
-import sys
-import time
 
 # Add parent directory to sys.path
 parent_dir = str(Path(__file__).resolve().parent.parent)
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     with DW1000(0, 0, 2, 64, 6.8, 128, 9, True, None) as dw:
         header = [0x41, 0xDC, 0x00, 0xCF, 0xBC] + list(ANCHOR_ID.to_bytes(6, 'little') + b'\xcf\xbc') +\
-                    list((0).to_bytes(6, 'little') + b'\xcf\xbc') + [LPP_SHORT_TAG] # NOTE: SOURCE_ADDR SET TO 0, ELSE ANCHOR FIRMWARE WILL REJECT MODIFS WHEN IN TWR MODE!
+                    list(bytes(0x00_00_00_00_00_00_CF_BC)) + [LPP_SHORT_TAG] # NOTE: SOURCE_ADDR SET TO 0, ELSE ANCHOR FIRMWARE WILL REJECT MODIFS WHEN IN TWR MODE!
         for cfg in config_messages:
             msg = header + cfg
             for _ in range(3):
