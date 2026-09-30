@@ -22,7 +22,7 @@ Flags are documented in the firmware as:
 """
 
 # Target anchor - unfortunately can't change ID remotely
-ANCHOR_ID = 1
+ANCHOR_ID = 4
 
 # Configuration parameters; set to None to leave them unchanged
 ANCHOR_POS = (1, 1, 1)              # (x, y, z) in meters
