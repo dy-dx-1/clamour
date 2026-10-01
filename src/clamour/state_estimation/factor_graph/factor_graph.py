@@ -3,7 +3,9 @@ import numpy as np
 
 from ...custom_terminal import print 
 from ...interfaces import Anchors, Pose
-from ...config import ANCHOR_POS_UNCERTAINTY
+from ...config import (ANCHOR_POS_UNCERTAINTY, IMU_TYPE,
+                        IMU_ACCEL_INITIAL_BIAS, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
+                        IMU_GYRO_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
 
 anchors = Anchors()
 ### Defining noise models 
@@ -13,12 +15,16 @@ RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
 
+## Defining IMU params 
+IMU_INITIAL_BIAS_COV = None # TODO figure out how to merge these arrays 
+if IMU_TYPE=="LSM6DSV320X": 
+    # set scale factor and bias (latter only for good measure) 
+    pass 
+else: 
+    pass 
+
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float, 
-                 imu_accel_initial_bias:np.ndarray, imu_gyro_initial_bias, 
-                 imu_accel_initial_bias_cov:np.ndarray, imu_gyro_initial_bias_cov:np.ndarray, 
-                 imu_accel_cov:float, imu_gyro_cov:float, 
-                 imu_accel_walk_cov: float, imu_gyro_walk_cov: float): 
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float) 
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
@@ -108,16 +114,16 @@ class FactorGraph:
         pim_params.setAccelerometerCovariance(accel_covar)
         pim_params.setGyroscopeCovariance(gyro_covar)
         pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) # Uncertainty due to modeling errors in the integration from accel->v->p
-        pim_params.setBiasAccCovariance(accel_bias_covar) 
-        pim_params.setBiasOmegaCovariance(gyro_bias_covar) 
+        pim_params.setBiasAccCovariance(IMU_ACCEL_WALK_COV) 
+        pim_params.setBiasOmegaCovariance(IMU_GYRO_WALK_COV) 
         # Defining IMU bias and setting a prior
         # The IMU calibration isn't perfect, this prior serves to anchor our confidence in it 
         # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve. This gives it it's reference starting point. 
         # TODO currently here, but some restructuring for clarity might be needed? harmonize with insert_init_prior? 
         # TODO we are expecting np.array([X, Y, Z]) for each. Floats for each. 
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
-        imu_bias = gt.imuBias.ConstantBias(accel_bias, gyro_bias)
-        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_BIAS_NOISE)) # define noise in the imu class 
+        imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS)
+        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_INITIAL_BIAS_COV)) # define noise in the imu class 
         initial.insert(gt.symbol('b', state_key), imu_bias) 
 
         # Creating the preintegration object 

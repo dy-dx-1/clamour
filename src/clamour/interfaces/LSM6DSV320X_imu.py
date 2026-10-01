@@ -58,16 +58,11 @@ class LSM6DSV320X:
     # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
     accel_covar_density_mg = 0.060**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (mg**2)*s 
     gyro_covar_density_mdps  = 3.8**2 # Units: (mdps**2)*s
-    # Bias random walk covariance - PLACEHOLDER VALUES - TO BE ESTIMATED WITH ALLAN VARIANCE ANALYSIS 
-    # As of 21sept 2026, placeholders as it'll be enough to validate IMU integration. We don't dead-reckon for long without range factors to correct. 
-    # GTSAM expects these values to be /s as it will *s during pre-integration 
-    # To be used in GTSAM setBiasAccCovariance/setBiasOmegaCovariance
-    accel_bias_random_walk_covar_mg =  0.032**2   # Guessed placeholders, units: (mg**2)/s
-    gyro_bias_random_walk_covar_mdps =   5.73**2  # Guessed placeholders, units: (mdps**2)/s
-
-    ### ACCEL/GYRO CALIBRATION VALUES
+ 
+    ### ACCEL/GYRO CALIBRATION VALUES: calibrated_measure = scale_factor @ (raw_measure-bias)
     ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
-    ## Units are in mgs and mdps. Format is x,y,z. Match the equation: calibrated_measure = scale_factor @ (raw_measure-bias)
+    ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
+    ## Units are in mgs and mdps. 
     # Scale Factor (always used internally) 
     accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
                                    [0.006256910346063383,    1.0018358510192535,   0.0],
@@ -75,8 +70,8 @@ class LSM6DSV320X:
     gyro_scale_factor  =  np.array([[1,0,0],
                                     [0,1,0],
                                     [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others. 
-    # Bias (Fixed initial value, does not consider bias drift) 
-    # If using GTSAM, use these values to initialize bias tracking & let the FG handle drift-estimation afterwards 
+    # Bias (general fixed rough values for the class) 
+    # Clamour uses the values in config.py, not here. These are just for testing when importing this file.
     # convert_accel_bytes_to_mgs() and convert_gyro_bytes_to_mdps() have params to return or not bias compensated values for this. 
     # as GTSAM will use non-compensated values so it can apply it's own estimated bias 
     accel_bias = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])

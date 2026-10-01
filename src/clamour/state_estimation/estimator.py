@@ -80,11 +80,7 @@ class StateEstimator:
                         # For the EKF, incorporating ranging data with >3 anchors will directly trigger a trilateration update
                         self.estimator.incorporate_ranging_data(msg.timestamp, msg.anchors_ranging_data, msg.tags_ranging_data, raw_yaw)
                     elif self.estimator_type == 'FG':
-                        self.estimator = FactorGraph(msg.anchors_ranging_data, raw_yaw, msg.timestamp,
-                                                     imu_accel_initial_bias=, imu_gyro_initial_bias=, 
-                                                     imu_accel_initial_bias_cov=, imu_gyro_initial_bias_cov=,
-                                                     imu_accel_cov=, imu_gyro_cov=, 
-                                                     imu_accel_walk_cov=, imu_gyro_walk_cov=)
+                        self.estimator = FactorGraph(msg.anchors_ranging_data, raw_yaw, msg.timestamp)
                         # Not calling incorporate_ranging_data yet, as need to update timestamp first 
                         # however should add a way to set factors in init as using directly incorporate_... will add a BetweenFactor
                         # separate adding functions inside incorporate and just put the ones adding the anchors and tags inside of the init part? 

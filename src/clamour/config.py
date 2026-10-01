@@ -1,3 +1,4 @@
+import numpy as np 
 """
 Defines all configuration parameters for Clamour. 
 - Tag type and ID 
@@ -24,8 +25,28 @@ TX_POWER_CONFIG = None     # Overwrites default TX power setting if different fr
 ### State estimation control 
 ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph) 
 
-### IMU control 
+### IMU control - Set IMU_TYPE to None for constant velocity model 
 IMU_TYPE = "LSM6DSV320X" 
+# The following parameters are specific to each individual hardware unit 
+# Scale factor 
+# NOTE TODO fix all units in this section 
+IMU_ACCEL_SCALE_FACTOR = np.array([[1.0017558373609916,      0.0,                  0.0],
+                                   [0.006256910346063383,    1.0018358510192535,   0.0],
+                                   [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
+IMU_GYRO_SCALE_FACTOR  =  np.array([[1,0,0],
+                                    [0,1,0],
+                                    [0,0,1]])
+# Initial bias from calibration, the FG estimates its drift automatically
+IMU_ACCEL_INITIAL_BIAS = (-1.9653053938720833, -14.595203153973426, -2.6589320093328133) 
+IMU_GYRO_INITIAL_BIAS  = (-376.4132487893914, -21.328286579486857,-206.75801625034532) 
+# Covariance on the bias. Variance of the initial bias value when calibrating. 
+IMU_ACCEL_INITIAL_BIAS_COV = None 
+IMU_GYRO_INITIAL_BIAS_COV  = None 
+# Accelerometer and Gyro bias random walk covariance (requires Allan variance analysis) 
+# As of 21sept 2026, placeholders as it'll be enough to validate IMU integration. We don't dead-reckon for long without range factors to correct. 
+# GTSAM expects these values to be /s as it will *s during pre-integration 
+IMU_ACCEL_WALK_COV = 0.032**2 # units: (mg**2)/s
+IMU_GYRO_WALK_COV  = 5.73**2  # units: (mdps**2)/s
 
 ### Output control 
 ## Terminal
