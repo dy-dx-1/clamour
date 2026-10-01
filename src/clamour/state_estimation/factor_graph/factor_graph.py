@@ -3,7 +3,7 @@ import numpy as np
 
 from ...custom_terminal import print 
 from ...interfaces import Anchors, Pose
-from ...config import (ANCHOR_POS_UNCERTAINTY, IMU_TYPE,
+from ...config import (ANCHOR_POS_UNCERTAINTY,
                         IMU_ACCEL_INITIAL_BIAS, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
                         IMU_GYRO_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
 
@@ -14,30 +14,15 @@ ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY, ANCHOR
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
-
-## Defining IMU params 
-IMU_INITIAL_BIAS_COV = None # TODO figure out how to merge these arrays 
-if IMU_TYPE=="LSM6DSV320X": 
-    # set scale factor and bias (latter only for good measure) 
-    pass 
-else: 
-    pass 
+IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
 
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float) 
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float):
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
         - prior_yaw: prior yaw value on initialization **[rad]** 
         - timestamp: timestamp of the initial data, will serve as reference for subsequent updates to calculate dt 
-        - imu_accel_initial_bias: initial guess of accelerometer bias vector (1x3) 
-        - imu_gyro_initial_bias: initial guess of gyroscope bias vector (1x3)
-        - imu_accel_initial_bias_cov: covariance of initial bias guess (how much calibration output varied) 
-        - imu_gyro_initial_bias_cov:  covariance of initial bias guess (how much calibration output varied)
-        - imu_accel_walk_cov: covariance of bias random walk **units: cm^2 * 1/s**
-        - imu_gyro_walk_cov: covariance of bias random walk  **units: cm^2 * 1/s**
-        - imu_accel_cov: covariance of measurement values **units: cm^2 * s**
-        - imu_gyro_cov: covariance of measurement values  **units: cm^2 * s**
         NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
         NOTE on units: 
         - All angle units are **radians** 
@@ -120,7 +105,7 @@ class FactorGraph:
         # The IMU calibration isn't perfect, this prior serves to anchor our confidence in it 
         # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve. This gives it it's reference starting point. 
         # TODO currently here, but some restructuring for clarity might be needed? harmonize with insert_init_prior? 
-        # TODO we are expecting np.array([X, Y, Z]) for each. Floats for each. 
+ 
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
         imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS)
         graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_INITIAL_BIAS_COV)) # define noise in the imu class 

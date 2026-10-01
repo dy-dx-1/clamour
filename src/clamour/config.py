@@ -1,6 +1,6 @@
 import numpy as np 
 """
-Defines all configuration parameters for Clamour. 
+Defines all configuration parameters for Clamour and validates they can be used by the application. 
 - Tag type and ID 
 - DW1000/UWB settings if applicable 
 - IMU selection
@@ -37,8 +37,8 @@ IMU_GYRO_SCALE_FACTOR  =  np.array([[1,0,0],
                                     [0,1,0],
                                     [0,0,1]])
 # Initial bias from calibration, the FG estimates its drift automatically
-IMU_ACCEL_INITIAL_BIAS = (-1.9653053938720833, -14.595203153973426, -2.6589320093328133) 
-IMU_GYRO_INITIAL_BIAS  = (-376.4132487893914, -21.328286579486857,-206.75801625034532) 
+IMU_ACCEL_INITIAL_BIAS = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
+IMU_GYRO_INITIAL_BIAS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
 # Covariance on the bias. Variance of the initial bias value when calibrating. 
 IMU_ACCEL_INITIAL_BIAS_COV = None 
 IMU_GYRO_INITIAL_BIAS_COV  = None 
@@ -89,3 +89,32 @@ if TX_POWER_CONFIG: # If specified, TX POWER CONFIG must be list in LSB order of
 
 # Estimator, only supporting EKF or Factor Graphs 
 assert ESTIMATOR_TYPE in ("EKF", "FG") # these match the types accepted and expected by the class StateEstimator 
+
+# IMU parameter types and shapes
+# all dtypes must be floats to work well with GTSAM 
+assert IMU_TYPE is None or (IMU_TYPE in ["LSM6DSV320X"])
+assert isinstance(IMU_ACCEL_SCALE_FACTOR, np.ndarray)
+assert np.issubdtype(IMU_ACCEL_SCALE_FACTOR.dtype, float)
+assert IMU_ACCEL_SCALE_FACTOR.shape == (3, 3)
+assert isinstance(IMU_GYRO_SCALE_FACTOR, np.ndarray)
+assert np.issubdtype(IMU_GYRO_SCALE_FACTOR.dtype, float)
+assert IMU_GYRO_SCALE_FACTOR.shape == (3, 3)
+assert isinstance(IMU_ACCEL_INITIAL_BIAS, np.ndarray)
+assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS.dtype, float)
+assert IMU_ACCEL_INITIAL_BIAS.shape == (3,)
+assert isinstance(IMU_GYRO_INITIAL_BIAS, np.ndarray)
+assert np.issubdtype(IMU_GYRO_INITIAL_BIAS.dtype, float)
+assert IMU_GYRO_INITIAL_BIAS.shape == (3,)
+assert IMU_ACCEL_INITIAL_BIAS_COV is None or (
+    isinstance(IMU_ACCEL_INITIAL_BIAS_COV, np.ndarray)
+    and np.issubdtype(IMU_ACCEL_INITIAL_BIAS_COV.dtype, float)
+    and IMU_ACCEL_INITIAL_BIAS_COV.shape == (1, 3)
+)
+assert IMU_GYRO_INITIAL_BIAS_COV is None or (
+    isinstance(IMU_GYRO_INITIAL_BIAS_COV, np.ndarray)
+    and np.issubdtype(IMU_GYRO_INITIAL_BIAS_COV.dtype, float)
+    and IMU_GYRO_INITIAL_BIAS_COV.shape == (1, 3)
+)
+assert isinstance(IMU_ACCEL_WALK_COV, float)
+assert isinstance(IMU_GYRO_WALK_COV, float)
+
