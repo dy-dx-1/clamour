@@ -22,12 +22,12 @@ Flags are documented in the firmware as:
 """
 ########################################## CONFIGURATION AREA - CHANGE THESE PARAMS ##########################################
 # Target anchor - unfortunately can't change ID remotely
-ANCHOR_ID = 4
+ANCHOR_ID = 5
 
 # Configuration parameters; set to None to leave them unchanged
-ANCHOR_POS = (1, 1, 1) # (x, y, z) 
+ANCHOR_POS = (1,1,1)      # (x, y, z) 
 REBOOT = None          # 1 = reboot to firmware, 2 = reboot to bootloader
-MODE = 1               # 1 = TWR, 2 = TDOA2, 3 = TDOA3
+MODE = 3               # 1 = TWR, 2 = TDOA2, 3 = TDOA3
 UWB_POWER = None       # (smart_tx_enabled, force_tx_enabled, 32bit_tx_power_value). Example: Force max power: (0, 1, 0xFFFFFFFF)
 # NOTE: Careful with UWB settings - if you want to change them back, you will have to change the DW1000 settings below 
 # the DW1000 is config'ed by default to match normal operation (0,0). 
@@ -51,7 +51,7 @@ parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from src.clamour.interfaces.dw_1000 import DW1000
+from src.dw1000 import DW1000
 
 def build_uwb_power_payload(smart_tx_power: int, force_tx_power: int, tx_power: int) -> list[int]:
     smart_tx_power = int(bool(smart_tx_power)) & 0x01
@@ -107,6 +107,13 @@ if __name__ == "__main__":
     with DW1000(0, 0, 2, 64, 6.8, 128, 9, True, None) as dw:
         # NOTE: SOURCE_ADDR SET TO 0, ELSE ANCHOR FIRMWARE WILL REJECT MODIFS WHEN IN TWR MODE!
         header = [0x41, 0xDC, 0x00, 0xCF, 0xBC] + list(ANCHOR_ID.to_bytes(6, 'little') + b'\xcf\xbc') + ([0]*6+[0xCF, 0xBC]) + [LPP_SHORT_TAG] 
+        
+        # If the tag is already in TWR mode, an internal check is performed to ensure the ID of the sender matches the latest ID the tag communicated with
+        # Sending a POLL request resets this variable (curr_tag in the firmware), which allows us to set the source address to 0 and have the anchor accept the modifs
+        if MODE!=1: 
+            poll = header[:-1] + [0x01] + [0x01]  # sending a random POLL with SEQ 1 to reset curr_tag to 0 in firmware
+            dw.transmit(poll, False) 
+
         for cfg in config_messages:
             msg = header + cfg
             for _ in range(3):
