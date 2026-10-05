@@ -74,53 +74,42 @@ class StateEstimator:
         self.current_room = self.floorplan.rooms['24'] 
 
     def run(self) -> None: 
+        self.initialize_estimator()
         try: 
-            self.initialize_estimator()
-            self._run_sensor_batching_loop()
+            last_state_boundary = monotonic()
+            next_boundary = last_state_boundary + STATE_INTERVAL
+            
+            while True:
+                self._drain_communication_queue() # fills self._pending_messages
+                now = monotonic()
+                if now < next_boundary:
+                    # Keep latency low without using a repeated fixed sleep, which
+                    # would accumulate scheduler drift over a long run.
+                    sleep(next_boundary - now)
+                    continue
+                # Drain once more so we don't miss messages at boundary 
+                self._drain_communication_queue()
+    
+                # Aggregate all messages, reset self._pending_messages and process them 
+                batch = SensorBatch(
+                    start_time=last_state_boundary,
+                    boundary_time=next_boundary,
+                    messages=self._pending_messages,
+                    # IMU samples will be drained from the IMU FIFO here, not placed
+                    # onto the general communication queue at IMU sample rate.
+                    imu_samples=[],
+                )
+                self._pending_messages = []
+                self.process_sensor_batch(batch)
+    
+                last_state_boundary = next_boundary
+                # Advance from the previous deadline rather than from ``now``.  When
+                # processing overruns, the following iterations catch up by closing
+                # the missed state intervals instead of permanently shifting cadence.
+                next_boundary += STATE_INTERVAL
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
             raise e
-
-    def _run_sensor_batching_loop(self) -> None:
-        """Close fixed-duration sensor intervals and estimate one state per interval.
-
-        This is intentionally the only long-running fusion loop.  It replaces the
-        old "one queue message equals one estimator update" loop and never treats
-        an empty queue as evidence that the tag is stationary.  IMU collection is
-        represented by ``SensorBatch.imu_samples`` for now; an IMU source will be
-        connected here once its common-clock timestamp conversion is available.
-        """
-        last_state_boundary = monotonic()
-        next_boundary = last_state_boundary + STATE_INTERVAL
-
-        while True:
-            self._drain_communication_queue() # fills self._pending_messages
-            now = monotonic()
-            if now < next_boundary:
-                # Keep latency low without using a repeated fixed sleep, which
-                # would accumulate scheduler drift over a long run.
-                sleep(next_boundary - now)
-                continue
-            # Drain once more so we don't miss messages at boundary 
-            self._drain_communication_queue()
-
-            # Aggregate all messages, reset self._pending_messages and process them 
-            batch = SensorBatch(
-                start_time=last_state_boundary,
-                boundary_time=next_boundary,
-                messages=self._pending_messages,
-                # IMU samples will be drained from the IMU FIFO here, not placed
-                # onto the general communication queue at IMU sample rate.
-                imu_samples=[],
-            )
-            self._pending_messages = []
-            self.process_sensor_batch(batch)
-
-            last_state_boundary = next_boundary
-            # Advance from the previous deadline rather than from ``now``.  When
-            # processing overruns, the following iterations catch up by closing
-            # the missed state intervals instead of permanently shifting cadence.
-            next_boundary += STATE_INTERVAL
 
     def _drain_communication_queue(self) -> None:
         """Move all currently available producer events into coordinator ownership."""
@@ -211,11 +200,6 @@ class StateEstimator:
         # TODO: convert the pedometer producer to emit a StepEvent with peak time,
         # stride/heading uncertainty, and a common-clock timestamp.
         return
-        
-    def run_legacy_message_loop(self) -> None:
-        """Deprecated compatibility loop; retained temporarily for diagnosis only."""
-        while True:
-            self.process_latest_state_info()
 
     def initialize_estimator(self) -> None: 
         """
@@ -244,6 +228,11 @@ class StateEstimator:
                     # Estimator initialized. Internalise and publish the posterior.  
                     self.publish_state(msg) 
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
+
+    def run_legacy_message_loop(self) -> None:
+        """Deprecated compatibility loop; retained temporarily for diagnosis only."""
+        while True:
+            self.process_latest_state_info()
 
     def process_latest_state_info(self): 
         """
