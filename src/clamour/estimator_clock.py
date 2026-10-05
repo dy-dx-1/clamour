@@ -13,9 +13,6 @@ from dataclasses import dataclass
 from time import monotonic_ns
 
 
-NANOSECONDS_PER_SECOND = 1_000_000_000
-
-
 @dataclass(frozen=True)
 class EstimatorClock:
     """Process-shareable estimator clock with a single monotonic host epoch."""
@@ -29,25 +26,6 @@ class EstimatorClock:
 
     def now_ns(self) -> int:
         return monotonic_ns() - self.epoch_monotonic_ns
-
-    def sample_ns(self) -> tuple[int, int]:
-        """Return ``(estimator_ns, raw_host_monotonic_ns)`` from one clock read."""
-        raw_host_ns = monotonic_ns()
-        return raw_host_ns - self.epoch_monotonic_ns, raw_host_ns
-
-    def from_host_monotonic_ns(self, host_time_ns: int) -> int:
-        return host_time_ns - self.epoch_monotonic_ns
-
-
-@dataclass(frozen=True)
-class ClockMapping:
-    """Snapshot of an affine sensor-clock to estimator-clock conversion."""
-
-    scale_ns_per_tick: float
-    offset_ns: float
-    residual_sigma_ns: float | None
-    version: int
-
 
 class SensorClockMapper:
     """Map one wrapping hardware counter onto :class:`EstimatorClock` time.
@@ -69,18 +47,14 @@ class SensorClockMapper:
             raise ValueError("max_observations must be at least two")
 
         self.nominal_tick_ns = nominal_tick_ns
-        self.counter_bits = counter_bits
         self._modulus = (1 << counter_bits) if counter_bits is not None else None
         self._last_raw_tick: int | None = None
         self._wrap_offset = 0
         self._observations: deque[tuple[int, int]] = deque(maxlen=max_observations)
-        self._mapping: ClockMapping | None = None
+        self._scale_ns_per_tick: float | None = None
+        self._offset_ns: float | None = None
 
-    @property
-    def mapping(self) -> ClockMapping | None:
-        return self._mapping
-
-    def unwrap_tick(self, raw_tick: int) -> int:
+    def _unwrap_tick(self, raw_tick: int) -> int:
         """Unwrap ordered hardware ticks; FIFO samples must be supplied in order."""
         if raw_tick < 0:
             raise ValueError("raw_tick must be non-negative")
@@ -100,15 +74,14 @@ class SensorClockMapper:
         self._last_raw_tick = raw_tick
         return self._wrap_offset + raw_tick
 
-    def observe(self, raw_tick: int, estimator_time_ns: int) -> ClockMapping:
+    def observe(self, raw_tick: int, estimator_time_ns: int) -> None:
         """Add a paired clock observation and refresh the affine mapping."""
-        tick = self.unwrap_tick(raw_tick)
+        tick = self._unwrap_tick(raw_tick)
         self._observations.append((tick, estimator_time_ns))
 
         if len(self._observations) == 1:
             scale = self.nominal_tick_ns
             offset = estimator_time_ns - scale * tick
-            residual_sigma = None
         else:
             ticks, times = zip(*self._observations)
             mean_tick = sum(ticks) / len(ticks)
@@ -120,22 +93,15 @@ class SensorClockMapper:
             ) / denominator
             if scale <= 0:
                 # A bad host pairing must not invert time.  Keep the nominal rate
-                # and let the residual expose the problem to the caller.
+                # rather than allowing time to run backwards.
                 scale = self.nominal_tick_ns
             offset = mean_time - scale * mean_tick
-            residuals = [timestamp - (scale * tick + offset)
-                         for tick, timestamp in zip(ticks, times)]
-            residual_sigma = (sum(residual ** 2 for residual in residuals) /
-                              len(residuals)) ** 0.5
+        self._scale_ns_per_tick = scale
+        self._offset_ns = offset
 
-        version = 1 if self._mapping is None else self._mapping.version + 1
-        self._mapping = ClockMapping(scale, offset, residual_sigma, version)
-        return self._mapping
-
-    def to_estimator_ns(self, raw_tick: int) -> tuple[int, ClockMapping]:
+    def to_estimator_ns(self, raw_tick: int) -> int:
         """Convert the next ordered sensor tick using the latest calibration."""
-        if self._mapping is None:
+        if self._scale_ns_per_tick is None or self._offset_ns is None:
             raise RuntimeError("clock mapper needs an initial paired observation")
-        tick = self.unwrap_tick(raw_tick)
-        mapped_ns = round(self._mapping.scale_ns_per_tick * tick + self._mapping.offset_ns)
-        return mapped_ns, self._mapping
+        tick = self._unwrap_tick(raw_tick)
+        return round(self._scale_ns_per_tick * tick + self._offset_ns)
