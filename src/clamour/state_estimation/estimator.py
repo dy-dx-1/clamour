@@ -2,12 +2,13 @@ import csv
 import math 
 from dataclasses import dataclass, field
 from queue import Empty
-from time import monotonic, sleep
+from time import sleep
 from typing import Literal
 from multiprocessing.synchronize import Lock
 
 from .ekf import CustomEKF
 from .factor_graph import FactorGraph
+from ..estimator_clock import EstimatorClock
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
 from ..interfaces import Tag, Pose
@@ -20,21 +21,18 @@ from ..rooms import Floorplan
 # This is deliberately local while the fusion configuration is being introduced.  It
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
 STATE_INTERVAL = 0.1  # seconds
+STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
 
 
 @dataclass
 class SensorBatch:
     """Measurements collected for one future graph-state interval.
 
-    ``boundary_time`` is on the estimator's monotonic clock.  Existing producers
-    still emit wall-clock timestamps, so their timestamps must not be compared to
-    it yet.  Until every producer is migrated to the common event-time clock, the
-    coordinator groups received messages by ingress time only.  The message
-    objects remain intact so their acquisition timestamps can be used by legacy
-    estimator adapters where necessary.
+    Boundary and measurement times are integer nanoseconds on the shared
+    estimator clock.  Legacy producers may still be grouped by ingress order.
     """
-    start_time: float
-    boundary_time: float
+    start_time_ns: int
+    boundary_time_ns: int
     messages: list[UpdateMessage] = field(default_factory=list)
     imu_samples: list = field(default_factory=list)
 
@@ -53,7 +51,8 @@ class StateEstimator:
     """
     def __init__(self, tag: Tag, tag_lock: Lock,
                   estimator_type: Literal['EKF', 'FG'], pose_callback, 
-                  communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue):
+                  communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue,
+                  estimator_clock: EstimatorClock|None=None):
         self.tag = tag 
         self.tag_lock = tag_lock 
 
@@ -67,6 +66,9 @@ class StateEstimator:
 
         self.sound_queue = sound_queue
         self.com_queue = communication_queue
+        # Clamour shares this immutable epoch with all local producer processes.
+        self.estimator_clock = estimator_clock or EstimatorClock.start()
+        self._pending_messages: list[UpdateMessage] = []
 
         self.state_csv, self.writer = self.initialize_csv()
 
@@ -76,24 +78,24 @@ class StateEstimator:
     def run(self) -> None: 
         self.initialize_estimator()
         try: 
-            last_state_boundary = monotonic()
-            next_boundary = last_state_boundary + STATE_INTERVAL
+            last_state_boundary = self.estimator_clock.now_ns()
+            next_boundary = last_state_boundary + STATE_INTERVAL_NS
             
             while True:
                 self._drain_communication_queue() # fills self._pending_messages
-                now = monotonic()
+                now = self.estimator_clock.now_ns()
                 if now < next_boundary:
                     # Keep latency low without using a repeated fixed sleep, which
                     # would accumulate scheduler drift over a long run.
-                    sleep(next_boundary - now)
+                    sleep((next_boundary - now) / 1_000_000_000)
                     continue
                 # Drain once more so we don't miss messages at boundary 
                 self._drain_communication_queue()
     
                 # Aggregate all messages, reset self._pending_messages and process them 
                 batch = SensorBatch(
-                    start_time=last_state_boundary,
-                    boundary_time=next_boundary,
+                    start_time_ns=last_state_boundary,
+                    boundary_time_ns=next_boundary,
                     messages=self._pending_messages,
                     # IMU samples will be drained from the IMU FIFO here, not placed
                     # onto the general communication queue at IMU sample rate.
@@ -106,7 +108,7 @@ class StateEstimator:
                 # Advance from the previous deadline rather than from ``now``.  When
                 # processing overruns, the following iterations catch up by closing
                 # the missed state intervals instead of permanently shifting cadence.
-                next_boundary += STATE_INTERVAL
+                next_boundary += STATE_INTERVAL_NS
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
             raise e
@@ -131,7 +133,7 @@ class StateEstimator:
         """
         # 1. IMU: drain and preintegrate every sample in (start, boundary] exactly
         # once.  This belongs to the estimator/coordinator, not the range producer.
-        # self._preintegrate_imu(batch.imu_samples, batch.start_time, batch.boundary_time)
+        # self._preintegrate_imu(batch.imu_samples, batch.start_time_ns, batch.boundary_time_ns)
 
         # 2. Parsing messages
         range_messages = [] 
@@ -142,13 +144,13 @@ class StateEstimator:
             elif message.update_type == UpdateType.RANGING: 
                 range_messages.append(message)
             elif message.update_type == UpdateType.PEDOMETER: 
-                range_messages.append(message)
+                step_messages.append(message)
 
         # 3. Create a state and its motion link.  Future FactorGraph support will
         # use IMU preintegration when available, otherwise its explicit
         # constant-velocity/random-walk factor.  No synthetic zero-motion factor
         # belongs here.
-        # self.estimator.advance_to(batch.boundary_time, preintegrated_imu=...)
+        # self.estimator.advance_to(batch.boundary_time_ns, preintegrated_imu=...)
 
         # 4. Add all range observations for the interval, then optimise once.  The
         # temporary adapters expose the intended batching behaviour to the EKF and
@@ -172,21 +174,16 @@ class StateEstimator:
         self.publish_state(range_messages[-1] if range_messages else None)
 
     def _apply_batched_ranges(self, messages: list[UpdateMessage]) -> None:
-        """Temporary adapter from interval range batches to the legacy API."""
-        anchors_ranging = []
-        tags_ranging = []
+        """Apply a batched range observation list to the estimator backend."""
+        all_range_observations = []
         for message in messages:
             self.update_neighbors(message.topology)
-            anchors_ranging.extend(message.anchors_ranging_data or [])
-            tags_ranging.extend(message.tags_ranging_data or [])
+            all_range_observations.extend(message.range_observations)
 
-        # Preserve legacy timestamp semantics until all producers use estimator
-        # event time.  The final batch API will receive individual range times.
         latest = messages[-1]
         self.estimator.incorporate_ranging_data(
             latest.timestamp,
-            anchors_ranging,
-            tags_ranging,
+            all_range_observations,
             latest.measured_yaw,
         )
 
@@ -209,21 +206,20 @@ class StateEstimator:
         while self.estimator is None: 
             if not self.com_queue.empty():
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
-                if msg.update_type == UpdateType.RANGING: 
-                    if len(msg.anchors_ranging_data)<3:  # Need a fully constrained measurement for initialization
-                        continue 
-                    self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses  
+                if msg.update_type == UpdateType.RANGING:
+                    anchor_ranges = [obs for obs in msg.range_observations if obs.is_anchor]
+                    if len(anchor_ranges) < 3:  # Need a fully constrained measurement for initialization
+                        continue
+                    self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses
                     raw_yaw = self.correct_yaw(msg.measured_yaw)
-                    
-                    if self.estimator_type == 'EKF': 
-                        self.estimator = CustomEKF(msg.anchors_ranging_data, raw_yaw)
-                        # For the EKF, incorporating ranging data with >3 anchors will directly trigger a trilateration update
-                        self.estimator.incorporate_ranging_data(msg.timestamp, msg.anchors_ranging_data, msg.tags_ranging_data, raw_yaw)
+
+                    anchor_data = [(obs.target_id, obs.distance_cm) for obs in anchor_ranges]
+                    if self.estimator_type == 'EKF':
+                        self.estimator = CustomEKF(anchor_data, raw_yaw)
+                        self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
                     elif self.estimator_type == 'FG':
-                        self.estimator = FactorGraph(msg.anchors_ranging_data, raw_yaw, msg.timestamp)
-                        # Not calling incorporate_ranging_data yet, as need to update timestamp first 
-                        # however should add a way to set factors in init as using directly incorporate_... will add a BetweenFactor
-                        # separate adding functions inside incorporate and just put the ones adding the anchors and tags inside of the init part? 
+                        self.estimator = FactorGraph(anchor_data, raw_yaw, msg.timestamp)
+                        self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
 
                     # Estimator initialized. Internalise and publish the posterior.  
                     self.publish_state(msg) 
@@ -241,17 +237,17 @@ class StateEstimator:
         """
         if not self.com_queue.empty(): 
             msg = UpdateMessage.load(*self.com_queue.get_nowait())
-            ts, anchors_ranging, tags_ranging, raw_yaw = msg.timestamp, msg.anchors_ranging_data, msg.tags_ranging_data, msg.measured_yaw
-            # TODO add an in-bounds of the room check somewhere 
-            match msg.update_type: 
-                case UpdateType.PEDOMETER: 
-                    self.estimator.pedometer_update(self.pedometer_yaw_to_coords(msg.measured_yaw), raw_yaw, ts) 
-                case UpdateType.RANGING: 
-                    self.update_neighbors(msg.topology) 
-                    self.estimator.incorporate_ranging_data(ts, anchors_ranging, tags_ranging, raw_yaw) 
-                case UpdateType.TOPOLOGY:  
-                    self.update_neighbors(msg.topology) 
-                case UpdateType.CUSTOM_POSE: 
+            ts, raw_yaw = msg.timestamp, msg.measured_yaw
+            # TODO add an in-bounds of the room check somewhere
+            match msg.update_type:
+                case UpdateType.PEDOMETER:
+                    self.estimator.pedometer_update(self.pedometer_yaw_to_coords(msg.measured_yaw), raw_yaw, ts)
+                case UpdateType.RANGING:
+                    self.update_neighbors(msg.topology)
+                    self.estimator.incorporate_ranging_data(ts, msg.range_observations, raw_yaw)
+                case UpdateType.TOPOLOGY:
+                    self.update_neighbors(msg.topology)
+                case UpdateType.CUSTOM_POSE:
                     self.estimator.custom_odometry_update(Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.heading, msg.R, msg.timestamp)
             
             self.publish_state(msg) 

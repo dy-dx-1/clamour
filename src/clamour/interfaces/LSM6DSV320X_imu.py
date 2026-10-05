@@ -2,6 +2,8 @@ import smbus2
 from typing import Literal 
 import numpy as np
 
+from ..estimator_clock import SensorClockMapper
+
 ######################## DATASHEET CONFIGURATION BITS FOR IMU ########################
 # ODR bit value to set for a desired rate in Hz 
 # Applies for the CTRL1 and CTRL2 registers (accel and gyro) 
@@ -53,6 +55,10 @@ def uint16_to_int16(value:int)->int:
     return value - 0x10000 if value & 0x8000 else value
 
 class LSM6DSV320X: 
+    # Hardware timestamp resolution from the datasheet.  Keep FIFO timestamps in
+    # raw ticks; SensorClockMapper converts them to estimator nanoseconds and can
+    # compensate for oscillator drift.
+    TIMESTAMP_TICK_NS = 21_700
     ### ACCEL/GYRO COVARIANCE  
     # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
     # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
@@ -384,3 +390,13 @@ class LSM6DSV320X:
         # From p.85, the conversion is 1LSB=21.7microseconds 
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
         return int.from_bytes(raw_bytes, 'little')*21.7
+
+    @classmethod
+    def create_clock_mapper(cls) -> SensorClockMapper:
+        """Create the IMU-tick mapper; pair it with host readings before use.
+
+        The 32-bit timestamp wraps.  FIFO samples must be submitted in timestamp
+        order, and host observations must correspond to the sensor timestamp
+        being observed rather than the later FIFO-drain time.
+        """
+        return SensorClockMapper(cls.TIMESTAMP_TICK_NS, counter_bits=32)

@@ -2,6 +2,7 @@ from multiprocessing import Lock, Queue
 from time import sleep
 
 from .state_estimation import StateEstimator, CustomOdometry # TODO eval if removing customodometry, check bottom functions
+from .estimator_clock import EstimatorClock
 from .tdma_node import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
@@ -55,11 +56,14 @@ class Clamour:
         with TAG_FACTORY() as shared_tag: # Type of tag defined in config file 
             shared_tag_lock = Lock()
             tag_id = shared_tag.tag_id
+            # One immutable epoch is passed to every local producer before any
+            # child process starts, making their monotonic timestamps comparable.
+            estimator_clock = EstimatorClock.start()
             with ContextManagedQueue() as sound_queue:
                 sound_processing_queue = sound_queue if sound else None # Passing None instead of a sound queue to the StateEstimator turns off the sound function
-                estimator = StateEstimator(shared_tag, shared_tag_lock, ESTIMATOR_TYPE, pose_callback, communication_queue, sound_processing_queue)
+                estimator = StateEstimator(shared_tag, shared_tag_lock, ESTIMATOR_TYPE, pose_callback, communication_queue, sound_processing_queue, estimator_clock)
                 #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
-                tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
+                tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id, estimator_clock)
                 if sound:
                     sound_player = SoundManager(sound_queue)
                 with ContextManagedProcess(target=estimator.run) as estimator_process:

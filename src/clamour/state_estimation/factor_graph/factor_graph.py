@@ -236,36 +236,41 @@ class FactorGraph:
         rot = self.state.R().ypr() # 1D array [yaw, pitch, roll]
         return Pose(position[0], position[1], position[2], heading=rot[0], pitch=rot[1], roll=rot[2], covar=self.covars)
 
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Pose, int]], raw_yaw:float):
+    def incorporate_ranging_data(self, timestamp: float, range_observations:list, raw_yaw:float):
         """
-        Called whenever we get new ranges from anchors or tags to add to the factor graph. 
-        NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model. 
+        Called whenever we get new ranges from anchors or tags to add to the factor graph.
+        The estimator-facing contract is a single list of RangeObservation objects,
+        which are split here into anchor and tag observations for the graph internals.
+        NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model.
         """
-        # TODO replace current_state by new state to make it clearer? 
-        if not self.validate_update(timestamp): 
+        # TODO replace current_state by new state to make it clearer?
+        if not self.validate_update(timestamp):
             # If the timestamp is not valid, don't use this data for an update
-            return 
+            return
 
-        ## Initialize the new section of the graph and the new state 
-        graph = gt.NonlinearFactorGraph() 
-        initial_values = gt.Values() 
+        anchor_ranges = [(obs.target_id, obs.distance_cm) for obs in range_observations if obs.is_anchor]
+        tag_ranges = [(obs.target_id, obs.target_pose, obs.distance_cm) for obs in range_observations if not obs.is_anchor and obs.target_pose is not None]
+
+        ## Initialize the new section of the graph and the new state
+        graph = gt.NonlinearFactorGraph()
+        initial_values = gt.Values()
 
         current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)    
-        v = gt.symbol('v', current_state_id)     
+        x = gt.symbol('x', current_state_id)
+        v = gt.symbol('v', current_state_id)
 
-        ## Linking states together 
+        ## Linking states together
         self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
 
-        ## Adding ranges 
-        self.add_ranging_data(x, current_state_id, graph, initial_values, anchors_ranging_data, tags_ranging_data) 
-            
-        ## Updating graph and internal data with the posterior 
-        self.isam.update(graph, initial_values) 
-        # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf. 
-        post = self.isam.calculateEstimate()    
+        ## Adding ranges
+        self.add_ranging_data(x, current_state_id, graph, initial_values, anchor_ranges, tag_ranges)
+
+        ## Updating graph and internal data with the posterior
+        self.isam.update(graph, initial_values)
+        # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
+        post = self.isam.calculateEstimate()
         self.state = gt.NavState(post.atPose3(x), post.atVector3(v)) # NOTE TODO when connecting IMU add velocity tracking (also for ZUPT) need to use v symbol upstream
-        # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it 
+        # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
         covariance = self.isam.marginalCovariance(x)
         self.covars = (
             covariance[3, 3],

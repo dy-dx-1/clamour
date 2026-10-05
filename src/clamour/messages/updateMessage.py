@@ -1,5 +1,18 @@
+from dataclasses import dataclass
+
 from ..interfaces import Pose
 from .types import UpdateType
+
+
+@dataclass(frozen=True)
+class RangeObservation:
+    """One UWB range with its own acquisition time on the estimator clock."""
+
+    target_id: int
+    distance_cm: float
+    event_time_ns: int
+    is_anchor: bool
+    target_pose: Pose | None = None
 
 class UpdateMessage:
     """
@@ -7,38 +20,47 @@ class UpdateMessage:
     It is intended to be passed to a ContextManagedQueue as a pickled class + dictionary tuple. 
     The state information passed within the message will be used to update the device's state estimation.
     
-    This message is expected to be used with UpdateType.PEDOMETER, RANGING and TOPOLOGY
-    Although not all require the same parameters. 
-    - PEDOMETER: update_type, timestamp and yaw 
-    - RANGING: All parameters, but note that the last yaw is directly passed, no new info on it though. 
-    - TOPOLOGY: All but ranging_data, measured_yaw and neighbors
-
-    NOTE: As of 2026-08-17, tentatively separating anchors and tags list, even if same format, to facilitate different covariance info to be added with FG? Maybe there's a cleaner solution apparent when more of the system is constructed. Currently separating them also helps in the EKF to eval if can trilaterate easily.  
+    This message is expected to be used with UpdateType.PEDOMETER, RANGING and TOPOLOGY.
+    The ranging contract is now unified around a single list of RangeObservation
+    objects so each measurement knows whether it is from an anchor or a tag.
 
     ARGS:
     - update_type
-    - timestamp
-    - synchronized_clock
-    - offset
-    - anchors_ranging_data: list of ranging to anchors in format (id, range_in_cm)
-    - tags_ranging_data: list of ranging to tags in format (target_pose, range_in_cm)
+    - timestamp_ns: canonical estimator-frame event time in nanoseconds
     - measured_yaw
-    - slots 
-    - topology: dict 
+    - range_observations: list[RangeObservation]
+    - slots
+    - topology: dict
     """
-    def __init__(self, update_type: UpdateType, timestamp: float,
-                 synchronized_clock: float=0.0, offset: float=0.0,
-                 anchors_ranging_data: list[tuple[int, int]]|None = None, tags_ranging_data: list[tuple[Pose, int]]|None = None,
-                 measured_yaw: float=0.0,
-                 slots: list=None, topology: dict=None):
+
+    def __init__(self, update_type: UpdateType, timestamp_ns: int | None = None,
+                 synchronized_clock: float = 0.0, offset: float = 0.0,
+                 measured_yaw: float = 0.0,
+                 slots: list | None = None, topology: dict | None = None,
+                 *, arrival_time_ns: int | None = None,
+                 source_clock_id: str = "host_monotonic", source_timestamp: int | None = None,
+                 time_sigma_ns: int | None = None,
+                 range_observations: list[RangeObservation] | None = None):
         self.update_type = update_type
-        self.timestamp = timestamp
+
+        if timestamp_ns is None:
+            raise ValueError("timestamp_ns is required")
+
+        # Canonical estimator-time value in nanoseconds. Producers should stamp
+        # events in estimator time before enqueueing them.
+        self.timestamp = int(round(timestamp_ns))
+        self.arrival_time_ns = arrival_time_ns
+        self.source_clock_id = source_clock_id
+        self.source_timestamp = source_timestamp
+        self.time_sigma_ns = time_sigma_ns
+
+        # Compatibility shim: older code still expects a float-style timestamp
+        # attribute, but the estimator-facing contract is nanoseconds.
         self.synchronized_clock = synchronized_clock
         self.offset = offset
 
-        self.anchors_ranging_data = anchors_ranging_data
-        self.tags_ranging_data = tags_ranging_data
         self.measured_yaw = measured_yaw
+        self.range_observations = range_observations or []
 
         self.slots = slots
         self.topology = topology if topology is not None else {}

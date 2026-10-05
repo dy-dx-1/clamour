@@ -1,9 +1,10 @@
 from .custom_terminal import print 
 import random
 from multiprocessing.synchronize import Lock
-from time import perf_counter, time
+from time import perf_counter
 import struct
 
+from .estimator_clock import EstimatorClock
 from .interfaces import Tag, Neighborhood, SlotAssignment
 from .tdma.timing import NB_TASK_SLOTS
 from .contextManagedQueue import ContextManagedQueue
@@ -17,7 +18,8 @@ from .messages.types import UpdateType
 class Messenger:
     def __init__(self, id: int, shared_tag: Tag, neighborhood: Neighborhood,
                  slot_assignment: SlotAssignment, shared_tag_lock: Lock,
-                 multiprocess_communication_queue: ContextManagedQueue):
+                 multiprocess_communication_queue: ContextManagedQueue,
+                 estimator_clock: EstimatorClock):
         self.id = id
         self.message_box = MessageBox()
         self.tag = shared_tag
@@ -25,25 +27,41 @@ class Messenger:
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.multiprocess_communication_queue = multiprocess_communication_queue
+        self.estimator_clock = estimator_clock
         self.received_messages = set()
         self.should_go_back_to_sync = 0
 
-    def send_range_update(self, clock: float, offset: float,
-                        anchors_ranging_data: list[tuple[int, int]]|None, tags_ranging_data: list[tuple]|None, 
-                        yaw: float, topology: dict) -> None:
-        """
-        Sends a RANGING UpdateMessage to the state estimator. 
-        See UpdateMessage docstring for more info on arguments. 
-        """
-        message = UpdateMessage(UpdateType.RANGING, time(), clock, offset,
-                                anchors_ranging_data, tags_ranging_data, yaw,  
-                                self.slot_assignment.pure_send_list, topology)
+    def send_range_update(self, yaw: float, topology: dict, *, range_observations=None) -> None:
+        """Send a batched ranging update on the estimator clock."""
+        # The batch gets the timestamp of the most recent range in the batch.
+        # This keeps the estimator cadence independent from bursty ranging arrivals.
+        event_time_ns = (max((item.event_time_ns for item in range_observations), default=None)
+                         if range_observations else self.estimator_clock.now_ns())
+        message = UpdateMessage(
+            UpdateType.RANGING,
+            timestamp_ns=event_time_ns,
+            measured_yaw=yaw,
+            slots=self.slot_assignment.pure_send_list,
+            topology=topology,
+            arrival_time_ns=self.estimator_clock.now_ns(),
+            source_clock_id="host_monotonic",
+            source_timestamp=event_time_ns,
+            range_observations=range_observations,
+        )
 
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
-    def send_topology_update(self, clock: float, offset: float, topology: dict) -> None:
-        message = UpdateMessage(UpdateType.TOPOLOGY, time(), clock, offset,
-                                slots=self.slot_assignment.pure_send_list, topology=topology)
+    def send_topology_update(self, topology: dict) -> None:
+        now_ns = self.estimator_clock.now_ns()
+        message = UpdateMessage(
+            UpdateType.TOPOLOGY,
+            timestamp_ns=now_ns,
+            slots=self.slot_assignment.pure_send_list,
+            topology=topology,
+            arrival_time_ns=now_ns,
+            source_clock_id="host_monotonic",
+            source_timestamp=now_ns,
+        )
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def broadcast_synchronization_message(self, timestamp: int, synchronized: bool) -> None:

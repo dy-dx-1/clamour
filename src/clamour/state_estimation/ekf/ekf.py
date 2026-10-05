@@ -149,42 +149,32 @@ class CustomEKF(ExtendedKalmanFilter):
                                       lambda _: self.observation_matrix,
                                       self.hx_pedometer, self.R_pedometer)
 
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple[int, int]], tags_ranging_data:list[tuple], raw_yaw:float):
-        """
-        This function is called for UpdateType.RANGING updates 
-        It determines if enough anchor ranges are passed for a trilateration update
-        and if not, makes multiple simple ranging updates with individual elements. 
-        """
-        if len(anchors_ranging_data)>=3: # Enough anchors for trilateration update, trilaterate position and update EKF 
-            anchor_pos = [] 
-            anchor_dist = [] 
-            for id, dist in anchors_ranging_data: 
+    def incorporate_ranging_data(self, timestamp: float, range_observations:list, raw_yaw:float):
+        """Apply a single batched list of range observations to the EKF."""
+        anchor_ranges = [(obs.target_id, obs.distance_cm) for obs in range_observations if obs.is_anchor]
+        tag_ranges = [(obs.target_id, obs.target_pose, obs.distance_cm) for obs in range_observations if not obs.is_anchor and obs.target_pose is not None]
+
+        if len(anchor_ranges) >= 3:  # Enough anchors for trilateration update, trilaterate position and update EKF
+            anchor_pos = []
+            anchor_dist = []
+            for id, dist in anchor_ranges:
                 anchor_pos.append(anchors.anchors_dict[id])
-                anchor_dist.append(dist) 
+                anchor_dist.append(dist)
             # Residual function (Error = Calculated Distance - Measured Distance)
             def equations(position):
-                calculated_distances =linalg.norm(anchor_pos - position, axis=1)
+                calculated_distances = linalg.norm(anchor_pos - position, axis=1)
                 return calculated_distances - anchor_dist
             # Solving with Non-linear Least Squares (Levenberg-Marquardt)
             raw_pos = least_squares(equations, array(self.pose.coordinates), method='lm')
             self.trilateration_update(Pose(raw_pos.x[0], raw_pos.x[1], raw_pos.x[2]), raw_yaw, timestamp)
 
-        else: # Not enough anchors for trilateration; add multiple ranging updates 
-            print("ADDING RANGE UPDATES", 'ok', 'loc')
-            print(f"{anchors_ranging_data}", 'ok', 'loc')
-            print(f"{tags_ranging_data}", 'ok', 'loc')
-            for id, z in anchors_ranging_data: 
+        else:  # Not enough anchors for trilateration; add multiple ranging updates
+            for id, z in anchor_ranges:
                 formatted_dist = Pose(z, 0, 0)
                 formatted_target_pos = array([anchors.anchors_dict[id]])
-                # NOTE 2026-08-17, in the past, neighbor positions were casted with atleast_2d. 
-                # If conversion problems arise, try to add it to formatted_target_pos / see jacobian methods 
                 self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)
-            
-            # Tag data 
-            for n_id, n_pos, z in tags_ranging_data:  
-                # Originally the code didn't support adding ranges from neighbors with changing covariance (seemingly at least) 
-                # since EKF is being phased out, I am not implementing it now, this is just to check everything works 
-                # and keep 'some' functionality 2026-08-25
+
+            for n_id, n_pos, z in tag_ranges:
                 formatted_dist = Pose(z, 0, 0)
                 formatted_target_pos = array([[n_pos.x, n_pos.y, n_pos.z]])
                 self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)

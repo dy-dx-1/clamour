@@ -3,7 +3,9 @@ from time import perf_counter, sleep
 from typing import TYPE_CHECKING
 
 from ...custom_terminal import print 
+from ...estimator_clock import EstimatorClock
 from ...interfaces import Tag, Anchors
+from ...messages.updateMessage import RangeObservation
 from ..neighborhood import Neighborhood
 from ..slot_assignment import SlotAssignment
 from ..timing import Timing
@@ -32,7 +34,7 @@ class Task(TDMAState):
     """
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood, 
                  shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
-                 slot_assignment: SlotAssignment):
+                 slot_assignment: SlotAssignment, estimator_clock: EstimatorClock):
         self.timing = timing
         self.anchors = anchors # TODO Remove, unused 
         self.tag = shared_tag
@@ -40,6 +42,7 @@ class Task(TDMAState):
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
+        self.estimator_clock = estimator_clock
         self.frame_id_done_discover = -1
         self.neighborUpdateFrequency = 5 # every five frames, do discovery and update neighbor information
         self.ranging_references = {'anchors':{}, 'tags':{}}     # Keeps track of what anchors/tags we previously used for ranging to allow variety in selection 
@@ -56,7 +59,7 @@ class Task(TDMAState):
 
         if self.neighborhood.changed:
             self.messenger.broadcast_topology_message()  # Broadcast topology change to other devices
-            self.messenger.send_topology_update(self.timing.logical_clock.clock, self.timing.logical_clock.offset, self.neighborhood.current_neighbors)
+            self.messenger.send_topology_update(self.neighborhood.current_neighbors)
             self.neighborhood.changed = False
 
         return self.next()
@@ -92,25 +95,31 @@ class Task(TDMAState):
         Ranges with appropriate anchors/neighbors through an intelligent selection policy. 
         Sends the collected info to the state estimator for positioning. 
         """
-        anchor_zs = []
-        tag_zs = []  
+        range_observations = []
         for target_id in self.select_ranging_targets():
-            z, target_pos = self.tag.ranging(target_id)  # target_pos also holds covar and will only be returned and used if target_id is another tag
-            if z: # Successful measurement, fetch position and add 
-                if self.tag.is_anchor(target_id): 
-                    anchor_zs.append( (target_id, z) )   # (id, range_measure_in_cm)
-                else: 
-                    if target_pos: # If None, we didn't get covariance info, so won't pass it to estimator
-                        tag_zs.append( (target_id, target_pos, z) ) 
-            sleep(0.000001) # Short break to ensure exchange finished. Should be more than enough.
-        # Packing in an update message and sending to estimator 
-        if anchor_zs or tag_zs: # Don't waste ressources sending ranging update if no data to add 
-            self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
-                                            offset=self.timing.logical_clock.offset,
-                                            anchors_ranging_data=anchor_zs,
-                                            tags_ranging_data=tag_zs,
-                                            yaw = self.tag.pose.heading,
-                                            topology= self.neighborhood.current_neighbors)
+            z, target_pose = self.tag.ranging(target_id)
+            if z:  # Successful measurement, fetch position and add.
+                range_time_ns = self.estimator_clock.now_ns()
+                is_anchor = self.tag.is_anchor(target_id)
+                if not is_anchor and target_pose is None:
+                    continue
+                range_observations.append(
+                    RangeObservation(
+                        target_id=target_id,
+                        distance_cm=z,
+                        event_time_ns=range_time_ns,
+                        is_anchor=is_anchor,
+                        target_pose=target_pose,
+                    )
+                )
+            sleep(0.000001)  # Short break to ensure exchange finished. Should be more than enough.
+
+        if range_observations:  # Don't waste resources sending a ranging update if there is nothing to add.
+            self.messenger.send_range_update(
+                yaw=self.tag.pose.heading,
+                topology=self.neighborhood.current_neighbors,
+                range_observations=range_observations,
+            )
 
     def select_ranging_targets(self)->set:
         """

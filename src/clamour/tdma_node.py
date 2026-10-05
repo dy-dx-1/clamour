@@ -2,13 +2,14 @@ from multiprocessing.synchronize import Lock
 from time import sleep, time
 
 from .interfaces import Anchors, Tag
+from .estimator_clock import EstimatorClock
 from .tdma import Neighborhood, SlotAssignment, Timing
 from .messenger import Messenger
 from .tdma.states import Initialization, Listen, Scheduling, State, Synchronization, Task
 
 class TDMANode:
     def __init__(self, multiprocess_communication_queue, shared_tag: Tag,
-                 shared_tag_lock: Lock, tag_id: int):
+                 shared_tag_lock: Lock, tag_id: int, estimator_clock: EstimatorClock):
 
         self.clear_devices(shared_tag, shared_tag_lock)
 
@@ -16,7 +17,7 @@ class TDMANode:
         slot_assignment = SlotAssignment()
         anchors = Anchors()
         messenger = Messenger(tag_id, shared_tag, neighborhood, slot_assignment,
-                              shared_tag_lock, multiprocess_communication_queue)
+                              shared_tag_lock, multiprocess_communication_queue, estimator_clock)
 
         self.timing = Timing()
         self.loop_start_time = time()
@@ -28,7 +29,7 @@ class TDMANode:
                                                    tag_id, multiprocess_communication_queue),
             State.SCHEDULING: Scheduling(neighborhood, slot_assignment, self.timing, tag_id, messenger),
             State.TASK: Task(self.timing, anchors, neighborhood, shared_tag, shared_tag_lock, messenger,
-                             slot_assignment),
+                             slot_assignment, estimator_clock),
             State.LISTEN: Listen(slot_assignment, self.timing, messenger, neighborhood)}
 
         self.current_state = self.states[State.INITIALIZATION]
