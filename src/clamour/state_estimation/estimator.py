@@ -61,8 +61,8 @@ class StateEstimator:
 
         self.yaw_offset = 0  # Measured in degrees relative to global coordinates X-Axis
         self.last_know_neighbors = {}
-        
-        self.pose_callback = pose_callback # NOTE future eval if can just put this in here, idk why need to pass it as arg 
+
+        self.pose_callback = pose_callback # NOTE future eval if can just put this in here, idk why need to pass it as arg
 
         self.sound_queue = sound_queue
         self.com_queue = communication_queue
@@ -159,8 +159,8 @@ class StateEstimator:
             self._apply_batched_ranges(range_messages)
 
         # A step must become a relative step factor between timestamp-bracketing
-        # states.  Do not route it through pedometer_yaw_to_coords(): that method
-        # manufactures an absolute observation from the current estimate.
+        # states; it is not an absolute pose update and should not be treated as
+        # one during the state-interval batch.
         if step_messages:
             self._queue_step_constraints(step_messages, batch)
 
@@ -225,51 +225,8 @@ class StateEstimator:
                     self.publish_state(msg) 
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
 
-    def run_legacy_message_loop(self) -> None:
-        """Deprecated compatibility loop; retained temporarily for diagnosis only."""
-        while True:
-            self.process_latest_state_info()
-
-    def process_latest_state_info(self): 
-        """
-        Get and process an update through the communication queue.
-        Updates the estimator, saves and prints the current measurement.  
-        """
-        if not self.com_queue.empty(): 
-            msg = UpdateMessage.load(*self.com_queue.get_nowait())
-            ts, raw_yaw = msg.timestamp, msg.measured_yaw
-            # TODO add an in-bounds of the room check somewhere
-            match msg.update_type:
-                case UpdateType.PEDOMETER:
-                    self.estimator.pedometer_update(self.pedometer_yaw_to_coords(msg.measured_yaw), raw_yaw, ts)
-                case UpdateType.RANGING:
-                    self.update_neighbors(msg.topology)
-                    self.estimator.incorporate_ranging_data(ts, msg.range_observations, raw_yaw)
-                case UpdateType.TOPOLOGY:
-                    self.update_neighbors(msg.topology)
-                case UpdateType.CUSTOM_POSE:
-                    self.estimator.custom_odometry_update(Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.heading, msg.R, msg.timestamp)
-            
-            self.publish_state(msg) 
-
-            if self.sound_queue != None: 
-                sound_message = SoundMessage(self.estimator.pose)
-                self.sound_queue.put(SoundMessage.save(sound_message))
-
     def update_neighbors(self, neighbors: dict):
         self.last_know_neighbors = neighbors
-
-    def pedometer_yaw_to_coords(self, measured_yaw: float) -> Pose:
-        """When new information arrives from the pedometer, it is in the form of a yaw and timestamp.
-        Since the step length is constant, we can infer cartesian coordinates from yaw and last know position."""
-
-        step_length = 75  # centimeters
-
-        delta_position_x = step_length * -math.cos(math.radians(self.correct_yaw(measured_yaw)))
-        delta_position_y = step_length * math.sin(math.radians(self.correct_yaw(measured_yaw)))
-
-        # The pedometer cannot measure height; we assumed it is constant.
-        return Pose(self.estimator.x[0] + delta_position_x, self.estimator.x[2] + delta_position_y, self.estimator.x[4])
 
     def correct_yaw(self, measured_yaw: float) -> float:
         """
@@ -322,8 +279,8 @@ class StateEstimator:
         if not SAVE_TO_CSV: 
             return None, None 
         filepath = 'pose_estimation.csv'
-        fieldnames = ['tag_id', 'timestamp', 'synchronized_clock', 'offset', 'update_type',
-                      'estimator_x', 'estimator_y', 'estimator_z', 'estimator_yaw', 
+        fieldnames = ['tag_id', 'timestamp', 'update_type',
+                      'estimator_x', 'estimator_y', 'estimator_z', 'estimator_yaw',
                       'covariance_matrix', 'slots', 'two_hop_neighbors']
 
         state_csv = open(filepath, 'w')
@@ -348,8 +305,6 @@ class StateEstimator:
             csv_data = {
                 'tag_id': self.tag.tag_id,
                 'timestamp': message.timestamp,
-                'synchronized_clock': message.synchronized_clock,
-                'offset': message.offset,
                 'update_type': message.update_type,
                 'estimator_x': pose.x,
                 'estimator_y': pose.y,

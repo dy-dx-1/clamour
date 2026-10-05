@@ -36,7 +36,6 @@ class Task(TDMAState):
                  shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
                  slot_assignment: SlotAssignment, estimator_clock: EstimatorClock):
         self.timing = timing
-        self.anchors = anchors # TODO Remove, unused 
         self.tag = shared_tag
         self.tag_lock = shared_tag_lock
         self.neighborhood = neighborhood
@@ -64,25 +63,6 @@ class Task(TDMAState):
 
         return self.next()
 
-    def testTDMA(self):
-        tosend = [0xFF] * 8
-        temp = self.slot_assignment.pure_send_list.copy()
-        for ele in temp:
-            if ele<0:
-                temp.remove(ele)
-        for i in range(min(len(temp), 8)):
-            tosend[i] = temp[i]
-        if self.timing.current_slot_id == 0:
-            tosend[-1] = (0 if tosend[-1]==255 else tosend[-1])
-            with self.tag_lock:
-                self.tag.broadcast(payload=tosend) # NOTE: previously there were 9 B's, but I don't think it matches format of tosend (26June26)
-        else:
-            tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
-            print(f"Task.testTDMA(): tosend: {tosend}", 'info', 'tdma')
-            with self.tag_lock:
-                self.tag.broadcast(payload=tosend)
-        print(f"Task.testTDMA(): {self.timing.frame_id} {self.timing.current_slot_id} {self.timing.get_full_cycle_duration()} {self.timing.current_time_in_cycle}", 'info', 'tdma')
-
     def next(self) -> State:
         if self.timing.in_cycle():
             return State.TASK if self.timing.in_taskslot(self.slot_assignment.pure_send_list) else State.LISTEN
@@ -101,7 +81,7 @@ class Task(TDMAState):
             if z:  # Successful measurement, fetch position and add.
                 range_time_ns = self.estimator_clock.now_ns()
                 is_anchor = self.tag.is_anchor(target_id)
-                if not is_anchor and target_pose is None:
+                if not is_anchor and target_pose is None: # If another tag doesn't share cov, we ignore it. Estimator needs cov. 
                     continue
                 range_observations.append(
                     RangeObservation(
@@ -114,7 +94,7 @@ class Task(TDMAState):
                 )
             sleep(0.000001)  # Short break to ensure exchange finished. Should be more than enough.
 
-        if range_observations:  # Don't waste resources sending a ranging update if there is nothing to add.
+        if range_observations: 
             self.messenger.send_range_update(
                 yaw=self.tag.pose.heading,
                 topology=self.neighborhood.current_neighbors,

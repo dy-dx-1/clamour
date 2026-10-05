@@ -43,9 +43,6 @@ class Messenger:
             measured_yaw=yaw,
             slots=self.slot_assignment.pure_send_list,
             topology=topology,
-            arrival_time_ns=self.estimator_clock.now_ns(),
-            source_clock_id="host_monotonic",
-            source_timestamp=event_time_ns,
             range_observations=range_observations,
         )
 
@@ -58,9 +55,6 @@ class Messenger:
             timestamp_ns=now_ns,
             slots=self.slot_assignment.pure_send_list,
             topology=topology,
-            arrival_time_ns=now_ns,
-            source_clock_id="host_monotonic",
-            source_timestamp=now_ns,
         )
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 

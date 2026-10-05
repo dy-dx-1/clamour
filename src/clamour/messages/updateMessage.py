@@ -33,31 +33,15 @@ class UpdateMessage:
     - topology: dict
     """
 
-    def __init__(self, update_type: UpdateType, timestamp_ns: int | None = None,
-                 synchronized_clock: float = 0.0, offset: float = 0.0,
+    def __init__(self, update_type: UpdateType, timestamp_ns: int,
                  measured_yaw: float = 0.0,
                  slots: list | None = None, topology: dict | None = None,
-                 *, arrival_time_ns: int | None = None,
-                 source_clock_id: str = "host_monotonic", source_timestamp: int | None = None,
-                 time_sigma_ns: int | None = None,
                  range_observations: list[RangeObservation] | None = None):
         self.update_type = update_type
-
-        if timestamp_ns is None:
-            raise ValueError("timestamp_ns is required")
 
         # Canonical estimator-time value in nanoseconds. Producers should stamp
         # events in estimator time before enqueueing them.
         self.timestamp = int(round(timestamp_ns))
-        self.arrival_time_ns = arrival_time_ns
-        self.source_clock_id = source_clock_id
-        self.source_timestamp = source_timestamp
-        self.time_sigma_ns = time_sigma_ns
-
-        # Compatibility shim: older code still expects a float-style timestamp
-        # attribute, but the estimator-facing contract is nanoseconds.
-        self.synchronized_clock = synchronized_clock
-        self.offset = offset
 
         self.measured_yaw = measured_yaw
         self.range_observations = range_observations or []
