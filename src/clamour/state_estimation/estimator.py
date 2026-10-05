@@ -17,7 +17,6 @@ from ..messages.soundMessage import SoundMessage
 from ..messages.types import UpdateType
 from ..rooms import Floorplan
 
-WAIT_TIME_DURING_INIT = 0.001 # s to wait at each iter while waiting for com queue to load message
 # This is deliberately local while the fusion configuration is being introduced.  It
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
 STATE_INTERVAL = 0.1  # seconds
@@ -68,11 +67,7 @@ class StateEstimator:
 
         self.sound_queue = sound_queue
         self.com_queue = communication_queue
-        
-        # The coordinator is the sole owner of these buffers.  Sensor processes
-        # only publish immutable, timestamped measurements into input queues.
-        self._pending_messages: list[UpdateMessage] = []
-        self._last_state_boundary: float | None = None
+
         self.state_csv, self.writer = self.initialize_csv()
 
         self.floorplan = Floorplan() # NOTE TODO: currently unused 
@@ -95,23 +90,23 @@ class StateEstimator:
         represented by ``SensorBatch.imu_samples`` for now; an IMU source will be
         connected here once its common-clock timestamp conversion is available.
         """
-        self._last_state_boundary = monotonic()
-        next_boundary = self._last_state_boundary + STATE_INTERVAL
+        last_state_boundary = monotonic()
+        next_boundary = last_state_boundary + STATE_INTERVAL
 
         while True:
-            self._drain_communication_queue()
+            self._drain_communication_queue() # fills self._pending_messages
             now = monotonic()
             if now < next_boundary:
                 # Keep latency low without using a repeated fixed sleep, which
                 # would accumulate scheduler drift over a long run.
-                sleep(min(WAIT_TIME_DURING_INIT, next_boundary - now))
+                sleep(next_boundary - now)
                 continue
-
-            # Drain once more so messages that arrived at the boundary are not
-            # unnecessarily delayed by a complete state interval.
+            # Drain once more so we don't miss messages at boundary 
             self._drain_communication_queue()
+
+            # Aggregate all messages, reset self._pending_messages and process them 
             batch = SensorBatch(
-                start_time=self._last_state_boundary,
+                start_time=last_state_boundary,
                 boundary_time=next_boundary,
                 messages=self._pending_messages,
                 # IMU samples will be drained from the IMU FIFO here, not placed
@@ -121,7 +116,7 @@ class StateEstimator:
             self._pending_messages = []
             self.process_sensor_batch(batch)
 
-            self._last_state_boundary = next_boundary
+            last_state_boundary = next_boundary
             # Advance from the previous deadline rather than from ``now``.  When
             # processing overruns, the following iterations catch up by closing
             # the missed state intervals instead of permanently shifting cadence.
@@ -149,19 +144,16 @@ class StateEstimator:
         # once.  This belongs to the estimator/coordinator, not the range producer.
         # self._preintegrate_imu(batch.imu_samples, batch.start_time, batch.boundary_time)
 
-        # 2. Non-geometric metadata does not create a state or a measurement.
+        # 2. Parsing messages
+        range_messages = [] 
+        step_messages = [] 
         for message in batch.messages:
             if message.update_type == UpdateType.TOPOLOGY:
                 self.update_neighbors(message.topology)
-
-        range_messages = [
-            message for message in batch.messages
-            if message.update_type == UpdateType.RANGING
-        ]
-        step_messages = [
-            message for message in batch.messages
-            if message.update_type == UpdateType.PEDOMETER
-        ]
+            elif message.update_type == UpdateType.RANGING: 
+                range_messages.append(message)
+            elif message.update_type == UpdateType.PEDOMETER: 
+                range_messages.append(message)
 
         # 3. Create a state and its motion link.  Future FactorGraph support will
         # use IMU preintegration when available, otherwise its explicit
@@ -189,7 +181,6 @@ class StateEstimator:
         # inside _apply_batched_ranges; a no-range interval therefore publishes the
         # latest posterior until their explicit advance_to() contract is added.
         self.publish_state(range_messages[-1] if range_messages else None)
-        self._publish_sound()
 
     def _apply_batched_ranges(self, messages: list[UpdateMessage]) -> None:
         """Temporary adapter from interval range batches to the legacy API."""
@@ -220,11 +211,7 @@ class StateEstimator:
         # TODO: convert the pedometer producer to emit a StepEvent with peak time,
         # stride/heading uncertainty, and a common-clock timestamp.
         return
-
-    def _publish_sound(self) -> None:
-        if self.sound_queue is not None:
-            self.sound_queue.put(SoundMessage.save(SoundMessage(self.estimator.pose)))
-
+        
     def run_legacy_message_loop(self) -> None:
         """Deprecated compatibility loop; retained temporarily for diagnosis only."""
         while True:
@@ -256,8 +243,6 @@ class StateEstimator:
 
                     # Estimator initialized. Internalise and publish the posterior.  
                     self.publish_state(msg) 
-            else:
-                sleep(WAIT_TIME_DURING_INIT)  
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
 
     def process_latest_state_info(self): 
@@ -277,7 +262,7 @@ class StateEstimator:
                     self.estimator.incorporate_ranging_data(ts, anchors_ranging, tags_ranging, raw_yaw) 
                 case UpdateType.TOPOLOGY:  
                     self.update_neighbors(msg.topology) 
-                case UpdateType.CUSTOM_POSE: # TODO remove / replace by IMU factor? 
+                case UpdateType.CUSTOM_POSE: 
                     self.estimator.custom_odometry_update(Pose(msg.pose.x, msg.pose.y, msg.pose.z), msg.pose.heading, msg.R, msg.timestamp)
             
             self.publish_state(msg) 
@@ -285,11 +270,6 @@ class StateEstimator:
             if self.sound_queue != None: 
                 sound_message = SoundMessage(self.estimator.pose)
                 self.sound_queue.put(SoundMessage.save(sound_message))
-
-        else: 
-            # Queue idleness is not a stationary measurement.  The cadence-driven
-            # coordinator now owns prediction and any future explicit ZUPT logic.
-            sleep(WAIT_TIME_DURING_INIT) 
 
     def update_neighbors(self, neighbors: dict):
         self.last_know_neighbors = neighbors
@@ -337,6 +317,7 @@ class StateEstimator:
         - Saves the pose and covariance in its Tag object
         - Prints out the current posterior from the estimator
         - Saves to CSV if configured to do so (config.py) 
+        - Updates the sound queue if available 
         """
         pose = self.estimator.pose
 
@@ -347,6 +328,9 @@ class StateEstimator:
 
         if SAVE_TO_CSV and message is not None:
             self.save_to_csv(message)
+
+        if self.sound_queue is not None:
+            self.sound_queue.put(SoundMessage.save(SoundMessage(self.estimator.pose)))
 
     @staticmethod 
     def initialize_csv(): 
