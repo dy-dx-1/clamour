@@ -60,15 +60,15 @@ RANGES = {
 #
 # Set USE_POSITION=True to overwrite RANGES and calculate ranges
 # from this position.
-POS = (250, 200, 100)
+POS = (251,271,40)
 
 USE_POSITION = True
 
 # Display the plot
-SHOW_PLOT = True
+SHOW_PLOT = False
 
 # Save the plot (None to not save)
-SAVE_PATH = None
+SAVE_PATH = "6oct_positive_test.png"
 
 
 # ----------------------------------------------------------------------
@@ -90,7 +90,7 @@ OMITTED_COORDINATE_RESOLUTION = 200
 # For example:
 #   5.0  -> highlight the lowest 5% of RMS residuals
 #   10.0 -> highlight the lowest 10%
-LOW_RESIDUAL_PERCENTILE = 5.0
+LOW_RESIDUAL_PERCENTILE = 1.0
 
 # Color of the low-residual region.
 RESIDUAL_COLOR = "#FFF2A8"

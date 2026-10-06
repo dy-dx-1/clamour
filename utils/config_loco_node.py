@@ -22,12 +22,12 @@ Flags are documented in the firmware as:
 """
 ########################################## CONFIGURATION AREA - CHANGE THESE PARAMS ##########################################
 # Target anchor - unfortunately can't change ID remotely
-ANCHOR_ID = 5
+ANCHOR_ID = 8
 
 # Configuration parameters; set to None to leave them unchanged
 ANCHOR_POS = (1,1,1)      # (x, y, z) 
 REBOOT = None          # 1 = reboot to firmware, 2 = reboot to bootloader
-MODE = 3               # 1 = TWR, 2 = TDOA2, 3 = TDOA3
+MODE = 1               # 1 = TWR, 2 = TDOA2, 3 = TDOA3
 UWB_POWER = None       # (smart_tx_enabled, force_tx_enabled, 32bit_tx_power_value). Example: Force max power: (0, 1, 0xFFFFFFFF)
 # NOTE: Careful with UWB settings - if you want to change them back, you will have to change the DW1000 settings below 
 # the DW1000 is config'ed by default to match normal operation (0,0). 
@@ -51,7 +51,7 @@ parent_dir = str(Path(__file__).resolve().parent.parent)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from src.dw1000 import DW1000
+from dw_1000 import DW1000
 
 def build_uwb_power_payload(smart_tx_power: int, force_tx_power: int, tx_power: int) -> list[int]:
     smart_tx_power = int(bool(smart_tx_power)) & 0x01
