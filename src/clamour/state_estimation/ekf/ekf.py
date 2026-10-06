@@ -158,6 +158,7 @@ class CustomEKF(ExtendedKalmanFilter):
         if len(anchors_ranging_data)>=3: # Enough anchors for trilateration update, trilaterate position and update EKF 
             anchor_pos = [] 
             anchor_dist = [] 
+            print(f"Anchor data: {anchors_ranging_data}", 'info', 'loc')
             for id, dist in anchors_ranging_data: 
                 anchor_pos.append(anchors.anchors_dict[id])
                 anchor_dist.append(dist) 
