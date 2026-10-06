@@ -33,9 +33,9 @@ IMU_TYPE = "LSM6DSV320X"
 IMU_ACCEL_SCALE_FACTOR = np.array([[1.0017558373609916,      0.0,                  0.0],
                                    [0.006256910346063383,    1.0018358510192535,   0.0],
                                    [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
-IMU_GYRO_SCALE_FACTOR  =  np.array([[1,0,0],
-                                    [0,1,0],
-                                    [0,0,1]])
+IMU_GYRO_SCALE_FACTOR  =  np.array([[1.0,0.0,0.0],
+                                    [0.0,1.0,0.0],
+                                    [0.0,0.0,1.0]])
 # Initial bias from calibration, the FG estimates its drift automatically
 IMU_ACCEL_INITIAL_BIAS = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
 IMU_GYRO_INITIAL_BIAS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
@@ -60,16 +60,16 @@ SAVE_TO_CSV = False     # Save localization data to csv or not
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be >0 and <=10. Spatial coordinates are in cm.
-ANCHORS = {'id': 1, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 121.3, 
-           'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 219, 
-           'id': 3, 'level': 0, 'x': 137.2, 'y':  15.0, 'z': 12.8, 
-           'id': 4, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 30.2, 
-           'id': 5, 'level': 0, 'x':  79.3, 'y': 297.1, 'z': 219, 
-           'id': 6, 'level': 0, 'x': 458.2, 'y': 604.0, 'z': 146, 
-           'id': 7, 'level': 0, 'x':  22.3, 'y':  45.8, 'z': 219, 
-           'id': 8, 'level': 0, 'x': 504.5, 'y': 419.4, 'z': 107}
+ANCHORS = ({'id': 1, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 121.3}, 
+           {'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 219}, 
+           {'id': 3, 'level': 0, 'x': 137.2, 'y':  15.0, 'z': 12.8}, 
+           {'id': 4, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 30.2}, 
+           {'id': 5, 'level': 0, 'x':  79.3, 'y': 297.1, 'z': 219}, 
+           {'id': 6, 'level': 0, 'x': 458.2, 'y': 604.0, 'z': 146}, 
+           {'id': 7, 'level': 0, 'x':  22.3, 'y':  45.8, 'z': 219}, 
+           {'id': 8, 'level': 0, 'x': 504.5, 'y': 419.4, 'z': 107})
 ANCHOR_POS_UNCERTAINTY = 5 # +- precision on the anchor's coordinates (cm) 
-
+.0
 
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 
 assert TAG_TYPE in ("Bitcraze", "Pozyx") 
