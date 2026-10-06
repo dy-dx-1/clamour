@@ -60,14 +60,14 @@ SAVE_TO_CSV = False     # Save localization data to csv or not
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
 # Anchor IDs are expected to be >0 and <=10. Spatial coordinates are in cm.
-ANCHORS = {'id': 1, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 100, 
-           'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 100, 
-           'id': 3, 'level': 0, 'x': 137.2, 'y':  15.0, 'z': 100, 
-           'id': 4, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 100, 
-           'id': 5, 'level': 0, 'x':  79.3, 'y': 297.1, 'z': 100, 
-           'id': 6, 'level': 0, 'x': 458.2, 'y': 604.0, 'z': 100, 
-           'id': 7, 'level': 0, 'x':  22.3, 'y':  45.8, 'z': 100, 
-           'id': 8, 'level': 0, 'x': 504.5, 'y': 419.4, 'z': 100}
+ANCHORS = {'id': 1, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 121.3, 
+           'id': 2, 'level': 0, 'x': 137.3, 'y': 552.0, 'z': 219, 
+           'id': 3, 'level': 0, 'x': 137.2, 'y':  15.0, 'z': 12.8, 
+           'id': 4, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 30.2, 
+           'id': 5, 'level': 0, 'x':  79.3, 'y': 297.1, 'z': 219, 
+           'id': 6, 'level': 0, 'x': 458.2, 'y': 604.0, 'z': 146, 
+           'id': 7, 'level': 0, 'x':  22.3, 'y':  45.8, 'z': 219, 
+           'id': 8, 'level': 0, 'x': 504.5, 'y': 419.4, 'z': 107}
 ANCHOR_POS_UNCERTAINTY = 5 # +- precision on the anchor's coordinates (cm) 
 
 
