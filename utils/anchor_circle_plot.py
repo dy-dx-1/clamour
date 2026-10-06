@@ -39,11 +39,14 @@ import numpy as np
 # ----------------------------------------------------------------------
 
 # Anchor positions {anchor_id: (x, y, z), ...}
-ANCHORS = {
-    5: (0, 0, 18),
-    3: (-57, 72, 127),
-    4: (107, 180, 69),
-}
+ANCHORS = {1: (473.6, 219.4, 100), 
+           2: (137.3, 552.0, 100), 
+           3: (137.2, 15.0, 100), 
+           4: (473.6, 219.4, 100), 
+           5: (79.3, 297.1, 100), 
+           6: (458.2, 604.0, 100), 
+           7: (22.3, 45.8, 100), 
+           8: (504.5, 419.4, 100)}
 
 # Ranges to anchor {anchor_id: range}
 # Anchors without a range entry are still plotted but without range circle
@@ -59,7 +62,7 @@ RANGES = {
 # from this position.
 POS = (250, 200, 100)
 
-USE_POSITION = False
+USE_POSITION = True
 
 # Display the plot
 SHOW_PLOT = True
