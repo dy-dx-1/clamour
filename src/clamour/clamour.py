@@ -20,7 +20,7 @@ from .custom_terminal import print
 from .config import (TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS, 
                      UWB_CHANNEL, UWB_BITRATE, UWB_PRF, UWB_PREAMBLE_CODE, UWB_PREAMBLE_LENGTH,
                      SMART_TX_POWER, TX_POWER_CONFIG,
-                     ESTIMATOR_TYPE, IMU_TYPE)
+                     ESTIMATOR_TYPE, IMU_TYPE, IMU_ACCEL_SCALE_FACTOR)
 
 match TAG_TYPE:
     case "Bitcraze": 
@@ -77,6 +77,9 @@ class Clamour:
                 sound_processing_queue = sound_queue if sound else None # Passing None instead of a sound queue to the StateEstimator turns off the sound function
                 imu_context = IMU_FACTORY() if IMU_FACTORY is not None else nullcontext()
                 with imu_context as imu:
+                    # Overwriting with config'ed scale factor as the correction is applied internally
+                    # No need to overwrite the others, because GTSAM applies the correction, the IMU class doesn't see them 
+                    imu.accel_scale_factor = IMU_ACCEL_SCALE_FACTOR
                     estimator = StateEstimator(
                         shared_tag, shared_tag_lock, ESTIMATOR_TYPE, pose_callback,
                         communication_queue, sound_processing_queue, estimator_clock,
