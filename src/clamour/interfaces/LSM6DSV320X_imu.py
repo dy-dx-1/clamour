@@ -2,7 +2,7 @@ import smbus2
 from typing import Literal 
 import numpy as np
 
-from ..estimator_clock import SensorClockMapper
+from .imu import IMU, RawIMUSample
 
 ######################## DATASHEET CONFIGURATION BITS FOR IMU ########################
 # ODR bit value to set for a desired rate in Hz 
@@ -54,11 +54,11 @@ def uint16_to_int16(value:int)->int:
     """ 
     return value - 0x10000 if value & 0x8000 else value
 
-class LSM6DSV320X: 
-    # Hardware timestamp resolution from the datasheet.  Keep FIFO timestamps in
-    # raw ticks; SensorClockMapper converts them to estimator nanoseconds and can
-    # compensate for oscillator drift.
+class LSM6DSV320X(IMU):
+    # Hardware timestamp resolution from the datasheet. FIFO ticks are mapped by
+    # StateEstimator, keeping this driver independent of estimator time.
     TIMESTAMP_TICK_NS = 21_700
+    TIMESTAMP_COUNTER_BITS = 32
     ### ACCEL/GYRO COVARIANCE  
     # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
     # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
@@ -117,7 +117,18 @@ class LSM6DSV320X:
         return self 
 
     def __exit__(self, exc_type, exc_val, exc_tb): 
-        self.bus.close() 
+        self.close()
+
+    def close(self) -> None:
+        self.bus.close()
+
+    @property
+    def timestamp_tick_ns(self) -> float:
+        return self.TIMESTAMP_TICK_NS
+
+    @property
+    def timestamp_counter_bits(self) -> int:
+        return self.TIMESTAMP_COUNTER_BITS
 
     def __del__(self): 
         try: 
@@ -282,7 +293,7 @@ class LSM6DSV320X:
         lo, st2 = self.bus.read_i2c_block_data(self.TAD, 0x1B, 2)  # STATUS1+STATUS2 together
         return min(((st2 & 0x01) << 8) | lo, 256)
 
-    def read_FIFO(self, apply_bias:bool)->list[tuple]: 
+    def read_FIFO(self, apply_bias: bool = False, word_count: int | None = None) -> list[RawIMUSample]:
         """
         Reads all of the data present in the FIFO. 
 
@@ -293,14 +304,13 @@ class LSM6DSV320X:
         RETURNS:
         - A list of tuples in the form [(timestamp, accel_data, gyro_data), ...]
             - Missing data for a sample is returned as None.
-            - accel_data is in mg's, gyro_data is in mdps and timestamp is in BYTES
-                (so that deltas can be calculated before converting twice).
+            - accel_data is in mg's, gyro_data is in mdps and timestamp is in TICKS (32-bit based) 
         """
         samples = []
         previous_tag_cnt = None # Used to group samples that belong together temporally 
         current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
         ### Checking how many words are in the FIFO 
-        diff_FIFO = self.get_FIFO_count() 
+        diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, 256)
         ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
         residual_words = diff_FIFO 
         while residual_words>0: 
@@ -382,21 +392,11 @@ class LSM6DSV320X:
                                                y = data[2] | (data[3] << 8),
                                                z = data[4] | (data[5] << 8), apply_bias=apply_bias) 
 
-    def get_timestamp(self)->int: 
+    def get_timestamp(self, return_ticks=True)->int: 
         """
         Gets the timestamp data from the 0x40, 0x41, 0x42 and 0x43 registers. 
-        Returns timestamp in microseconds 
+        Returns timestamp in 32-bit based ticks or in micro-seconds 
         """
         # From p.85, the conversion is 1LSB=21.7microseconds 
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
-        return int.from_bytes(raw_bytes, 'little')*21.7
-
-    @classmethod
-    def create_clock_mapper(cls) -> SensorClockMapper:
-        """Create the IMU-tick mapper; pair it with host readings before use.
-
-        The 32-bit timestamp wraps.  FIFO samples must be submitted in timestamp
-        order, and host observations must correspond to the sensor timestamp
-        being observed rather than the later FIFO-drain time.
-        """
-        return SensorClockMapper(cls.TIMESTAMP_TICK_NS, counter_bits=32)
+        return int.from_bytes(raw_bytes, 'little') if return_ticks else int.from_bytes(raw_bytes, 'little')*21.7

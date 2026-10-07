@@ -1,9 +1,8 @@
-"""Common timebase primitives for sensor fusion.
+"""
+Common timebase primitives for sensor fusion.
 
 Estimator time is an integer count of nanoseconds since one host monotonic epoch.
-Never mix it with wall-clock time or TDMA logical time.  Preserve raw sensor
-timestamps alongside converted values so future clock-calibration work remains
-auditable.
+Never mix it with wall-clock time or TDMA logical time.  
 """
 
 from __future__ import annotations
@@ -11,7 +10,6 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from time import monotonic_ns
-
 
 @dataclass(frozen=True)
 class EstimatorClock:
@@ -28,16 +26,26 @@ class EstimatorClock:
         return monotonic_ns() - self.epoch_monotonic_ns
 
 class SensorClockMapper:
-    """Map one wrapping hardware counter onto :class:`EstimatorClock` time.
+    """
+    Map one wrapping hardware counter onto :class:`EstimatorClock` time.
 
     ``observe`` receives occasional paired hardware/host readings and estimates
-    ``estimator_ns = scale * unwrapped_ticks + offset``.  The rolling fit tracks
-    oscillator drift.  It is deliberately small scaffolding, not a transport
-    synchronization protocol: callers must ensure a host observation represents
-    the hardware time they pair with it, rather than FIFO delivery time.
+    ``estimator_ns = scale * unwrapped_ticks + offset``.  The rolling fit tracks oscillator drift. 
+
+    Configure with:
+    - ``nominal_tick_ns`` : Nanoseconds per hardware clock tick.
+    - ``counter_bits``    : Counter width when the hardware clock wraps.
+    - ``max_observations``: Number of recent paired readings used by the rolling
+        fit. A larger window smooths pairing noise but adapts more slowly to clock
+        drift; the limit also bounds retained calibration data.
+
+    To use: 
+    1. Call ``observe()`` with a (raw_tick, estimator_time) pairing  
+    2. Use ``to_estimator_ns()`` to convert raw_ticks to estimator time 
+    3. Periodically call ``observe()`` again to keep the estimate relevant 
     """
 
-    def __init__(self, nominal_tick_ns: float, *, counter_bits: int | None = None,
+    def __init__(self, nominal_tick_ns: float, counter_bits: int | None = None,
                  max_observations: int = 64):
         if nominal_tick_ns <= 0:
             raise ValueError("nominal_tick_ns must be positive")
