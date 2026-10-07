@@ -78,7 +78,8 @@ class StateEstimator:
         # Clamour shares this immutable epoch with all local producer processes.
         self.estimator_clock = estimator_clock
         self.imu = imu
-        self.imu_clock_mapper: SensorClockMapper | None = None
+        if imu: 
+            self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, self.imu.timestamp_counter_bits)
         self._pending_imu_samples: deque[TimedIMUSample] = deque()
 
         self.state_csv, self.writer = self.initialize_csv()
@@ -140,20 +141,6 @@ class StateEstimator:
             # the missed state intervals instead of permanently shifting cadence.
             last_state_boundary = next_boundary
             next_boundary += STATE_INTERVAL_NS
-
-    def _update_sensor_clock_mapper(self) -> None:
-        """Seed the IMU tick mapping before waiting for the initial range fix."""
-        if self.imu is None:
-            return
-
-        self.imu_clock_mapper = SensorClockMapper(
-            self.imu.timestamp_tick_ns,
-            counter_bits=self.imu.timestamp_counter_bits,
-        )
-        before_ns = self.estimator_clock.now_ns()
-        raw_tick = self.imu.get_timestamp()
-        after_ns = self.estimator_clock.now_ns()
-        self.imu_clock_mapper.observe(raw_tick, (before_ns + after_ns) // 2)
 
     def _drain_imu_samples(self, start_time_ns: int,
                            boundary_time_ns: int) -> list[TimedIMUSample]:
@@ -277,6 +264,16 @@ class StateEstimator:
         # TODO: convert the pedometer producer to emit a StepEvent with peak time,
         # stride/heading uncertainty, and a common-clock timestamp.
         return
+
+    def _update_sensor_clock_mapper(self) -> None:
+        """Updates the IMU tick mapping with a timestamp and estimator measurement"""
+        if self.imu is None:
+            return
+
+        before_ns = self.estimator_clock.now_ns()
+        raw_tick = self.imu.get_timestamp()
+        after_ns = self.estimator_clock.now_ns()
+        self.imu_clock_mapper.observe(raw_tick, (before_ns + after_ns) // 2)
 
     def initialize_estimator(self) -> None: 
         """
