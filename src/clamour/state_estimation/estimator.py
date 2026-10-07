@@ -1,5 +1,4 @@
 import csv
-import math 
 from dataclasses import dataclass, field
 from queue import Empty
 from time import sleep
@@ -22,7 +21,6 @@ from ..rooms import Floorplan
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
 STATE_INTERVAL = 0.1  # seconds
 STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
-
 
 @dataclass
 class SensorBatch:
@@ -52,7 +50,7 @@ class StateEstimator:
     def __init__(self, tag: Tag, tag_lock: Lock,
                   estimator_type: Literal['EKF', 'FG'], pose_callback, 
                   communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue,
-                  estimator_clock: EstimatorClock|None=None):
+                  estimator_clock: EstimatorClock):
         self.tag = tag 
         self.tag_lock = tag_lock 
 
@@ -60,15 +58,15 @@ class StateEstimator:
         self.estimator_type = estimator_type # validity check done in config  
 
         self.yaw_offset = 0  # Measured in degrees relative to global coordinates X-Axis
-        self.last_know_neighbors = {}
+        self.last_known_neighbors = {}
 
         self.pose_callback = pose_callback # NOTE future eval if can just put this in here, idk why need to pass it as arg
 
         self.sound_queue = sound_queue
         self.com_queue = communication_queue
+
         # Clamour shares this immutable epoch with all local producer processes.
-        self.estimator_clock = estimator_clock or EstimatorClock.start()
-        self._pending_messages: list[UpdateMessage] = []
+        self.estimator_clock = estimator_clock
 
         self.state_csv, self.writer = self.initialize_csv()
 
@@ -78,48 +76,65 @@ class StateEstimator:
     def run(self) -> None: 
         self.initialize_estimator()
         try: 
-            last_state_boundary = self.estimator_clock.now_ns()
-            next_boundary = last_state_boundary + STATE_INTERVAL_NS
-            
-            while True:
-                self._drain_communication_queue() # fills self._pending_messages
-                now = self.estimator_clock.now_ns()
-                if now < next_boundary:
-                    # Keep latency low without using a repeated fixed sleep, which
-                    # would accumulate scheduler drift over a long run.
-                    sleep((next_boundary - now) / 1_000_000_000)
-                    continue
-                # Drain once more so we don't miss messages at boundary 
-                self._drain_communication_queue()
-    
-                # Aggregate all messages, reset self._pending_messages and process them 
-                batch = SensorBatch(
-                    start_time_ns=last_state_boundary,
-                    boundary_time_ns=next_boundary,
-                    messages=self._pending_messages,
-                    # IMU samples will be drained from the IMU FIFO here, not placed
-                    # onto the general communication queue at IMU sample rate.
-                    imu_samples=[],
-                )
-                self._pending_messages = []
-                self.process_sensor_batch(batch)
-    
-                last_state_boundary = next_boundary
-                # Advance from the previous deadline rather than from ``now``.  When
-                # processing overruns, the following iterations catch up by closing
-                # the missed state intervals instead of permanently shifting cadence.
-                next_boundary += STATE_INTERVAL_NS
+            self._run_processing_loop() 
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
             raise e
 
-    def _drain_communication_queue(self) -> None:
-        """Move all currently available producer events into coordinator ownership."""
+    def _run_processing_loop(self) -> None: 
+        """
+        Continuously estimates the posterior state every STATE_INTERVAL seconds.  
+
+        For each interval [t, t+STATE_INTERVAL[: 
+        1. Fetch all measurements from the communication queue 
+        2. Collect all IMU samples if available 
+        3. Create a SensorBatch dataclass for all measures 
+        4. Process the SensorBatch
+            - Add all measures to the new state and use IMU info as a motion link. If no IMU, assume constant-velocity.
+            - Update the estimator posterior and publish it 
+
+        NOTE: All sensor timings are compared on the same EstimatorClock reference 
+        """
+        last_state_boundary = self.estimator_clock.now_ns()
+        next_boundary = last_state_boundary + STATE_INTERVAL_NS
+        
+        while True:
+            # Fetching measurements from comm queue 
+            pending_messages = self._drain_communication_queue() 
+            now = self.estimator_clock.now_ns()
+            if now < next_boundary:
+                # Keep latency low without using a repeated fixed sleep, which
+                # would accumulate scheduler drift over a long run.
+                sleep((next_boundary - now) / 1_000_000_000)
+                continue
+            # Drain once more so we don't miss messages at boundary 
+            pending_messages.extend(self._drain_communication_queue()) 
+
+            # Aggregate all messages and process them 
+            batch = SensorBatch(
+                start_time_ns=last_state_boundary,
+                boundary_time_ns=next_boundary,
+                messages=pending_messages,
+                # IMU samples will be drained from the IMU FIFO here, not placed
+                # onto the general communication queue at IMU sample rate.
+                imu_samples=[],
+            )
+            self.process_sensor_batch(batch)
+
+            # Advance from the previous deadline rather than from ``now``.  When
+            # processing overruns, the following iterations catch up by closing
+            # the missed state intervals instead of permanently shifting cadence.
+            last_state_boundary = next_boundary
+            next_boundary += STATE_INTERVAL_NS
+
+    def _drain_communication_queue(self) -> list[UpdateMessage]:
+        """Returns a list of all currently available producer events and clears the queue"""
+        pending_messages = [] 
         while True:
             try:
-                self._pending_messages.append(UpdateMessage.load(*self.com_queue.get_nowait()))
+                pending_messages.append(UpdateMessage.load(*self.com_queue.get_nowait()))
             except Empty:
-                return
+                return pending_messages
 
     def process_sensor_batch(self, batch: SensorBatch) -> None:
         """Skeleton for one state transition in the new fusion architecture.
@@ -200,8 +215,8 @@ class StateEstimator:
 
     def initialize_estimator(self) -> None: 
         """
-        Wait for a trilateration-sufficient update to arrive in communication queue. Use it to init estimator. 
-        Need to start from a fully constrained position to lock in the global reference frame.
+        Wait for a trilateration-sufficient update to arrive in the communication queue.
+        Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
         while self.estimator is None: 
             if not self.com_queue.empty():
@@ -226,7 +241,7 @@ class StateEstimator:
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
 
     def update_neighbors(self, neighbors: dict):
-        self.last_know_neighbors = neighbors
+        self.last_known_neighbors = neighbors
 
     def correct_yaw(self, measured_yaw: float) -> float:
         """
@@ -312,7 +327,7 @@ class StateEstimator:
                 'estimator_yaw': pose.heading,
                 'covariance_matrix': "to implement", # previously: np.linalg.det(self.estimator.P)
                 'slots': message.slots,
-                'two_hop_neighbors': self.last_know_neighbors
+                'two_hop_neighbors': self.last_known_neighbors
             }
 
             self.writer.writerow(csv_data)
