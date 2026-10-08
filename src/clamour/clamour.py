@@ -80,11 +80,9 @@ class Clamour:
                     # Overwriting with config'ed scale factor as the correction is applied internally
                     # No need to overwrite the others, because GTSAM applies the correction, the IMU class doesn't see them 
                     imu.accel_scale_factor = IMU_ACCEL_SCALE_FACTOR
-                    estimator = StateEstimator(
-                        shared_tag, shared_tag_lock, ESTIMATOR_TYPE, pose_callback,
-                        communication_queue, sound_processing_queue, estimator_clock,
-                        imu,
-                    )
+                    estimator = StateEstimator(shared_tag, shared_tag_lock, imu, 
+                                               estimator_clock, ESTIMATOR_TYPE, pose_callback,
+                                               communication_queue, sound_processing_queue)
                     #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
                     tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id, estimator_clock)
                     if sound:
