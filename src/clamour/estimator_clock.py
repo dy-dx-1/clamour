@@ -11,6 +11,8 @@ from collections import deque
 from dataclasses import dataclass
 from time import monotonic_ns
 
+NANOSECONDS_PER_SECOND = 1_000_000_000
+
 @dataclass(frozen=True)
 class EstimatorClock:
     """Process-shareable estimator clock with a single monotonic host epoch."""
@@ -61,6 +63,7 @@ class SensorClockMapper:
         self._observations: deque[tuple[int, int]] = deque(maxlen=max_observations)
         self._scale_ns_per_tick: float | None = None
         self._offset_ns: float | None = None
+        self._last_emitted_estimator_ns: int | None = None
 
     def _unwrap_tick(self, raw_tick: int) -> int:
         """Unwrap ordered hardware ticks; FIFO samples must be supplied in order."""
@@ -107,9 +110,20 @@ class SensorClockMapper:
         self._scale_ns_per_tick = scale
         self._offset_ns = offset
 
+        # Clock-fit noise must not make future FIFO samples appear before a
+        # sample that was already admitted to the estimator timeline.
+        if self._last_emitted_estimator_ns is not None:
+            mapped_observation = scale * tick + offset
+            if mapped_observation < self._last_emitted_estimator_ns:
+                self._offset_ns += self._last_emitted_estimator_ns - mapped_observation
+
     def to_estimator_ns(self, raw_tick: int) -> int:
         """Convert the next ordered sensor tick using the latest calibration."""
         if self._scale_ns_per_tick is None or self._offset_ns is None:
             raise RuntimeError("clock mapper needs an initial paired observation")
         tick = self._unwrap_tick(raw_tick)
-        return round(self._scale_ns_per_tick * tick + self._offset_ns)
+        estimator_time_ns = round(self._scale_ns_per_tick * tick + self._offset_ns)
+        if self._last_emitted_estimator_ns is not None:
+            estimator_time_ns = max(estimator_time_ns, self._last_emitted_estimator_ns)
+        self._last_emitted_estimator_ns = estimator_time_ns
+        return estimator_time_ns
