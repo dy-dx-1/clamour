@@ -23,12 +23,16 @@ from ..rooms import Floorplan
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
 STATE_INTERVAL = 0.1  # seconds
 STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
+# The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift 
 IMU_CLOCK_REFRESH_INTERVAL = 1.0  # seconds; ten times the state interval
 IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000)
+# FIFO emptying safeties - we empty the FIFO before the limit to avoid losing info
+# poll_interval = SF × time_to_overflow
+# time_to_overflow = (capacity_words - watermark_words) / fifo_word_rate
+# fifo_word_rate = sample_rate_hz × IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
 IMU_FIFO_WATERMARK_FRACTION = 0.70
-# FIFO polling is only a fallback until the IMU watermark interrupt is wired.  It
-# caps how long the estimator sleeps without checking for an approaching overflow.
-IMU_FIFO_POLL_INTERVAL_NS = 5_000_000  # 5 ms
+IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE = 3 # Words per grouped FIFO sample: ex: accel, gyro, timestamp 
+IMU_FIFO_POLL_SAFETY_FACTOR = 0.5       
 
 @dataclass(frozen=True)
 class TimedIMUSample:
@@ -82,8 +86,12 @@ class StateEstimator:
         # Clamour shares this immutable epoch with all local producer processes.
         self.estimator_clock = estimator_clock
         self.imu = imu
-        if imu: 
-            self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, counter_bits=self.imu.timestamp_counter_bits)
+        if imu:
+            self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, self.imu.timestamp_counter_bits)
+            self.imu_fifo_watermark_words = ceil(self.imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
+            fifo_word_rate = self.imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
+            time_from_watermark_to_overflow_s = (self.imu.fifo_capacity_words - self.imu_fifo_watermark_words)/fifo_word_rate
+            self.imu_fifo_poll_interval_ns = max(1,round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000))
 
         self._last_imu_clock_observation_ns: int | None = None
         self._pending_imu_samples: deque[TimedIMUSample] = deque()
@@ -106,16 +114,18 @@ class StateEstimator:
         Wait for a trilateration-sufficient update to arrive in the communication queue.
         Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
-        self._initialize_imu_clock_mapper()
+        if self.imu is not None:
+            self._initialize_imu_clock_mapper()
         while self.estimator is None:
             # No graph state exists yet, so pre-initialisation samples cannot be
-            # integrated.  Still service the FIFO so a delayed first range does
-            # not cause the sensor to overwrite its oldest samples.
-            self._discard_preinitialization_imu_samples()
+            # integrated.  The deterministic discard makes that intentional
+            # rather than relying on continuous-mode FIFO overwrite semantics.
+            if self.imu is not None:
+                self._discard_preinitialization_imu_samples()
             try:
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
             except Empty:
-                sleep(IMU_FIFO_POLL_INTERVAL_NS / 1_000_000_000 if self.imu else STATE_INTERVAL)
+                sleep(self.imu_fifo_poll_interval_ns / 1_000_000_000 if (self.imu is not None) else STATE_INTERVAL)
                 continue
 
             if msg.update_type == UpdateType.RANGING:
@@ -159,7 +169,8 @@ class StateEstimator:
             # Fetching measurements from comm queue.  Retain them until the
             # interval closes; recreating this list on each poll would lose events.
             pending_messages.extend(self._drain_communication_queue())
-            self._monitor_imu_fifo()
+            if self.imu is not None:
+                self._monitor_imu_fifo()
             now = self.estimator_clock.now_ns()
             if now < next_boundary:
                 # Keep latency low without using a repeated fixed sleep, which
@@ -167,15 +178,17 @@ class StateEstimator:
                 # wake often enough to service the FIFO before it can overflow.
                 sleep_ns = next_boundary - now
                 if self.imu is not None:
-                    sleep_ns = min(sleep_ns, IMU_FIFO_POLL_INTERVAL_NS)
+                    sleep_ns = min(sleep_ns, self.imu_fifo_poll_interval_ns)
                 sleep(sleep_ns / 1_000_000_000)
                 continue
             # Drain once more so we don't miss messages at boundary 
             pending_messages.extend(self._drain_communication_queue()) 
-            # Force one final read so samples below the watermark are included in
-            # the state that closes this interval.
-            imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
-            self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift 
+            # Force one IMU final read so samples below the watermark are included 
+            if self.imu is not None:
+                imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
+                self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift
+            else:
+                imu_samples = []
 
             # Aggregate all messages and process them 
             batch = SensorBatch(
@@ -185,19 +198,13 @@ class StateEstimator:
                 imu_samples=imu_samples,
             )
             self._process_sensor_batch(batch)
-            pending_messages = []
+            pending_messages.clear() 
 
             # Advance from the previous deadline rather than from ``now``.  When
             # processing overruns, the following iterations catch up by closing
             # the missed state intervals instead of permanently shifting cadence.
             last_state_boundary = next_boundary
             next_boundary += STATE_INTERVAL_NS
-
-    def _imu_fifo_watermark_words(self) -> int:
-        """Return the conservative FIFO fill level at which to drain samples."""
-        if self.imu is None:
-            return 0
-        return max(1, ceil(self.imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION))
 
     def _monitor_imu_fifo(self) -> None:
         """Drain a sufficiently full FIFO into the estimator-owned pending buffer.
@@ -206,9 +213,7 @@ class StateEstimator:
         ``_drain_imu_samples`` later selects these timestamped samples for the
         appropriate state interval.
         """
-        if self.imu is None:
-            return
-        if self.imu.get_FIFO_count() >= self._imu_fifo_watermark_words():
+        if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
             self._read_imu_fifo_into_pending()
 
     def _drain_communication_queue(self) -> list[UpdateMessage]:
@@ -227,9 +232,6 @@ class StateEstimator:
         pass. Samples after the boundary remain pending for the next interval;
         samples at or before the start are discarded.
         """
-        if self.imu is None: 
-            return []
-
         # The boundary always forces a final read.  Earlier watermark reads have
         # already appended their samples to the same pending deque.
         self._read_imu_fifo_into_pending()
@@ -247,9 +249,6 @@ class StateEstimator:
 
     def _read_imu_fifo_into_pending(self) -> None:
         """Read all currently available FIFO words without assigning a state yet."""
-        if self.imu is None:
-            return
-
         raw_samples = self.imu.read_FIFO(apply_bias=False)
         for raw_tick, acceleration, angular_velocity in raw_samples:
             if raw_tick is None or acceleration is None or angular_velocity is None:
@@ -262,8 +261,6 @@ class StateEstimator:
 
     def _initialize_imu_clock_mapper(self) -> None:
         """Establish a clock anchor after intentionally dropping startup FIFO data."""
-        if self.imu is None:
-            return
         # An observation is newer than all samples currently in the FIFO.  Clear
         # that pre-estimation data before observing it so SensorClockMapper sees
         # raw ticks strictly in chronological order from this point forward.
@@ -272,13 +269,11 @@ class StateEstimator:
 
     def _discard_preinitialization_imu_samples(self) -> None:
         """Avoid FIFO overflow while waiting for a ranging-based initial state."""
-        if self.imu is None:
-            return
-        if self.imu.get_FIFO_count() >= self._imu_fifo_watermark_words():
+        if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
             self.imu.read_FIFO(apply_bias=False)
 
     def _refresh_imu_clock_if_due(self) -> None:
-        if self.imu is None or self._last_imu_clock_observation_ns is None:
+        if self._last_imu_clock_observation_ns is None:
             return
 
         if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns < IMU_CLOCK_REFRESH_INTERVAL_NS:
@@ -288,9 +283,6 @@ class StateEstimator:
 
     def _update_sensor_clock_mapper(self) -> None:
         """Update the IMU tick mapping without discarding unread FIFO samples."""
-        if self.imu is None:
-            return
-
         before_ns = self.estimator_clock.now_ns()
         raw_tick = self.imu.get_timestamp()
         after_ns = self.estimator_clock.now_ns()
