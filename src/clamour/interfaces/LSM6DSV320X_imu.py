@@ -320,7 +320,7 @@ class LSM6DSV320X(IMU):
         previous_tag_cnt = None # Used to group samples that belong together temporally 
         current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
         ### Checking how many words are in the FIFO 
-        diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, 256)
+        diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, self.FIFO_CAPACITY_WORDS)
         ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
         residual_words = diff_FIFO 
         while residual_words>0: 
