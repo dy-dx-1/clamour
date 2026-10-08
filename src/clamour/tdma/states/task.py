@@ -77,9 +77,13 @@ class Task(TDMAState):
         """
         range_observations = []
         for target_id in self.select_ranging_targets():
+            range_start_ns = self.estimator_clock.now_ns()
             z, target_pose = self.tag.ranging(target_id)
+            range_end_ns = self.estimator_clock.now_ns()
             if z:  # Successful measurement, fetch position and add.
-                range_time_ns = self.estimator_clock.now_ns()
+                # These UWB exchanges are applied at once into the new estimated state -> don't need to be as precise as IMU clock
+                # Therefore we just take the exchange midpoint as reference instead of dealing with hardware clock sync. 
+                range_time_ns = (range_start_ns + range_end_ns) // 2
                 is_anchor = self.tag.is_anchor(target_id)
                 if not is_anchor and target_pose is None: # If another tag doesn't share cov, we ignore it. Estimator needs cov. 
                     continue
