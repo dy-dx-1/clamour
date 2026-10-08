@@ -3,6 +3,7 @@ import numpy as np
 
 from ...custom_terminal import print 
 from ...interfaces import Anchors, Pose
+from ...estimator_clock import NANOSECONDS_PER_SECOND
 from ...config import (ANCHOR_POS_UNCERTAINTY,
                         IMU_ACCEL_INITIAL_BIAS, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
                         IMU_GYRO_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
@@ -17,19 +18,19 @@ IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to th
 #IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
 
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float):
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp_ns:int):
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
         - prior_yaw: prior yaw value on initialization **[rad]** 
-        - timestamp: timestamp of the initial data, will serve as reference for subsequent updates to calculate dt 
+        - timestamp_ns: initial event time on EstimatorClock, used to calculate dt
         NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
         NOTE on units: 
         - All angle units are **radians** 
         - All spatial units are **cm-based**
             - The graph doesn't care about this unit as long as it's fully internally consistent, but enforcing cm until we have proper code-wide documentation and unit standardisation to be safer. (For example, gravity vector in graph should be updated if change of units)
         """
-        self.last_measurement_time = timestamp   # Will be updated during subsequent call of validate_update by incorporate_ranging_data 
+        self.last_measurement_time_ns = timestamp_ns
         self.dt = None 
         
         # Graph trackers 
@@ -115,15 +116,15 @@ class FactorGraph:
         # Using combined version as we'll use CombinedImuFactor later
         return gt.PreintegratedCombinedMeasurements(pim_params, imu_bias)
 
-    def validate_update(self, timestamp:float)->bool: 
+    def validate_update(self, timestamp_ns:int)->bool:
         """
         To be called before an update. Adjusts the internal timestamp and speed for the constant velocity model. 
         Returns bool depending on if the update can be applied. 
         NOTE: eventually, this will be replaced by an IMU factor 
         """
-        if timestamp > self.last_measurement_time: 
-            self.dt = timestamp - self.last_measurement_time
-            self.last_measurement_time = timestamp
+        if timestamp_ns > self.last_measurement_time_ns:
+            self.dt = (timestamp_ns - self.last_measurement_time_ns) / NANOSECONDS_PER_SECOND
+            self.last_measurement_time_ns = timestamp_ns
             return True 
         else: 
             print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')

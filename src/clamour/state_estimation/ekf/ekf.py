@@ -5,6 +5,7 @@ from scipy.optimize import least_squares
 
 from .customOdometry import CustomOdometry
 from ...interfaces import Pose, Anchors
+from ...estimator_clock import NANOSECONDS_PER_SECOND
 
 anchors = Anchors()
 
@@ -13,7 +14,7 @@ class CustomEKF(ExtendedKalmanFilter):
         super(CustomEKF, self).__init__(dim_x=8, dim_z=4)
 
         self.dt = 0.1
-        self.last_measurement_time = 0
+        self.last_measurement_time_ns: int | None = None
         self.set_qf()
         self.R_pedometer = array([[20, 0, 0, 0],
                                   [0, 20, 0, 0],
@@ -122,18 +123,25 @@ class CustomEKF(ExtendedKalmanFilter):
                       [deltas[6], 0, deltas[7], 0, deltas[8], 0, 0, 0],
                       [0, 0, 0, 0, 0, 0, 1, 0]])
 
-    def pre_update(self, timestamp: float) -> None:
-        if timestamp > self.last_measurement_time:
-            self.dt = timestamp - self.last_measurement_time
-            self.last_measurement_time = timestamp
-            self.set_qf()
-        else: # TODO 2026-08-20 I believe this has a mistake: should have a way to block update if bad timestamp, currently just printing, try with block? 
+    def pre_update(self, timestamp_ns: int) -> bool:
+        """Prepare a measurement update using canonical nanosecond event time."""
+        if self.last_measurement_time_ns is None:
+            self.last_measurement_time_ns = timestamp_ns
+            return True
+        if timestamp_ns <= self.last_measurement_time_ns:
             print("CustomEKF.pre_update(): Received message with bad timestamp", 'error', 'loc')
+            return False
+
+        self.dt = (timestamp_ns - self.last_measurement_time_ns) / NANOSECONDS_PER_SECOND
+        self.last_measurement_time_ns = timestamp_ns
+        self.set_qf()
         self.predict()
+        return True
 
     def custom_odometry_update(self, position: Pose, yaw: float, R, timestamp: float) -> None:
         print("CustomEKF.custom_odometry_update(): Custom odometry update", 'error', 'loc')
-        self.pre_update(timestamp)
+        if not self.pre_update(timestamp):
+            return
 
         super(CustomEKF, self).update(
             asarray([position.x, position.y, position.z, yaw]),
@@ -143,7 +151,8 @@ class CustomEKF(ExtendedKalmanFilter):
         )
 
     def pedometer_update(self, position: Pose, yaw: float, timestamp: float) -> None:
-        self.pre_update(timestamp)
+        if not self.pre_update(timestamp):
+            return
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
@@ -180,14 +189,16 @@ class CustomEKF(ExtendedKalmanFilter):
                 self.ranging_update(formatted_dist, raw_yaw, timestamp, formatted_target_pos)
 
     def trilateration_update(self, position: Pose, yaw: float, timestamp: float) -> None:
-        self.pre_update(timestamp)
+        if not self.pre_update(timestamp):
+            return
 
         super(CustomEKF, self).update(asarray([position.x, position.y, position.z, yaw]),
                                       lambda _: self.observation_matrix,
                                       self.hx_trilateration, self.R_trilateration)
 
     def ranging_update(self, distance: Pose, yaw: float, timestamp: float, neighbor_position: ndarray) -> None:
-        self.pre_update(timestamp)
+        if not self.pre_update(timestamp):
+            return
 
         super(CustomEKF, self).update(asarray([distance.x, distance.y, distance.z, yaw]),
                                       self.h_ranging, self.hx_ranging, self.R_ranging,
@@ -199,7 +210,8 @@ class CustomEKF(ExtendedKalmanFilter):
         This allows to keep the dt relatively small and avoid drift.
         Indeed, if dt is too big, the process noise increase even if there was no change to the state."""
 
-        self.pre_update(timestamp)
+        if not self.pre_update(timestamp):
+            return
         pose = self.pose
         super(CustomEKF, self).update(asarray([pose.x, pose.y, pose.z, pose.heading]),
                                       lambda _: self.observation_matrix,
