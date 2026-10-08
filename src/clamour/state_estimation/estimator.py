@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from math import ceil
 from queue import Empty
 from time import sleep
-from typing import Literal
+from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
 
 from .ekf import CustomEKF
@@ -66,7 +66,7 @@ class StateEstimator:
     - communication_queue: Queue where pose updates / messages to process appear 
     - sound_queue: Optional, if a Queue is passed, will send updates to it to allow for sound playing 
     """
-    def __init__(self, tag: Tag, tag_lock: Lock, imu: IMU|None,
+    def __init__(self, tag: Tag, tag_lock: Lock, imu_factory: Callable[[], ContextManager[IMU | None]],
                   estimator_clock: EstimatorClock, estimator_type: Literal['EKF', 'FG'], 
                   pose_callback, communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue):
         self.tag = tag 
@@ -85,15 +85,8 @@ class StateEstimator:
 
         # Clamour shares this immutable epoch with all local producer processes.
         self.estimator_clock = estimator_clock
-        self.imu = imu
-        if imu is not None:
-            self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, self.imu.timestamp_counter_bits)
-            self.imu_fifo_watermark_words = ceil(self.imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
-            fifo_word_rate = self.imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
-            if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= self.imu.fifo_capacity_words:
-                raise ValueError("IMU FIFO capacity, watermark, and sample rate must leave overflow headroom")
-            time_from_watermark_to_overflow_s = (self.imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
-            self.imu_fifo_poll_interval_ns = max(1,round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000))
+        self.imu_factory = imu_factory
+        self.imu: IMU | None = None
 
         self._last_imu_clock_observation_ns: int | None = None
         self._pending_imu_samples: deque[TimedIMUSample] = deque()
@@ -105,11 +98,30 @@ class StateEstimator:
 
     def run(self) -> None: 
         try: 
-            self.initialize_estimator()
-            self._run_processing_loop()
+            with self.imu_factory() as imu:
+                self._configure_imu(imu)
+                self.initialize_estimator()
+                self._run_processing_loop()
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
             raise e
+
+    def _configure_imu(self, imu: IMU | None) -> None:
+        """Attach the estimator-owned IMU and derive immutable FIFO timing."""
+        self.imu = imu
+        if imu is None:
+            return
+
+        self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits)
+        self.imu_fifo_watermark_words = ceil(imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
+        fifo_word_rate = imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
+        if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= imu.fifo_capacity_words:
+            raise ValueError("IMU FIFO capacity, watermark, and sample rate must leave overflow headroom")
+        time_from_watermark_to_overflow_s = (imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
+        self.imu_fifo_poll_interval_ns = max(
+            1,
+            round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000),
+        )
 
     def initialize_estimator(self) -> None: 
         """

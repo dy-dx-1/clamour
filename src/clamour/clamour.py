@@ -1,6 +1,7 @@
 from multiprocessing import Lock, Queue
 from contextlib import nullcontext
 from time import sleep
+from typing import ContextManager
 
 from .state_estimation import StateEstimator, CustomOdometry # TODO eval if removing customodometry, check bottom functions
 from .estimator_clock import EstimatorClock
@@ -8,7 +9,7 @@ from .tdma_node import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
 #from .pedometer import Pedometer
-from .interfaces import LSM6DSV320X, Pose
+from .interfaces import IMU, LSM6DSV320X, Pose
 from .messages.customOdometryMessage import CustomOdometryMessage
 from .runnableProcess import RunnableProcess
 from .soundmanager import SoundManager
@@ -39,18 +40,22 @@ match TAG_TYPE:
     case _: 
         raise ValueError(f"Invalid tag type: {TAG_TYPE}. Check your config file.")
 
-match IMU_TYPE:
-    case None:
-        IMU_FACTORY = None
-    case "LSM6DSV320X":
-        IMU_FACTORY = lambda: LSM6DSV320X(
-            ODR_rate            = 120,
-            accelerometer_scale = 2,
-            gyro_dps_scale      = 500,
-            SDO_state           = False,
-        )
-    case _:
-        raise ValueError(f"Invalid IMU type: {IMU_TYPE}. Check your config file.")
+def create_imu() -> ContextManager[IMU | None]:
+    """Construct the configured IMU inside the estimator process to avoid passing the live I2C object"""
+    match IMU_TYPE:
+        case None:
+            return nullcontext(None)
+        case "LSM6DSV320X":
+            imu = LSM6DSV320X(
+                ODR_rate=120,
+                accelerometer_scale=2,
+                gyro_dps_scale=500,
+                SDO_state=False,
+            )
+            imu.accel_scale_factor = IMU_ACCEL_SCALE_FACTOR
+            return imu
+        case _:
+            raise ValueError(f"Invalid IMU type: {IMU_TYPE}. Check your config file.")
 
 #################################################### CLAMOUR
 def keep_alive(process: RunnableProcess) -> None:
@@ -75,30 +80,24 @@ class Clamour:
             estimator_clock = EstimatorClock.start()
             with ContextManagedQueue() as sound_queue:
                 sound_processing_queue = sound_queue if sound else None # Passing None instead of a sound queue to the StateEstimator turns off the sound function
-                imu_context = IMU_FACTORY() if IMU_FACTORY is not None else nullcontext()
-                with imu_context as imu:
-                    # Overwriting with config'ed scale factor as the correction is applied internally
-                    # No need to overwrite the others, because GTSAM applies the correction, the IMU class doesn't see them 
-                    if imu is not None:
-                        imu.accel_scale_factor = IMU_ACCEL_SCALE_FACTOR
-                    estimator = StateEstimator(shared_tag, shared_tag_lock, imu, 
-                                               estimator_clock, ESTIMATOR_TYPE, pose_callback,
-                                               communication_queue, sound_processing_queue)
-                    #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
-                    tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id, estimator_clock)
-                    if sound:
-                        sound_player = SoundManager(sound_queue)
-                    with ContextManagedProcess(target=estimator.run) as estimator_process:
-                        estimator_process.start()
-                        with ContextManagedProcess(target=tdma_node.run) as tdma_process:
-                            tdma_process.start()
-                            #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
-                                #pedometer_process.start()
+                estimator = StateEstimator(shared_tag, shared_tag_lock, create_imu,
+                                           estimator_clock, ESTIMATOR_TYPE, pose_callback,
+                                           communication_queue, sound_processing_queue)
+                #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
+                tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id, estimator_clock)
+                if sound:
+                    sound_player = SoundManager(sound_queue)
+                with ContextManagedProcess(target=estimator.run) as estimator_process:
+                    estimator_process.start()
+                    with ContextManagedProcess(target=tdma_node.run) as tdma_process:
+                        tdma_process.start()
+                        #with ContextManagedProcess(target=pedometer.run) as pedometer_process:
+                            #pedometer_process.start()
 
-                            #    if sound:  was like this before, indented under pedometer, just couldn'T run it yet
-                            #        keep_alive(sound_player)
-                            if sound:
-                                keep_alive(sound_player)
+                        #    if sound:  was like this before, indented under pedometer, just couldn'T run it yet
+                        #        keep_alive(sound_player)
+                        if sound:
+                            keep_alive(sound_player)
 
     # TODO NOTE : eval if we need start_non_blocking and _on_custom_pose_update and what's their point 
     def start_non_blocking(self, sound: bool, pose_callback):
