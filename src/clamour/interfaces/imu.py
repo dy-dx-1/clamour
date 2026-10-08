@@ -17,6 +17,11 @@ class IMU(ABC):
     def timestamp_counter_bits(self) -> int | None:
         """Counter width, or ``None`` for a non-wrapping counter."""
 
+    @property
+    @abstractmethod
+    def sample_rate_hz(self) -> float:
+        """Configured rate of grouped accel/gyro samples in the FIFO."""
+
     @abstractmethod
     def get_FIFO_count(self) -> int:
         """Return the number of FIFO words currently available."""

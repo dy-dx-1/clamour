@@ -105,6 +105,7 @@ class LSM6DSV320X(IMU):
         - SDO_state: True for 'HIGH' and False for 'LOW', defines the Target Address 
         - i2c_bus: I2C bus, 1 by default 
         """
+        self._sample_rate_hz = float(ODR_rate)
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
         if not self.validate_connection(): 
@@ -129,6 +130,10 @@ class LSM6DSV320X(IMU):
     @property
     def timestamp_counter_bits(self) -> int:
         return self.TIMESTAMP_COUNTER_BITS
+
+    @property
+    def sample_rate_hz(self) -> float:
+        return self._sample_rate_hz
 
     def __del__(self): 
         try: 

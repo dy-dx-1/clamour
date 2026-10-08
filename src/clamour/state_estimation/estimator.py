@@ -22,6 +22,8 @@ from ..rooms import Floorplan
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
 STATE_INTERVAL = 0.1  # seconds
 STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
+IMU_CLOCK_REFRESH_INTERVAL = 1.0  # seconds; ten times the state interval
+IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000)
 
 @dataclass(frozen=True)
 class TimedIMUSample:
@@ -79,7 +81,9 @@ class StateEstimator:
         self.estimator_clock = estimator_clock
         self.imu = imu
         if imu: 
-            self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, self.imu.timestamp_counter_bits)
+            self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, counter_bits=self.imu.timestamp_counter_bits)
+
+        self._last_imu_clock_observation_ns: int | None = None
         self._pending_imu_samples: deque[TimedIMUSample] = deque()
 
         self.state_csv, self.writer = self.initialize_csv()
@@ -123,15 +127,15 @@ class StateEstimator:
                 continue
             # Drain once more so we don't miss messages at boundary 
             pending_messages.extend(self._drain_communication_queue()) 
+            # Getting IMU samples for this interval TODO move up? need continuous loop cause FIFO fills extremely fast 
             imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
+            self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift 
 
             # Aggregate all messages and process them 
             batch = SensorBatch(
                 start_time_ns=last_state_boundary,
                 boundary_time_ns=next_boundary,
                 messages=pending_messages,
-                # IMU samples will be drained from the IMU FIFO here, not placed
-                # onto the general communication queue at IMU sample rate.
                 imu_samples=imu_samples,
             )
             self.process_sensor_batch(batch)
@@ -142,42 +146,36 @@ class StateEstimator:
             last_state_boundary = next_boundary
             next_boundary += STATE_INTERVAL_NS
 
-    def _drain_imu_samples(self, start_time_ns: int,
-                           boundary_time_ns: int) -> list[TimedIMUSample]:
+    def _drain_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> list[TimedIMUSample]:
         """Read available FIFO words, map ticks, and return one interval's samples."""
-        if self.imu is not None:
-            if self.imu_clock_mapper is None:
-                raise RuntimeError("IMU clock mapper was not initialized")
+        if self.imu is None: 
+            return 
 
-            fifo_word_count = self.imu.get_FIFO_count()
-            if fifo_word_count:
-                raw_samples = self.imu.read_FIFO(
-                    apply_bias=False,
-                    word_count=fifo_word_count,
-                )
-                for raw_tick, acceleration, angular_velocity in raw_samples:
-                    if raw_tick is None:
-                        continue
-                    timestamp_ns = self.imu_clock_mapper.to_estimator_ns(raw_tick)
-                    self._pending_imu_samples.append(TimedIMUSample(
-                        timestamp_ns,
-                        acceleration,
-                        angular_velocity,
-                    ))
-
+        raw_samples = self.imu.read_FIFO(apply_bias=False)
+        for raw_tick, acceleration, angular_velocity in raw_samples:
+            if raw_tick is None or acceleration is None or angular_velocity is None:
+                continue
+            self._pending_imu_samples.append(TimedIMUSample(
+                timestamp_ns= self.imu_clock_mapper.to_estimator_ns(raw_tick),
+                acceleration= acceleration,
+                angular_velocity= angular_velocity,
+            ))
+        # TODO shift this check into the above for loop to avoid double looping? 
         interval_samples = []
-        while (self._pending_imu_samples and
-               self._pending_imu_samples[0].timestamp_ns <= boundary_time_ns):
+        while (self._pending_imu_samples and self._pending_imu_samples[0].timestamp_ns <= boundary_time_ns):
             sample = self._pending_imu_samples.popleft()
             if sample.timestamp_ns > start_time_ns:
                 interval_samples.append(sample)
         return interval_samples
 
-    def _discard_imu_fifo(self) -> None:
-        """Discard startup samples whose ticks may precede the mapper anchor."""
-        if self.imu is None:
+    def _refresh_imu_clock_if_due(self) -> None:
+        if self.imu is None or self._last_imu_clock_observation_ns is None:
             return
-        self.imu.read_FIFO(apply_bias=False)
+
+        if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns < IMU_CLOCK_REFRESH_INTERVAL_NS:
+            return
+
+        self._update_sensor_clock_mapper()
 
     def _drain_communication_queue(self) -> list[UpdateMessage]:
         """Returns a list of all currently available producer events and clears the queue"""
@@ -266,14 +264,25 @@ class StateEstimator:
         return
 
     def _update_sensor_clock_mapper(self) -> None:
-        """Updates the IMU tick mapping with a timestamp and estimator measurement"""
+        """Update the IMU tick mapping and discard samples queued before the new anchor."""
         if self.imu is None:
             return
 
         before_ns = self.estimator_clock.now_ns()
         raw_tick = self.imu.get_timestamp()
         after_ns = self.estimator_clock.now_ns()
-        self.imu_clock_mapper.observe(raw_tick, (before_ns + after_ns) // 2)
+        estimator_time_ns = (before_ns + after_ns) // 2
+        self.imu_clock_mapper.observe(raw_tick, estimator_time_ns)
+        self._last_imu_clock_observation_ns = estimator_time_ns
+
+        fifo_word_count = self.imu.get_FIFO_count()
+        discarded_samples = self.imu.read_FIFO(
+            apply_bias=False,
+            word_count=fifo_word_count,
+        ) if fifo_word_count else []
+        timestamped_count = sum(sample[0] is not None for sample in discarded_samples)
+        equivalent_seconds = timestamped_count / self.imu.sample_rate_hz
+        print(f"TEMP DEBUG IMU FIFO discard: samples={timestamped_count}, equivalent_seconds={equivalent_seconds:.6f}", 'info', 'loc')
 
     def initialize_estimator(self) -> None: 
         """
@@ -281,7 +290,6 @@ class StateEstimator:
         Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
         self._update_sensor_clock_mapper()
-        self._discard_imu_fifo()
         while self.estimator is None: 
             if not self.com_queue.empty():
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
