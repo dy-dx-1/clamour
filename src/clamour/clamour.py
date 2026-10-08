@@ -79,7 +79,8 @@ class Clamour:
                 with imu_context as imu:
                     # Overwriting with config'ed scale factor as the correction is applied internally
                     # No need to overwrite the others, because GTSAM applies the correction, the IMU class doesn't see them 
-                    imu.accel_scale_factor = IMU_ACCEL_SCALE_FACTOR
+                    if imu is not None:
+                        imu.accel_scale_factor = IMU_ACCEL_SCALE_FACTOR
                     estimator = StateEstimator(shared_tag, shared_tag_lock, imu, 
                                                estimator_clock, ESTIMATOR_TYPE, pose_callback,
                                                communication_queue, sound_processing_queue)
