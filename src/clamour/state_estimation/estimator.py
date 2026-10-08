@@ -86,11 +86,13 @@ class StateEstimator:
         # Clamour shares this immutable epoch with all local producer processes.
         self.estimator_clock = estimator_clock
         self.imu = imu
-        if imu:
+        if imu is not None:
             self.imu_clock_mapper = SensorClockMapper(self.imu.timestamp_tick_ns, self.imu.timestamp_counter_bits)
             self.imu_fifo_watermark_words = ceil(self.imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
             fifo_word_rate = self.imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
-            time_from_watermark_to_overflow_s = (self.imu.fifo_capacity_words - self.imu_fifo_watermark_words)/fifo_word_rate
+            if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= self.imu.fifo_capacity_words:
+                raise ValueError("IMU FIFO capacity, watermark, and sample rate must leave overflow headroom")
+            time_from_watermark_to_overflow_s = (self.imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
             self.imu_fifo_poll_interval_ns = max(1,round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000))
 
         self._last_imu_clock_observation_ns: int | None = None
