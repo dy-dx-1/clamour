@@ -59,6 +59,7 @@ class LSM6DSV320X(IMU):
     # StateEstimator, keeping this driver independent of estimator time.
     TIMESTAMP_TICK_NS = 21_700
     TIMESTAMP_COUNTER_BITS = 32
+    FIFO_CAPACITY_WORDS = 256
     ### ACCEL/GYRO COVARIANCE  
     # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
     # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
@@ -113,6 +114,10 @@ class LSM6DSV320X(IMU):
         else:
             self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
             print("SUCCESSFULLY CONNECTED TO IMU")
+
+    @property
+    def fifo_capacity_words(self) -> int:
+        return self.FIFO_CAPACITY_WORDS
 
     def __enter__(self):
         return self 
@@ -296,7 +301,7 @@ class LSM6DSV320X(IMU):
         ### Checking DIFF_FIFO which is split between FIFO_STATUS1 and FIFO_STATUS2 registers 
         ## It gives the number of words (1 word = 7 bytes) that are in FIFO 
         lo, st2 = self.bus.read_i2c_block_data(self.TAD, 0x1B, 2)  # STATUS1+STATUS2 together
-        return min(((st2 & 0x01) << 8) | lo, 256)
+        return min(((st2 & 0x01) << 8) | lo, self.FIFO_CAPACITY_WORDS)
 
     def read_FIFO(self, apply_bias: bool = False, word_count: int | None = None) -> list[RawIMUSample]:
         """

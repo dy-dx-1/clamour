@@ -22,6 +22,11 @@ class IMU(ABC):
     def sample_rate_hz(self) -> float:
         """Configured rate of grouped accel/gyro samples in the FIFO."""
 
+    @property
+    @abstractmethod
+    def fifo_capacity_words(self) -> int:
+        """Maximum number of FIFO words retained before samples are overwritten."""
+
     @abstractmethod
     def get_FIFO_count(self) -> int:
         """Return the number of FIFO words currently available."""
