@@ -7,6 +7,9 @@ RawIMUSample = tuple[int | None, object | None, object | None]
 class IMU(ABC):
     """Generic IMU interface; timestamps remain raw sensor ticks. These values should all be from the datasheet."""
 
+    ### ACCEL/GYRO COVARIANCE  
+    # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
+    # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
     @property
     @abstractmethod
     def accel_covar_density_mg(self) -> float: 
@@ -14,7 +17,7 @@ class IMU(ABC):
 
     @property
     @abstractmethod
-    def accel_covar_density_mg(self) -> float: 
+    def gyro_covar_density_mg(self) -> float: 
         """Covariance density of gyroscope measurements in (mdps**2)*s"""
 
     @property
