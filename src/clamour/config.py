@@ -45,6 +45,7 @@ IMU_GYRO_INITIAL_BIAS_COV  = None
 # Accelerometer and Gyro bias random walk covariance (requires Allan variance analysis) 
 # As of 21sept 2026, placeholders as it'll be enough to validate IMU integration. We don't dead-reckon for long without range factors to correct. 
 # GTSAM expects these values to be /s as it will *s during pre-integration 
+# NOTE These should simply be unidimensional values - array conversion will be done by GTSAM 
 IMU_ACCEL_WALK_COV = 0.032**2 # units: (mg**2)/s
 IMU_GYRO_WALK_COV  = 5.73**2  # units: (mdps**2)/s
 
