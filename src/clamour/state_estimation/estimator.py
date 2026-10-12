@@ -314,9 +314,8 @@ class StateEstimator:
         ranges into one legacy backend call while leaving step and pose events out
         of the old pseudo-measurement paths.
         """
-        # 1. IMU: drain and preintegrate every sample in (start, boundary] exactly
-        # once.  This belongs to the estimator/coordinator, not the range producer.
-        # self._preintegrate_imu(batch.imu_samples, batch.start_time_ns, batch.boundary_time_ns)
+        # 1. IMU: preintegrate every sample in (start, boundary] to create a motion link 
+        self.estimator.add_imu_link(batch.imu_samples)
 
         # 2. Parsing messages
         range_messages = [] 

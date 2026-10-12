@@ -2,6 +2,7 @@ import gtsam as gt
 import numpy as np 
 
 from ...custom_terminal import print 
+from ..estimator import TimedIMUSample
 from ...interfaces import Anchors, Pose
 from ...estimator_clock import NANOSECONDS_PER_SECOND
 from ...config import (ANCHOR_POS_UNCERTAINTY,
@@ -166,7 +167,7 @@ class FactorGraph:
             # Adding range data 
             graph.add(gt.RangeFactor3D(state_symbol, neighbor, z, RANGING_NOISE))
 
-    def add_imu_data(self, state_symbol, state_id, graph, initial_values):
+    def add_imu_link(self, state_symbol, state_id, graph, initial_values, timed_imu_samples:list[TimedIMUSample]):
         """
         Adds IMU data to the factor graph & uses it to set an initial belief on the state. 
         - state_symbol: gt.Symbol of the new state to add to the graph 
@@ -176,7 +177,12 @@ class FactorGraph:
         """
         # TODO add raw data preintegration 
         # for each data triple do self.pim.integrateMeasurement(a, g, dt) ; a and g are np arrays 3x1 and dt is float 
-
+        prev_ts = timed_imu_samples[0].timestamp_ns # preintegration from (start, end]
+        for imu_sample in timed_imu_samples[1:]: 
+            # NOTE TODO convert to proper units, check for monotonic necessary or not? 
+            dt = (imu_sample.timestamp_ns-prev_ts) # convert to S 
+            self.pim.integrateMeasurement(imu_sample.acceleration, imu_sample.angular_velocity, dt) 
+            prev_ts = imu_sample.timestamp_ns
         # Adding pre-integrated data to the graph as a CombinedImuFactor
         # Using this factor removes the need of an independent BetweenFactor to track the bias (would be needed with ImuFactor) 
         # while keeping taking into account correlations between bias drift and IMU predictions 
