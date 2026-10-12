@@ -7,7 +7,7 @@ from ...interfaces import Anchors, Pose
 from ...estimator_clock import NANOSECONDS_PER_SECOND
 from ...config import (ANCHOR_POS_UNCERTAINTY,
                         IMU_ACCEL_INITIAL_BIAS, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
-                        IMU_GYRO_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
+                        IMU_GYRO_INITIAL_BIAS,  IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
 
 anchors = Anchors()
 ### Defining noise models 
@@ -16,13 +16,14 @@ ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY, ANCHOR
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
-#IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
+IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
 
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp_ns:int):
+    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp_ns:int, imu_accel_covar:float, imu_gyro_covar:float):
         """
         Factor Graph based 3D pose estimator. 
         - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
+            - NOTE TODO replace by RangeObservations 
         - prior_yaw: prior yaw value on initialization **[rad]** 
         - timestamp_ns: initial event time on EstimatorClock, used to calculate dt
         NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
@@ -35,9 +36,16 @@ class FactorGraph:
         self.dt = None 
         
         # Graph trackers 
-        self._state_counter = -1   # Keeps track of how many state nodes have been added to the graph
-        self.seen_anchors = set() # Keeps track of the anchors we have previously seen, to avoid re-adding prior factors
+        self._state_counter = -1   # How many state nodes have been added to the graph
+        self.seen_anchors = set()  # Anchors we have previously seen; to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
+
+        # NOTE TODO add optional IMU creation / switches 
+        # Covar on IMU measurements. Passed by estimator.py, set to None if no IMU 
+        if imu_accel_covar and imu_gyro_covar: 
+            self.imu_accel_covar = imu_accel_covar 
+            self.imu_gyro_covar  = imu_gyro_covar
+        self.imu_gyro_covar = imu_gyro_covar 
         self.pim  = self.create_imu_pim_obj() # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
 
         # Creating prior factor that locks rotation and position at initial estimate
@@ -90,27 +98,24 @@ class FactorGraph:
         )
         return gt.NavState(post_pose, np.zeros(3)) # NOTE TODO 0 velocity initialization - confirm if keep 
 
-    def create_imu_pim_obj(self, state_key, graph, initial, gyro_covar, accel_covar, integration_covar, gyro_bias, accel_bias): 
+    def create_imu_pim_obj(self, state_key, graph, initial): 
         """
         Creates a gtsam.PreintegratedCombinedMeasurements object, which will be used to do IMU pre-integration with the CombinedImuFactor
         """
-        # Define Z axis pointing up. The factor will then handle gravity measurements internally. 
+        # Defining Z axis pointing up. The factor will then handle gravity measurements internally. 
         pim_params = gt.PreintegrationCombinedParams.MakeSharedU(9.806)
-        # Define covariances (noise models) 
-        # TODO we are expecting a 3x3 np matrix for all of these. Floats for each element. 
-        pim_params.setAccelerometerCovariance(accel_covar)
-        pim_params.setGyroscopeCovariance(gyro_covar)
-        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) # Uncertainty due to modeling errors in the integration from accel->v->p
-        pim_params.setBiasAccCovariance(IMU_ACCEL_WALK_COV) 
-        pim_params.setBiasOmegaCovariance(IMU_GYRO_WALK_COV) 
-        # Defining IMU bias and setting a prior
-        # The IMU calibration isn't perfect, this prior serves to anchor our confidence in it 
-        # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve. This gives it it's reference starting point. 
-        # TODO currently here, but some restructuring for clarity might be needed? harmonize with insert_init_prior? 
- 
+        # Defining covariances (noise models) 
+        pim_params.setAccelerometerCovariance(self.imu_accel_covar)
+        pim_params.setGyroscopeCovariance(self.imu_gyro_covar)
+        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) 
+        pim_params.setBiasAccCovariance( IMU_ACCEL_WALK_COV * np.eye(3)) 
+        pim_params.setBiasOmegaCovariance(IMU_GYRO_WALK_COV * np.eye(3)) 
+        # Setting prior on IMU bias (calibration isn't perfect, this represents our confidence in it) 
+        # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve through time  
+        # NOTE TODO currently here, but some restructuring for clarity might be needed? harmonize with insert_init_prior? 
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
         imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS)
-        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_INITIAL_BIAS_COV)) # define noise in the imu class 
+        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_INITIAL_BIAS_COV))
         initial.insert(gt.symbol('b', state_key), imu_bias) 
 
         # Creating the preintegration object 
