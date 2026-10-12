@@ -5,7 +5,17 @@ RawIMUSample = tuple[int | None, object | None, object | None]
 
 
 class IMU(ABC):
-    """Generic IMU interface; timestamps remain raw sensor ticks."""
+    """Generic IMU interface; timestamps remain raw sensor ticks. These values should all be from the datasheet."""
+
+    @property
+    @abstractmethod
+    def accel_covar_density_mg(self) -> float: 
+        """Covariance density of accelerometer measurements in (mg**2)*s"""
+
+    @property
+    @abstractmethod
+    def accel_covar_density_mg(self) -> float: 
+        """Covariance density of gyroscope measurements in (mdps**2)*s"""
 
     @property
     @abstractmethod

@@ -55,17 +55,6 @@ def uint16_to_int16(value:int)->int:
     return value - 0x10000 if value & 0x8000 else value
 
 class LSM6DSV320X(IMU):
-    # Hardware timestamp resolution from the datasheet. FIFO ticks are mapped by
-    # StateEstimator, keeping this driver independent of estimator time.
-    TIMESTAMP_TICK_NS = 21_700
-    TIMESTAMP_COUNTER_BITS = 32
-    FIFO_CAPACITY_WORDS = 256
-    ### ACCEL/GYRO COVARIANCE  
-    # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
-    # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
-    accel_covar_density_mg = 0.060**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (mg**2)*s 
-    gyro_covar_density_mdps  = 3.8**2 # Units: (mdps**2)*s
- 
     ### ACCEL/GYRO CALIBRATION VALUES: calibrated_measure = scale_factor @ (raw_measure-bias)
     ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
     ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
@@ -96,8 +85,6 @@ class LSM6DSV320X(IMU):
         - Accel/gyro values are always returned in **mg** and **mdps** units 
             - Values are always scale-corrected
             - Bias correction is optional so they can be applied by an external estimator if desired (ex: GTSAM). See class attributes.
-        - Remember that accel/gyro scale factor, bias and bias random walk covar all are HARDWARE UNIT SPECIFIC. 
-            - NOTE TODO: Should shift these from class attributes to facilitate per-unit definition? 
 
         ARGS: 
         - ODR_rate: Output Data Rate in Hz (must match High Perf mode see p.65 manual)
@@ -115,10 +102,6 @@ class LSM6DSV320X(IMU):
             self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
             print("SUCCESSFULLY CONNECTED TO IMU")
 
-    @property
-    def fifo_capacity_words(self) -> int:
-        return self.FIFO_CAPACITY_WORDS
-
     def __enter__(self):
         return self 
 
@@ -128,23 +111,35 @@ class LSM6DSV320X(IMU):
     def close(self) -> None:
         self.bus.close()
 
-    @property
-    def timestamp_tick_ns(self) -> float:
-        return self.TIMESTAMP_TICK_NS
-
-    @property
-    def timestamp_counter_bits(self) -> int:
-        return self.TIMESTAMP_COUNTER_BITS
-
-    @property
-    def sample_rate_hz(self) -> float:
-        return self._sample_rate_hz
-
     def __del__(self): 
         try: 
             self.bus.close() 
         except: 
             pass
+
+    @property
+    def accel_covar_density_mg(self):
+        return 0.060**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (mg**2)*s 
+
+    @property
+    def gyro_covar_density_mg(self):
+        return 3.8**2 # Units: (mdps**2)*s
+
+    @property
+    def fifo_capacity_words(self) -> int:
+        return 256
+
+    @property
+    def timestamp_tick_ns(self) -> float:
+        return 21_700
+
+    @property
+    def timestamp_counter_bits(self) -> int:
+        return 32
+
+    @property
+    def sample_rate_hz(self) -> float:
+        return self._sample_rate_hz
 
     @staticmethod
     def _apply_scalar_calibration(x:float, y:float, z:float, bias:np.ndarray,
@@ -301,7 +296,7 @@ class LSM6DSV320X(IMU):
         ### Checking DIFF_FIFO which is split between FIFO_STATUS1 and FIFO_STATUS2 registers 
         ## It gives the number of words (1 word = 7 bytes) that are in FIFO 
         lo, st2 = self.bus.read_i2c_block_data(self.TAD, 0x1B, 2)  # STATUS1+STATUS2 together
-        return min(((st2 & 0x01) << 8) | lo, self.FIFO_CAPACITY_WORDS)
+        return min(((st2 & 0x01) << 8) | lo, self.fifo_capacity_words)
 
     def read_FIFO(self, apply_bias: bool = False, word_count: int | None = None) -> list[RawIMUSample]:
         """
@@ -320,7 +315,7 @@ class LSM6DSV320X(IMU):
         previous_tag_cnt = None # Used to group samples that belong together temporally 
         current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
         ### Checking how many words are in the FIFO 
-        diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, self.FIFO_CAPACITY_WORDS)
+        diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, self.fifo_capacity_words)
         ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
         residual_words = diff_FIFO 
         while residual_words>0: 
