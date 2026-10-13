@@ -20,11 +20,10 @@ IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to th
 IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
 
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp_ns:int, imu_accel_covar_density:float, imu_gyro_covar_density:float):
+    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, timestamp_ns:int, imu_accel_covar_density:float, imu_gyro_covar_density:float):
         """
         Factor Graph based 3D pose estimator. 
-        - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
-            - NOTE TODO replace by RangeObservations 
+        - range_observations: Range observations used to initialize the graph; at least 3 anchors are required to fully initialize the prior position.
         - prior_yaw: prior yaw value on initialization **[rad]** 
         - timestamp_ns: initial event time on EstimatorClock, used to calculate dt
         NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
@@ -52,7 +51,7 @@ class FactorGraph:
             self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
         # Creating prior factor that locks rotation and position at initial estimate
         # Internal state tracker is a NavState for Pose and Velocity 
-        self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, anchors_range_data) 
+        self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, range_observations) 
 
     ### Properties
     @property
@@ -69,7 +68,7 @@ class FactorGraph:
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
     
-    def advance_to(self, timestamp:float, imu_data:list[TimedIMUSample]|None, range_observations:list):
+    def advance_to(self, timestamp:float, imu_data:list[TimedIMUSample]|None, range_observations:list[RangeObservation]):
         """
         Creates a new state in the FG, linked to the previous by a motion factor and supported by external measurements if available. 
         Optimizes the graph and internal data with the posterior. 
@@ -94,7 +93,7 @@ class FactorGraph:
             self.add_imu_link()
 
         ## External measurements 
-        self.add_ranging_data(current_state_id, graph, initial_values, anchor_ranges, tag_ranges)
+        self.add_ranging_data(current_state_id, graph, initial_values, range_observations)
 
         ## Updating graph and internal data with the posterior
         self.isam.update(graph, initial_values)
@@ -149,7 +148,7 @@ class FactorGraph:
         pass
 
     ### -------------------------------------------------- INTERNAL COMPUTATION METHODS --------------------------------------------------
-    def _insert_init_prior(self, state_key, graph, initial_values, yaw_prior:float, anchors_range_data:list[RangeObservation])->gt.NavState: 
+    def _insert_init_prior(self, state_key, graph, initial_values, yaw_prior:float, range_observations:list[RangeObservation])->gt.NavState: 
         """
         Constrains the initial state of the graph with a rotation lock & sufficient range data to multilaterate the position. 
 
@@ -159,13 +158,14 @@ class FactorGraph:
         """     
         x0 = gt.symbol('x', state_key)  
         # ROTATION LOCK 
-        throwaway_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
+        anchor_observations = [observation for observation in range_observations if observation.is_anchor]
+        throwaway_pos = anchors.get_centroid_for(*(observation.target_id for observation in anchor_observations))
         graph.add(gt.PriorFactorPose3(x0, 
                                       gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
         # POSITION LOCK 
-        self.add_ranging_data(state_key, graph, initial_values, anchors_range_data)
+        self.add_ranging_data(state_key, graph, initial_values, range_observations)
         # GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
         post_pose = self.isam.calculateEstimate().atPose3(x0) 
@@ -217,43 +217,41 @@ class FactorGraph:
             print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')
             return False 
 
-    def add_ranging_data(self, state_id, graph, initial_values, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple]): 
+    def add_ranging_data(self, state_id, graph, initial_values, range_observations:list[RangeObservation]): 
         """
-        Adds anchor and tag ranging data to a graph state without adding a prior or solving for it. 
-        - state_symbol: gt.Symbol of the new state to add to the graph 
-        - state_id: Key corresponding to the new state 
-        - graph: Factor Graph object 
-        - initial_values: Values object related to the graph 
-        # TODO modify this function and it's implementations to use a single list of RangeObservation dataclasses as arg. 
-        - anchors_ranging_data: list of measurements [(anchor_id, range), ...] 
-        - tags_ranging_data: list of measurements [(neighbor_id, neighbor_pose, range), ...]
+        Adds anchor and tag range observations to a graph state without adding a prior or solving for it.
         """
-        print(f"Adding anchors {anchors_ranging_data} ||| Tags {tags_ranging_data}", 'info', 'loc')
+        print(f"Adding range observations {range_observations}", 'info', 'loc')
         x_new = gt.symbol('x', state_id) 
-        # ANCHORS
-        for id, z in anchors_ranging_data: 
-            anchor = gt.symbol('a', id) 
-            if id not in self.seen_anchors:
-                # ONLY if we have never seen this anchor -> need to add a prior on it's position 
-                anchor_pos = anchors.anchors_dict[id] 
-                graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
-                initial_values.insert(anchor, gt.Point3(*anchor_pos))
-                self.seen_anchors.add(id) 
-            graph.add(gt.RangeFactor3D(x_new, anchor, z, RANGING_NOISE))
-        # TAGS 
-        for n_id, n_coords, z in tags_ranging_data:  
-            # tags_ranging_data only contains tags that have known positions/covar (filtered at TASK level)
-            # NOTE: in future, could be nice to add here or in TASK a filter for stale data based on timestamps 
-            n_pos, n_cov = n_coords.coordinates, n_coords.covar
-            # Adding the other tag's position to the graph with a special ID that tracks his position and the time
-            neighbor = gt.symbol('t', int(f'{n_id}000{state_id}')) 
-            # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
-            # If an indeterminate system is thrown when ranging with neighbors, printing out the matrix and checking that it's invertible 
-            # is a good debugging step, as gt.noiseModel.Gaussian.Covariance will attempt to invert it to get the Information Matrix
-            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov.astype(float)))) 
-            initial_values.insert(neighbor, gt.Point3(*n_pos))
-            # Adding range data 
-            graph.add(gt.RangeFactor3D(x_new, neighbor, z, RANGING_NOISE))
+        for observation in range_observations:
+            target_id = observation.target_id
+            distance = observation.distance_cm
+            if observation.is_anchor:
+                anchor = gt.symbol('a', target_id)
+                if target_id not in self.seen_anchors:
+                    # Add a prior only the first time this anchor is observed.
+                    anchor_pos = anchors.anchors_dict[target_id]
+                    graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
+                    initial_values.insert(anchor, gt.Point3(*anchor_pos))
+                    self.seen_anchors.add(target_id)
+                graph.add(gt.RangeFactor3D(x_new, anchor, distance, RANGING_NOISE))
+            else: 
+                # Ranging data from tags is useful only when their pose estimate is known.
+                if observation.target_pose is None:
+                    continue
+                n_pos = observation.target_pose.coordinates
+                n_cov = observation.target_pose.covar
+                if n_cov is None:
+                    raise ValueError(f"Tag range observation for target {target_id} has no pose covariance")
+                # Adding the other tag's position to the graph with a special ID that tracks his position and the time
+                neighbor = gt.symbol('t', int(f'{target_id}000{state_id}')) 
+                # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
+                # If an indeterminate system is thrown when ranging with neighbors, printing out the matrix and checking that it's invertible 
+                # is a good debugging step, as gt.noiseModel.Gaussian.Covariance will attempt to invert it to get the Information Matrix
+                graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov.astype(float)))) 
+                initial_values.insert(neighbor, gt.Point3(*n_pos))
+                # Adding range data 
+                graph.add(gt.RangeFactor3D(x_new, neighbor, distance, RANGING_NOISE))
 
     def add_imu_link(self, state_symbol, state_id, graph, initial_values, timed_imu_samples:list[TimedIMUSample]):
         """

@@ -143,19 +143,17 @@ class StateEstimator:
                 continue
 
             if msg.update_type == UpdateType.RANGING:
-                anchor_ranges = [obs for obs in msg.range_observations if obs.is_anchor]
-                if len(anchor_ranges) < 3:  # Need a fully constrained measurement for initialization
+                anchor_ros = [obs for obs in msg.range_observations if obs.is_anchor]
+                if len(anchor_ros) < 4:  # Need a fully constrained measurement for initialization
                     continue
                 self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses
                 raw_yaw = self.correct_yaw(msg.measured_yaw)
 
-                anchor_data = [(obs.target_id, obs.distance_cm) for obs in anchor_ranges]
                 if self.estimator_type == 'EKF':
                     self.estimator = CustomEKF(anchor_data, raw_yaw)
                     self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
                 elif self.estimator_type == 'FG':
-                    self.estimator = FactorGraph(anchor_data, raw_yaw, msg.timestamp)
-                    self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
+                    self.estimator = FactorGraph(msg.range_observations, raw_yaw, msg.timestamp)
 
                 # Estimator initialized. Internalise and publish the posterior.
                 self.publish_state(msg)
