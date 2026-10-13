@@ -90,7 +90,7 @@ class FactorGraph:
         if imu_data is None: 
             self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
         else:
-            self.add_imu_link()
+            self._add_imu_link()
 
         ## External measurements 
         self.add_ranging_data(current_state_id, graph, initial_values, range_observations)
@@ -222,7 +222,7 @@ class FactorGraph:
         Adds anchor and tag range observations to a graph state without adding a prior or solving for it.
         """
         print(f"Adding range observations {range_observations}", 'info', 'loc')
-        x_new = gt.symbol('x', state_id) 
+        x = gt.symbol('x', state_id) 
         for observation in range_observations:
             target_id = observation.target_id
             distance = observation.distance_cm
@@ -234,7 +234,7 @@ class FactorGraph:
                     graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
                     initial_values.insert(anchor, gt.Point3(*anchor_pos))
                     self.seen_anchors.add(target_id)
-                graph.add(gt.RangeFactor3D(x_new, anchor, distance, RANGING_NOISE))
+                graph.add(gt.RangeFactor3D(x, anchor, distance, RANGING_NOISE))
             else: 
                 # Ranging data from tags is useful only when their pose estimate is known.
                 if observation.target_pose is None:
@@ -251,19 +251,19 @@ class FactorGraph:
                 graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov.astype(float)))) 
                 initial_values.insert(neighbor, gt.Point3(*n_pos))
                 # Adding range data 
-                graph.add(gt.RangeFactor3D(x_new, neighbor, distance, RANGING_NOISE))
+                graph.add(gt.RangeFactor3D(x, neighbor, distance, RANGING_NOISE))
 
-    def add_imu_link(self, state_symbol, state_id, graph, initial_values, timed_imu_samples:list[TimedIMUSample]):
+    def _add_imu_link(self, state_id, graph, initial_values, timed_imu_samples:list[TimedIMUSample]):
         """
         Preintegrates IMU data to add a motion factor from the previous state to the next. \n 
         The new state is initialized with a prior defined by the preintegration. 
-        - state_symbol: gt.Symbol of the new state to add to the graph 
         - state_id: Key corresponding to the new state 
         - graph: Factor Graph object 
         - initial_values: Values object related to the graph 
         """
-        # TODO add raw data preintegration 
-        # for each data triple do self.pim.integrateMeasurement(a, g, dt) ; a and g are np arrays 3x1 and dt is float 
+        x_old, v_old, b_old = gt.symbol('x', state_id-1), gt.symbol('v', state_id-1), gt.symbol('b', state_id-1)
+        x_new, v_new, b_new = gt.symbol('x', state_id), gt.symbol('v', state_id), gt.symbol('b', state_id)
+        # Pre integrating data 
         prev_ts = timed_imu_samples[0].timestamp_ns # preintegration from (start, end]
         for imu_sample in timed_imu_samples[1:]: 
             # NOTE TODO convert to proper units, check for monotonic necessary or not? 
@@ -273,14 +273,15 @@ class FactorGraph:
         # Adding pre-integrated data to the graph as a CombinedImuFactor
         # Using this factor removes the need of an independent BetweenFactor to track the bias (would be needed with ImuFactor) 
         # while keeping taking into account correlations between bias drift and IMU predictions 
-        # TODO figure out a better naming for these a bit too long and confusing 
-        graph.add( gt.CombinedImuFactor(prev_state_symbol, prev_velocity_symbol, state_symbol, velocity_symbol, prev_bias_symbol, bias_symbol, self.pim) )
+        graph.add( gt.CombinedImuFactor(x_old, v_old, x_new, v_new, b_old, b_new, self.pim) )
+        # NOTE TODO check if need to track speeds in other functions? range? 
 
         # Adding initial guess for the state with the IMU's predictions
-        predicted_state = self.pim.predict(self._state, imu_bias) # self._state is already a NavState, and if this function is called, it doesn't represent the posterior yet
-        initial_values.insert(state_symbol, predicted_state.pose())
-        initial_values.insert(velocity_symbol, predicted_state.velocity())
-        initial_values.insert(bias_symbol, imu_bias) #TODO check if pim of combined values can automatically use up to date estimation for imu bias for it's pred? just a thought 
+        # NOTE TODO: can we fetch up to date estimate of bias or do we just put back the initial one? 
+        dead_reckoned_state = self.pim.predict(self._state, imu_bias) 
+        initial_values.insert(x_new, dead_reckoned_state.pose())
+        initial_values.insert(v_new, dead_reckoned_state.velocity())
+        initial_values.insert(b_new, imu_bias) 
 
         # Make sure to clear out preintegration values for the next run 
         self.pim.resetIntegration()
