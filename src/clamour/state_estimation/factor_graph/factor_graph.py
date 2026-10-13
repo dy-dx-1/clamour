@@ -82,26 +82,26 @@ class FactorGraph:
         graph = gt.NonlinearFactorGraph()
         initial_values = gt.Values()
 
-        current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)
-        v = gt.symbol('v', current_state_id)
+        new_state_id = self.state_counter
+        x_new = gt.symbol('x', new_state_id)
+        v_new = gt.symbol('v', new_state_id)
 
         ## Motion factor 
         if imu_data is None: 
-            self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
+            self.add_constant_velocity_link(graph, initial_values, new_state_id)
         else:
             self._add_imu_link()
 
         ## External measurements 
-        self.add_ranging_data(current_state_id, graph, initial_values, range_observations)
+        self.add_ranging_data(new_state_id, graph, initial_values, range_observations)
 
         ## Updating graph and internal data with the posterior
         self.isam.update(graph, initial_values)
         # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
         post = self.isam.calculateEstimate()
-        self._state = gt.NavState(post.atPose3(x), post.atVector3(v)) # NOTE TODO when connecting IMU add velocity tracking (also for ZUPT) need to use v symbol upstream
+        self._state = gt.NavState(post.atPose3(v_new), post.atVector3(v_new)) # NOTE TODO when connecting IMU add velocity tracking (also for ZUPT) need to use v symbol upstream
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
-        covariance = self.isam.marginalCovariance(x)
+        covariance = self.isam.marginalCovariance(x_new)
         self.covars = (
             covariance[3, 3],
             covariance[4, 4],
@@ -310,7 +310,7 @@ class FactorGraph:
             delta_body = pose.rotation().unrotate(delta_world)
             return delta_body
         ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # ~~~constant velocity so very loose (except on z cause expect less mvt that way)
-        x = current_state_symbol
+        x = gt.symbol('x', current_state_id)
         ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
         # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
         # which would directly be ~equivalent to blindly trilaterating and discarding each step. 
