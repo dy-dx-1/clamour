@@ -49,10 +49,10 @@ class FactorGraph:
         if imu_accel_covar_density and imu_gyro_covar_density: 
             self.imu_accel_covar_density = imu_accel_covar_density 
             self.imu_gyro_covar_density  = imu_gyro_covar_density
-            self.pim  = self.create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
+            self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
         # Creating prior factor that locks rotation and position at initial estimate
         # Internal state tracker is a NavState for Pose and Velocity 
-        self._state = self.insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, anchors_range_data) 
+        self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, anchors_range_data) 
 
     ### Properties
     @property
@@ -149,24 +149,24 @@ class FactorGraph:
         pass
 
     ### -------------------------------------------------- INTERNAL COMPUTATION METHODS --------------------------------------------------
-    def insert_init_prior(self, state_key, graph, initial_values, yaw_prior:float, anchors_range_data:list[RangeObservation])->gt.NavState: 
+    def _insert_init_prior(self, state_key, graph, initial_values, yaw_prior:float, anchors_range_data:list[RangeObservation])->gt.NavState: 
         """
-        Constrains the initial state of the graph with a rotation lock & sufficient range data to multilaterate the position. \n
+        Constrains the initial state of the graph with a rotation lock & sufficient range data to multilaterate the position. 
 
-        Only to be used in __init__! 
+        Only to be used in __init__! \n 
         NOTE: **Currently supposing graph is initialized while stationnary!**
-        NOTE: To avoid imprecise/unstable measures, one should ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
+        NOTE: To avoid imprecise/unstable measures, ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
         """     
         x0 = gt.symbol('x', state_key)  
-        ### ROTATION LOCK 
+        # ROTATION LOCK 
         throwaway_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
         graph.add(gt.PriorFactorPose3(x0, 
                                       gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
-        ### POSITION LOCK 
+        # POSITION LOCK 
         self.add_ranging_data(state_key, graph, initial_values, anchors_range_data)
-        ### GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
+        # GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
         post_pose = self.isam.calculateEstimate().atPose3(x0) 
         covariance = self.isam.marginalCovariance(x0)
@@ -180,7 +180,7 @@ class FactorGraph:
         )
         return gt.NavState(post_pose, np.zeros(3))  
 
-    def create_imu_pim_obj(self, state_key, graph, initial): 
+    def _create_imu_pim_obj(self, state_key, graph, initial): 
         """
         Creates a gtsam.PreintegratedCombinedMeasurements object, which will be used to do IMU pre-integration with the CombinedImuFactor
         """
