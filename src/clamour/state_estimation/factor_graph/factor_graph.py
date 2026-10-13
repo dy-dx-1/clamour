@@ -138,11 +138,12 @@ class FactorGraph:
 
     def add_ranging_data(self, state_symbol, state_id, graph, initial_values, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple]): 
         """
-        Add anchor and tag ranging data of a new state to the graph. Does not add an initial belief to our own state. 
+        Adds anchor and tag ranging data to a graph state without adding a prior or solving for it. 
         - state_symbol: gt.Symbol of the new state to add to the graph 
         - state_id: Key corresponding to the new state 
         - graph: Factor Graph object 
         - initial_values: Values object related to the graph 
+        # TODO modify this function and it's implementations to use a single list of RangeObservation dataclasses as arg. 
         - anchors_ranging_data: list of measurements [(anchor_id, range), ...] 
         - tags_ranging_data: list of measurements [(neighbor_id, neighbor_pose, range), ...]
         """
@@ -150,9 +151,9 @@ class FactorGraph:
         # ANCHORS
         for id, z in anchors_ranging_data: 
             anchor = gt.symbol('a', id) 
-            anchor_pos = anchors.anchors_dict[id] # Tuple of the x, y, z coordinates in cm
             if id not in self.seen_anchors:
                 # ONLY if we have never seen this anchor -> need to add a prior on it's position 
+                anchor_pos = anchors.anchors_dict[id] 
                 graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
                 initial_values.insert(anchor, gt.Point3(*anchor_pos))
                 self.seen_anchors.add(id) 
@@ -174,7 +175,8 @@ class FactorGraph:
 
     def add_imu_link(self, state_symbol, state_id, graph, initial_values, timed_imu_samples:list[TimedIMUSample]):
         """
-        Adds IMU data to the factor graph & uses it to set an initial belief on the state. 
+        Preintegrates IMU data to add a motion factor from the previous state to the next. \n 
+        The new state is initialized with a prior defined by the preintegration. 
         - state_symbol: gt.Symbol of the new state to add to the graph 
         - state_id: Key corresponding to the new state 
         - graph: Factor Graph object 
@@ -248,21 +250,16 @@ class FactorGraph:
         rot = self.state.R().ypr() # 1D array [yaw, pitch, roll]
         return Pose(position[0], position[1], position[2], heading=rot[0], pitch=rot[1], roll=rot[2], covar=self.covars)
 
-    def incorporate_ranging_data(self, timestamp: float, range_observations:list, raw_yaw:float):
+    def advance_to(self, timestamp:float, imu_data:list[TimedIMUSample]|None, range_observations:list):
         """
-        Called whenever we get new ranges from anchors or tags to add to the factor graph.
-        The estimator-facing contract is a single list of RangeObservation objects,
-        which are split here into anchor and tag observations for the graph internals.
-        NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model.
+        Creates a new state in the FG, linked to the previous by a motion factor and supported by external measurements if available. 
+        Optimizes the graph and internal data with the posterior. 
+        This function should be called every STATE_INTERVAL seconds by estimator.py 
         """
-        # TODO replace current_state by new state to make it clearer?
         if not self.validate_update(timestamp):
             # If the timestamp is not valid, don't use this data for an update
             return
-
-        anchor_ranges = [(obs.target_id, obs.distance_cm) for obs in range_observations if obs.is_anchor]
-        tag_ranges = [(obs.target_id, obs.target_pose, obs.distance_cm) for obs in range_observations if not obs.is_anchor and obs.target_pose is not None]
-
+        
         ## Initialize the new section of the graph and the new state
         graph = gt.NonlinearFactorGraph()
         initial_values = gt.Values()
@@ -271,10 +268,13 @@ class FactorGraph:
         x = gt.symbol('x', current_state_id)
         v = gt.symbol('v', current_state_id)
 
-        ## Linking states together
-        self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
+        ## Motion factor 
+        if imu_data is None: 
+            self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
+        else:
+            self.add_imu_link()
 
-        ## Adding ranges
+        ## External measurements 
         self.add_ranging_data(x, current_state_id, graph, initial_values, anchor_ranges, tag_ranges)
 
         ## Updating graph and internal data with the posterior
@@ -291,7 +291,7 @@ class FactorGraph:
             covariance[3, 4],
             covariance[3, 5],
             covariance[4, 5],
-        )
+        )   
 
     def zero_movement_update(self, timestamp: float) -> None:
         """Temporarily constrain the next pose to the current one after an input gap.
