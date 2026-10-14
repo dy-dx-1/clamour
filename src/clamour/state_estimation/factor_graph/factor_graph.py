@@ -90,7 +90,7 @@ class FactorGraph:
         if imu_data is None: 
             self.add_constant_velocity_link(graph, initial_values, new_state_id)
         else:
-            self._add_imu_link()
+            self._add_imu_link(new_state_id, graph, initial_values, imu_data)
 
         ## External measurements 
         self.add_ranging_data(new_state_id, graph, initial_values, range_observations)
@@ -99,7 +99,7 @@ class FactorGraph:
         self.isam.update(graph, initial_values)
         # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
         post = self.isam.calculateEstimate()
-        self._state = gt.NavState(post.atPose3(v_new), post.atVector3(v_new)) # NOTE TODO when connecting IMU add velocity tracking (also for ZUPT) need to use v symbol upstream
+        self._state = gt.NavState(post.atPose3(x_new), post.atVector3(v_new))
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
         covariance = self.isam.marginalCovariance(x_new)
         self.covars = (
@@ -262,28 +262,28 @@ class FactorGraph:
         - initial_values: Values object related to the graph 
         """
         x_old, v_old, b_old = gt.symbol('x', state_id-1), gt.symbol('v', state_id-1), gt.symbol('b', state_id-1)
-        x_new, v_new, b_new = gt.symbol('x', state_id), gt.symbol('v', state_id), gt.symbol('b', state_id)
-        # Pre integrating data 
+        x_new, v_new, b_new = gt.symbol('x', state_id),   gt.symbol('v', state_id),   gt.symbol('b', state_id)
+        # IMU Preintegration
         prev_ts = timed_imu_samples[0].timestamp_ns # preintegration from (start, end]
         for imu_sample in timed_imu_samples[1:]: 
             # NOTE TODO convert to proper units, check for monotonic necessary or not? 
             dt = (imu_sample.timestamp_ns-prev_ts) # convert to S 
             self.pim.integrateMeasurement(imu_sample.acceleration, imu_sample.angular_velocity, dt) 
             prev_ts = imu_sample.timestamp_ns
-        # Adding pre-integrated data to the graph as a CombinedImuFactor
-        # Using this factor removes the need of an independent BetweenFactor to track the bias (would be needed with ImuFactor) 
-        # while keeping taking into account correlations between bias drift and IMU predictions 
-        graph.add( gt.CombinedImuFactor(x_old, v_old, x_new, v_new, b_old, b_new, self.pim) )
-        # NOTE TODO check if need to track speeds in other functions? range? 
 
-        # Adding initial guess for the state with the IMU's predictions
-        # NOTE TODO: can we fetch up to date estimate of bias or do we just put back the initial one? 
-        dead_reckoned_state = self.pim.predict(self._state, imu_bias) 
+        # Adding pre-integrated data to the graph as a CombinedImuFactor
+        # This removes the need of an independent BetweenFactor to track the bias (needed with ImuFactor)
+        # while still taking into account correlations between bias drift and IMU predictions
+        graph.add( gt.CombinedImuFactor(x_old, v_old, x_new, v_new, b_old, b_new, self.pim) )
+
+        # Using IMU preintegration as initial values. Bias is set to the latest posterior. 
+        current_bias = self.isam.calculateEstimate().atConstantBias(b_old)
+        dead_reckoned_state = self.pim.predict(self._state, current_bias)
         initial_values.insert(x_new, dead_reckoned_state.pose())
         initial_values.insert(v_new, dead_reckoned_state.velocity())
-        initial_values.insert(b_new, imu_bias) 
+        initial_values.insert(b_new, current_bias)
 
-        # Make sure to clear out preintegration values for the next run 
+        # Clearing preintegration values for the next run 
         self.pim.resetIntegration()
 
     def add_constant_velocity_link(self, graph, initial_values, current_state_symbol, current_state_id): 
