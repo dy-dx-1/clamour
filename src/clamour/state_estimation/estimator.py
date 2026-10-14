@@ -240,22 +240,23 @@ class StateEstimator:
     def _drain_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> list[TimedIMUSample]:
         """Return IMU samples in (start_time_ns, boundary_time_ns], corrected for EstimatorClock time.
 
-        Process pending and newly read FIFO samples in timestamp order in one
-        pass. Samples after the boundary remain pending for the next interval;
-        samples at or before the start are discarded.
+        The pending deque is verified chronological on append, so a single O(n)
+        pass can retain the first post-boundary sample and stop. Samples at or
+        before the start are discarded because they were already assigned to an
+        earlier interval.
         """
         # The boundary always forces a final read.  Earlier watermark reads have
         # already appended their samples to the same pending deque.
         self._read_imu_fifo_into_pending()
-        pending_samples = self._pending_imu_samples
-        self._pending_imu_samples = deque()
         interval_samples = []
-        future_sample_pending = False
-        for sample in pending_samples:
-            if future_sample_pending or sample.timestamp_ns > boundary_time_ns:
-                self._pending_imu_samples.append(sample)
-                future_sample_pending = True
-            elif sample.timestamp_ns > start_time_ns:
+        while self._pending_imu_samples:
+            sample = self._pending_imu_samples.popleft()
+            if sample.timestamp_ns > boundary_time_ns:
+                # It is the first sample in the next interval.  Keeping it at
+                # the left avoids scanning/rebuilding the future FIFO backlog.
+                self._pending_imu_samples.appendleft(sample)
+                break
+            if sample.timestamp_ns > start_time_ns:
                 interval_samples.append(sample)
         return interval_samples
 
@@ -265,11 +266,17 @@ class StateEstimator:
         for raw_tick, acceleration, angular_velocity in raw_samples:
             if raw_tick is None or acceleration is None or angular_velocity is None:
                 continue
-            self._pending_imu_samples.append(TimedIMUSample(
+            sample = TimedIMUSample(
                 timestamp_ns=self.imu_clock_mapper.to_estimator_ns(raw_tick),
                 acceleration=acceleration,
                 angular_velocity=angular_velocity,
-            ))
+            )
+            if (self._pending_imu_samples and
+                    sample.timestamp_ns < self._pending_imu_samples[-1].timestamp_ns):
+                # Sorting would hide a FIFO/parser/clock-mapping defect and add
+                # O(n log n) work every interval.  FIFO order is a source contract.
+                raise RuntimeError("IMU samples are not chronological after clock conversion")
+            self._pending_imu_samples.append(sample)
 
     def _initialize_imu_clock_mapper(self) -> None:
         """Establish a clock anchor after intentionally dropping startup FIFO data."""
