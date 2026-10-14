@@ -1,8 +1,9 @@
 import csv
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from math import ceil
 from queue import Empty
+from statistics import median
 from time import sleep
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
@@ -14,7 +15,7 @@ from ..custom_terminal import print
 from ..config import SAVE_TO_CSV
 from ..interfaces import IMU, Tag, Pose
 from ..contextManagedQueue import ContextManagedQueue
-from ..messages.updateMessage import UpdateMessage
+from ..messages.updateMessage import RangeObservation, UpdateMessage
 from ..messages.soundMessage import SoundMessage
 from ..messages.types import UpdateType
 from ..rooms import Floorplan
@@ -325,19 +326,18 @@ class StateEstimator:
         for message in batch.messages:
             if message.update_type == UpdateType.TOPOLOGY:
                 self.update_neighbors(message.topology)
-            elif (message.update_type == UpdateType.RANGING and self._message_is_in_batch_interval(message, batch)):
+            elif message.update_type == UpdateType.RANGING: 
+                self.update_neighbors(message.topology)
                 range_messages.append(message)
-            elif (message.update_type == UpdateType.PEDOMETER and self._message_is_in_batch_interval(message, batch)):
+            elif message.update_type == UpdateType.PEDOMETER:
                 step_messages.append(message)
-
-        # Ranging is intentionally retained as a list here.  The first FG pass
-        # will coalesce all accepted observations into this state; any future
-        # per-anchor mean/median policy belongs in that factor-building step.
+        # Retaining only ranges in the boundary & grouping them if possible 
+        range_observations = self._coalesce_ranges( self._select_interval_ranges(range_messages, batch) )
 
         # Create the new state and integrate the info from the sensor batch. 
         # if no IMU data is provided, a constant velocity model will be used 
-        self.estimator.advance_to() 
-
+        self.estimator.advance_to(batch.boundary_time_ns,batch.imu_samples or None,range_observations) 
+            
         """ 
         PEDOMETER AND CUSTOM POSES NOT YET IMPLEMENTED
         # A step must become a relative step factor between timestamp-bracketing
@@ -352,41 +352,42 @@ class StateEstimator:
         """
         
         # Optimise and publish
-        self.publish_state(range_messages[-1] if range_messages else None)
+        self.publish_state(range_messages[-1] if range_observations else None)
 
     @staticmethod
-    def _message_is_in_batch_interval(message: UpdateMessage, batch: SensorBatch) -> bool:
-        """Accept only events in this half-open state interval.
+    def _select_interval_ranges(messages: list[UpdateMessage], batch: SensorBatch) -> list[RangeObservation]:
+        """Extract RangeObservations from a list of UpdateMessages that are in the boundary interval of the SensorBatch"""
+        return [
+            observation for message in messages for observation in message.range_observations
+            if batch.start_time_ns < observation.event_time_ns <= batch.boundary_time_ns
+        ]
 
-        Stale and future range/step messages are discarded for now.  A later
-        reorder buffer may retain late events and attach them to historical graph states *if needed*. 
+    @staticmethod
+    def _coalesce_ranges(observations: list[RangeObservation]) -> list[RangeObservation]:
+        """Group anchor ranges by median; preserve tag ranges as independent factors.
+
+        Median limits the influence of a short NLOS outlier burst without
+        pretending repeated UWB samples are independent. Tag ranges are kept separate 
+        because the neighbor's position and covariance might evolve significantly during the batch. 
         """
-        return batch.start_time_ns < message.timestamp <= batch.boundary_time_ns
+        anchor_groups: dict[int, list[RangeObservation]] = defaultdict(list)
+        tag_observations = []
+        for observation in observations:
+            if observation.is_anchor:
+                anchor_groups[observation.target_id].append(observation)
+            else:
+                tag_observations.append(observation)
 
-    def _apply_batched_ranges(self, messages: list[UpdateMessage]) -> None:
-        """Apply a batched range observation list to the estimator backend."""
-        all_range_observations = []
-        for message in messages:
-            self.update_neighbors(message.topology)
-            all_range_observations.extend(message.range_observations)
-
-        latest = messages[-1]
-        self.estimator.incorporate_ranging_data(
-            latest.timestamp,
-            all_range_observations,
-            latest.measured_yaw,
-        )
-
-    def _queue_step_constraints(self, messages: list[UpdateMessage], batch: SensorBatch) -> None:
-        """Extension point for timestamped relative pedometer factors.
-
-        Step events may be delivered after their physical event time.  The final
-        implementation will place each one between retained graph states using
-        that event time, rather than treating it as a current absolute pose.
-        """
-        # TODO: convert the pedometer producer to emit a StepEvent with peak time,
-        # stride/heading uncertainty, and a common-clock timestamp.
-        return
+        coalesced_anchors = [
+            RangeObservation(
+                target_id=target_id,
+                distance_cm=median(item.distance_cm for item in grouped),
+                event_time_ns=max(item.event_time_ns for item in grouped),
+                is_anchor=True,
+            )
+            for target_id, grouped in anchor_groups.items()
+        ]
+        return coalesced_anchors + tag_observations
 
     def update_neighbors(self, neighbors: dict):
         self.last_known_neighbors = neighbors
