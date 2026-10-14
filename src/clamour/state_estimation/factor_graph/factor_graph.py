@@ -35,7 +35,7 @@ class FactorGraph:
         self.last_measurement_time_ns = timestamp_ns
         self.dt = None 
         
-        # Graph trackers 
+        ## Graph trackers 
         self._state_counter = -1   # How many state nodes have been added to the graph
         self.seen_anchors = set()  # Anchors we have previously seen; to avoid re-adding prior factors
         self.isam = gt.ISAM2() 
@@ -49,8 +49,8 @@ class FactorGraph:
             self.imu_accel_covar_density = imu_accel_covar_density 
             self.imu_gyro_covar_density  = imu_gyro_covar_density
             self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
-        # Creating prior factor that locks rotation and position at initial estimate
-        # Internal state tracker is a NavState for Pose and Velocity 
+        # Initializing the state by locking rotation and position 
+        # Internal state tracker is a NavState for Pose3 and Velocity. Public access is the pose() property, which formats it into a Pose container.
         self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, range_observations) 
 
     ### Properties
@@ -88,7 +88,7 @@ class FactorGraph:
 
         ## Motion factor 
         if imu_data is None: 
-            self.add_constant_velocity_link(graph, initial_values, new_state_id)
+            self._add_constant_velocity_link(graph, initial_values, new_state_id)
         else:
             self._add_imu_link(new_state_id, graph, initial_values, imu_data)
 
@@ -286,11 +286,11 @@ class FactorGraph:
         # Clearing preintegration values for the next run 
         self.pim.resetIntegration()
 
-    def add_constant_velocity_link(self, graph, initial_values, current_state_symbol, current_state_id): 
+    def _add_constant_velocity_link(self, current_state_id, graph, initial_values): 
         """
-        Uses a constant velocity model to loosely link states with a BetweenFactorPose 
-        NOTE TODO The function is ready to use but I haven't configured support to switch to it 
-        Leaving it here to facilitate deploying the code on non-IMU platforms in the future if needed. 
+        Uses a constant velocity model to loosely link states with a BetweenFactorPose and uses the relative movement to seed the solver. 
+
+        Note that this simple model cannot track rotations so the orientation is left unchanged. 
         """
         def constant_velocity_model(nav_state): 
             """
@@ -317,8 +317,8 @@ class FactorGraph:
         # Having even a loose motion model allows us to link states and smooth the global trajectory, for example, correcting sudden bad trilaterations due to NLOS. 
         # Any information is useful information to include, as long as it's even slightly relevant, as it will affect the joint posterior. 
         x_prev = gt.symbol('x', current_state_id-1) # fetching past state (corresponding to the current value of self.x)
-        # Connecting to previous state through a motion model 
+        # Motion model
         delta_local_frame = constant_velocity_model(self._state) # Supposing constant velocity, what would be the local vector to the new state?
-        mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )    # NOTE simple constant velocity model keeps yaw constant
-        graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
-        initial_values.insert(x, self._state.compose(mvt))
+        relative_mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )  
+        graph.add(gt.BetweenFactorPose3(x_prev, x, relative_mvt, ODOMETRY_NOISE))
+        initial_values.insert(x, self._state.compose(relative_mvt))
