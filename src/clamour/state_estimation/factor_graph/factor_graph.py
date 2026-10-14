@@ -20,20 +20,19 @@ IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to th
 IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
 
 class FactorGraph: 
-    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, timestamp_ns:int, imu_accel_covar_density:float, imu_gyro_covar_density:float):
+    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, initial_state_time_ns:int, imu_accel_covar_density:float, imu_gyro_covar_density:float):
         """
         Factor Graph based 3D pose estimator. 
         - range_observations: Range observations used to initialize the graph; at least 3 anchors are required to fully initialize the prior position.
         - prior_yaw: prior yaw value on initialization **[rad]** 
-        - timestamp_ns: initial event time on EstimatorClock, used to calculate dt
+        - initial_state_time_ns: EstimatorClock timestamp of the initial graph state
         NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
         NOTE on units: 
         - All angle units are **radians** 
         - All spatial units are **cm-based**
             - The graph doesn't care about this unit as long as it's fully internally consistent, but enforcing cm until we have proper code-wide documentation and unit standardisation to be safer. (For example, gravity vector in graph should be updated if change of units)
         """
-        self.last_measurement_time_ns = timestamp_ns
-        self.dt = None 
+        self.last_state_time_ns = initial_state_time_ns
         
         ## Graph trackers 
         self._state_counter = -1   # How many state nodes have been added to the graph
@@ -68,15 +67,16 @@ class FactorGraph:
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
     
-    def advance_to(self, timestamp:float, imu_data:list[TimedIMUSample]|None, range_observations:list[RangeObservation]):
+    def advance_to(self, state_boundary_ns:int, imu_data:list[TimedIMUSample], range_observations:list[RangeObservation]):
         """
         Creates a new state in the FG, linked to the previous by a motion factor and supported by external measurements if available. 
         Optimizes the graph and internal data with the posterior. 
         This function should be called every STATE_INTERVAL seconds by estimator.py 
         """
-        if not self.validate_update(timestamp):
-            # If the timestamp is not valid, don't use this data for an update
-            return
+        # state_boundary_ns is the timestamp of the new cadence state, not
+        # the first/last IMU sample or a range timestamp.  The coordinator owns
+        # measurement validity; this only protects the graph's state timeline.
+        dt_s = self._prepare_new_state(state_boundary_ns)
         
         ## Initialize the new section of the graph and the new state
         graph = gt.NonlinearFactorGraph()
@@ -87,8 +87,8 @@ class FactorGraph:
         v_new = gt.symbol('v', new_state_id)
 
         ## Motion factor 
-        if imu_data is None: 
-            self._add_constant_velocity_link(graph, initial_values, new_state_id)
+        if len(imu_data) == 0: 
+            self._add_constant_velocity_link(new_state_id, graph, initial_values, dt_s)
         else:
             self._add_imu_link(new_state_id, graph, initial_values, imu_data)
 
@@ -111,7 +111,7 @@ class FactorGraph:
             covariance[4, 5],
         )   
 
-    def zero_movement_update(self, timestamp: float) -> None:
+    def zero_movement_update(self, state_boundary_ns: int) -> None:
         """Temporarily constrain the next pose to the current one after an input gap.
 
         This mirrors the EKF's synthetic zero-movement update to limit drift from
@@ -119,8 +119,7 @@ class FactorGraph:
         really means the tag is stationary; it will be replaced by IMU-based
         propagation and stationary detection.
         """
-        if not self.validate_update(timestamp):
-            return
+        self._prepare_new_state(state_boundary_ns)
 
         graph = gt.NonlinearFactorGraph()
         initial_values = gt.Values()
@@ -203,19 +202,23 @@ class FactorGraph:
         # Using combined version as we'll use CombinedImuFactor later
         return gt.PreintegratedCombinedMeasurements(pim_params, imu_bias)
 
-    def validate_update(self, timestamp_ns:int)->bool:
+    def _prepare_new_state(self, state_boundary_ns: int) -> float:
+        """Advance the graph-state clock and return its duration in seconds.
+
+        ``state_boundary_ns`` must be the canonical EstimatorClock timestamp for
+        the *new state boundary*.  It must not be a range timestamp or the first
+        or last IMU sample timestamp.  A non-increasing boundary is a coordinator
+        bug, so fail rather than silently omitting a scheduled graph state.
         """
-        To be called before an update. Adjusts the internal timestamp and speed for the constant velocity model. 
-        Returns bool depending on if the update can be applied. 
-        NOTE: eventually, this will be replaced by an IMU factor 
-        """
-        if timestamp_ns > self.last_measurement_time_ns:
-            self.dt = (timestamp_ns - self.last_measurement_time_ns) / NANOSECONDS_PER_SECOND
-            self.last_measurement_time_ns = timestamp_ns
-            return True 
-        else: 
-            print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')
-            return False 
+        if state_boundary_ns <= self.last_state_time_ns:
+            raise ValueError(
+                "FactorGraph received a non-increasing state boundary: "
+                f"{state_boundary_ns} <= {self.last_state_time_ns}"
+            )
+
+        dt_s = (state_boundary_ns - self.last_state_time_ns) / NANOSECONDS_PER_SECOND
+        self.last_state_time_ns = state_boundary_ns
+        return dt_s
 
     def _add_ranging_data(self, state_key, graph, initial_values, range_observations:list[RangeObservation]): 
         """
@@ -286,7 +289,7 @@ class FactorGraph:
         # Clearing preintegration values for the next run 
         self.pim.resetIntegration()
 
-    def _add_constant_velocity_link(self, current_state_id, graph, initial_values): 
+    def _add_constant_velocity_link(self, current_state_id, graph, initial_values, dt_s: float):
         """
         Uses a constant velocity model to loosely link states with a BetweenFactorPose and uses the relative movement to seed the solver. 
 
@@ -304,7 +307,7 @@ class FactorGraph:
             """
             pose, vel = nav_state.pose(), nav_state.velocity()
             # Expected delta in the global reference frame 
-            delta_world = gt.Point3(vel[0]*self.dt, vel[1]*self.dt, vel[2]*self.dt)
+            delta_world = gt.Point3(vel[0]*dt_s, vel[1]*dt_s, vel[2]*dt_s)
             # Mapping it to the local frame so BetweenFactor can be applied 
             # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
             delta_body = pose.rotation().unrotate(delta_world)
