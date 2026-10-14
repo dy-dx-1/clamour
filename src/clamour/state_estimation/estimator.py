@@ -312,10 +312,7 @@ class StateEstimator:
         ranges into one legacy backend call while leaving step and pose events out
         of the old pseudo-measurement paths.
         """
-        # 1. IMU: preintegrate every sample in (start, boundary] to create a motion link 
-        self.estimator.add_imu_link(batch.imu_samples)
-
-        # 2. Parsing messages
+        # Parsing messages
         range_messages = [] 
         step_messages = [] 
         for message in batch.messages:
@@ -326,18 +323,15 @@ class StateEstimator:
             elif message.update_type == UpdateType.PEDOMETER: 
                 step_messages.append(message)
 
-        # 3. Create a state and its motion link.  Future FactorGraph support will
-        # use IMU preintegration when available, otherwise its explicit
-        # constant-velocity/random-walk factor.  No synthetic zero-motion factor
-        # belongs here.
-        # self.estimator.advance_to(batch.boundary_time_ns, preintegrated_imu=...)
+        # Verify timestamps for each message match boundary 
+        # TODO 
 
-        # 4. Add all range observations for the interval, then optimise once.  The
-        # temporary adapters expose the intended batching behaviour to the EKF and
-        # current factor-graph APIs; the final API will accept a SensorBatch.
-        if range_messages:
-            self._apply_batched_ranges(range_messages)
+        # Create the new state and integrate the info from the sensor batch. 
+        # if no IMU data is provided, a constant velocity model will be used 
+        self.estimator.advance_to() 
 
+        """ 
+        PEDOMETER AND CUSTOM POSES NOT YET IMPLEMENTED
         # A step must become a relative step factor between timestamp-bracketing
         # states; it is not an absolute pose update and should not be treated as
         # one during the state-interval batch.
@@ -347,10 +341,9 @@ class StateEstimator:
         # CustomOdometry is intentionally not forwarded here.  It will either be
         # removed with the retired Cognifly integration or reintroduced later as a
         # generic, explicitly framed PoseObservation factor.
-
-        # 5. Optimise and publish at the state cadence.  Current backends optimise
-        # inside _apply_batched_ranges; a no-range interval therefore publishes the
-        # latest posterior until their explicit advance_to() contract is added.
+        """
+        
+        # Optimise and publish
         self.publish_state(range_messages[-1] if range_messages else None)
 
     def _apply_batched_ranges(self, messages: list[UpdateMessage]) -> None:
@@ -413,6 +406,7 @@ class StateEstimator:
         - Prints out the current posterior from the estimator
         - Saves to CSV if configured to do so (config.py) 
         - Updates the sound queue if available 
+        TODO: remove requirement of a message arg. Update CSV to not need this as it makes it less clean
         """
         pose = self.estimator.pose
 
