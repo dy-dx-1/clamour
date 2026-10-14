@@ -336,7 +336,7 @@ class StateEstimator:
 
         # Create the new state and integrate the info from the sensor batch. 
         # if no IMU data is provided, a constant velocity model will be used 
-        self.estimator.advance_to(batch.boundary_time_ns,batch.imu_samples or None,range_observations) 
+        self.estimator.advance_to(batch.boundary_time_ns, batch.imu_samples, range_observations) 
             
         """ 
         PEDOMETER AND CUSTOM POSES NOT YET IMPLEMENTED
