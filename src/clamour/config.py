@@ -30,15 +30,15 @@ IMU_TYPE = "LSM6DSV320X"
 # The following parameters are specific to each individual hardware unit 
 # Scale factor 
 # NOTE TODO fix all units in this section 
-IMU_ACCEL_SCALE_FACTOR = np.array([[1.0017558373609916,      0.0,                  0.0],
-                                   [0.006256910346063383,    1.0018358510192535,   0.0],
-                                   [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
-IMU_GYRO_SCALE_FACTOR  =  np.array([[1.0,0.0,0.0],
+IMU_ACCEL_SCALE_FACTOR_MG = np.array([[1.0017558373609916,      0.0,                  0.0],
+                                     [0.006256910346063383,    1.0018358510192535,   0.0],
+                                     [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
+IMU_GYRO_SCALE_FACTOR_MDPS  =  np.array([[1.0,0.0,0.0],
                                     [0.0,1.0,0.0],
                                     [0.0,0.0,1.0]])
 # Initial bias from calibration, the FG estimates its drift automatically
-IMU_ACCEL_INITIAL_BIAS = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
-IMU_GYRO_INITIAL_BIAS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
+IMU_ACCEL_INITIAL_BIAS_MG   = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
+IMU_GYRO_INITIAL_BIAS_MDPS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
 # Covariance on the bias. Variance of the initial bias value when calibrating. 
 IMU_ACCEL_INITIAL_BIAS_COV = None 
 IMU_GYRO_INITIAL_BIAS_COV  = None 

@@ -54,18 +54,7 @@ def uint16_to_int16(value:int)->int:
     """ 
     return value - 0x10000 if value & 0x8000 else value
 
-class LSM6DSV320X(IMU):
-    ### ACCEL/GYRO CALIBRATION VALUES: calibrated_measure = scale_factor @ (raw_measure-bias)
-    ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
-    ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
-    ## Units are in mgs and mdps. 
-    # Scale Factor (always used internally) 
-    accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
-                                   [0.006256910346063383,    1.0018358510192535,   0.0],
-                                   [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
-    gyro_scale_factor  =  np.array([[1,0,0],
-                                    [0,1,0],
-                                    [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others. 
+class LSM6DSV320X(IMU): 
     # Bias (general fixed rough values for the class) 
     # Clamour uses the values in config.py, not here. These are just for testing when importing this file.
     # convert_accel_bytes_to_mgs() and convert_gyro_bytes_to_mdps() have params to return or not bias compensated values for this. 
@@ -116,6 +105,21 @@ class LSM6DSV320X(IMU):
             self.bus.close() 
         except: 
             pass
+
+    ### ACCEL/GYRO CALIBRATION VALUES: calibrated_measure = scale_factor @ (raw_measure-bias)
+    ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
+    ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
+    @property
+    def accel_scale_factor_mg(self):
+        return np.array([[1.0017558373609916,      0.0,                  0.0],
+                        [0.006256910346063383,    1.0018358510192535,   0.0],
+                        [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
+
+    @property
+    def gyro_scale_factor_mdps(self):
+        return np.array([[1,0,0],
+                        [0,1,0],
+                        [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others.
 
     @property
     def accel_covar_density_mg(self):
@@ -177,7 +181,7 @@ class LSM6DSV320X(IMU):
             self.LSB_TO_MG * uint16_to_int16(y),
             self.LSB_TO_MG * uint16_to_int16(z),
             self.accel_bias,
-            self.accel_scale_factor,
+            self.accel_scale_factor_mg,
             apply_bias,
         )
 
@@ -191,7 +195,7 @@ class LSM6DSV320X(IMU):
             self.LSB_TO_MDPS * uint16_to_int16(roll),
             self.LSB_TO_MDPS * uint16_to_int16(yaw),
             self.gyro_bias,
-            self.gyro_scale_factor,
+            self.gyro_scale_factor_mdps,
             apply_bias,
         )
 

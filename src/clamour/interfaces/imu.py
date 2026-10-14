@@ -1,11 +1,32 @@
 from abc import ABC, abstractmethod
+import numpy as np 
 
 # Expected format is (timestamp, acceleration, gyro) 
+# timestamps in raw ticks
+# acceleration in mg and gyro in mdps 
 RawIMUSample = tuple[int | None, object | None, object | None]
 
 
 class IMU(ABC):
-    """Generic IMU interface; timestamps remain raw sensor ticks. These values should all be from the datasheet."""
+    """
+    Generic IMU interface; timestamps remain raw sensor ticks. These values should all be from the datasheet.
+    
+    The IMU must internally apply scale factor correction but not bias as the FG will handle this. 
+    Values read from FIFO must be raw tick timestamps, mg for acceleration and mdps for gyro.
+    """
+    ### ACCEL/GYRO SCALE FACTOR 
+    # IMU must internally apply scale factor correction to values read from FIFO 
+    # Bias is not an abstractclass requirement as it needs to be defined in config.py . IMU samples should NOT be bias corrected. 
+    @property
+    @abstractmethod
+    def accel_scale_factor_mg(self) -> np.ndarray: 
+        """3x3 scale factor matrix in mgs. Will be overwritten by config value on IMU instanciation.
+           Here to highlight that the IMU must internally apply this to it's FIFO-read values."""
+    @property
+    @abstractmethod
+    def gyro_scale_factor_mg(self) -> np.ndarray: 
+        """3x3 scale factor matrix in mdps. Will be overwritten by config value on IMU instanciation.
+           Here to highlight that the IMU must internally apply this to it's FIFO-read values."""        
 
     ### ACCEL/GYRO COVARIANCE  
     # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 

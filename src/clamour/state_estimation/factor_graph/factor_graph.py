@@ -1,23 +1,28 @@
 import gtsam as gt 
 import numpy as np 
 
-from ...custom_terminal import print 
 from ..estimator import TimedIMUSample
+from ...custom_terminal import print 
 from ...messages import RangeObservation
 from ...interfaces import Anchors, Pose
 from ...estimator_clock import NANOSECONDS_PER_SECOND
 from ...config import (ANCHOR_POS_UNCERTAINTY,
-                        IMU_ACCEL_INITIAL_BIAS, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
-                        IMU_GYRO_INITIAL_BIAS,  IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
+                        IMU_ACCEL_INITIAL_BIAS_MG, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
+                        IMU_GYRO_INITIAL_BIAS_MDPS,  IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
+ANCHORS = Anchors()
 
-anchors = Anchors()
 ### Defining noise models 
-## Units in cm, like the rest of the graph
+# The graph operates internally with CM for spatial units and RAD for angular. 
+# The posterior pose accessed externally is in CM-based units, BUT with DEG for angular 
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY]) # uncertainty in anchor placement
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
-ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
+ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1]) # NOTE TODO might be removed in the future if zero movement update is not reintegrated
+
+IMU_ACCEL_INITIAL_BIAS = IMU_ACCEL_INITIAL_BIAS_MG  * MG_TO_CM_PER_S2
+IMU_GYRO_INITIAL_BIAS  = IMU_GYRO_INITIAL_BIAS_MDPS * MDPS_TO_RAD_PER_S
 IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
 IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
+GRAVITY_CM_S2 = 980.665 # cm/s^2 
 
 class FactorGraph: 
     def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, initial_state_time_ns:int, imu_accel_covar_density:float, imu_gyro_covar_density:float):
@@ -60,7 +65,7 @@ class FactorGraph:
 
     @property
     def pose(self) -> Pose:
-        """The posterior pose after running the estimator, or the last estimate if we didn't run it yet"""
+        """The posterior `Pose` in it's corresponding units after running the estimator, or the last estimate if we didn't run it yet"""
         position = self._state.t()  # 1D array [x, y, z]
         rot = self._state.R().ypr() # 1D array [yaw, pitch, roll]
         return Pose(position[0], position[1], position[2], heading=rot[0], pitch=rot[1], roll=rot[2], covar=self.covars)
@@ -158,7 +163,7 @@ class FactorGraph:
         x0 = gt.symbol('x', state_key)  
         # ROTATION LOCK 
         anchor_observations = [observation for observation in range_observations if observation.is_anchor]
-        throwaway_pos = anchors.get_centroid_for(*(observation.target_id for observation in anchor_observations))
+        throwaway_pos = ANCHORS.get_centroid_for(*(observation.target_id for observation in anchor_observations))
         graph.add(gt.PriorFactorPose3(x0, 
                                       gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
@@ -184,7 +189,7 @@ class FactorGraph:
         Creates a gtsam.PreintegratedCombinedMeasurements object, which will be used to do IMU pre-integration with the CombinedImuFactor
         """
         # Defining Z axis pointing up. The factor will then handle gravity measurements internally. 
-        pim_params = gt.PreintegrationCombinedParams.MakeSharedU(9.806)
+        pim_params = gt.PreintegrationCombinedParams.MakeSharedU(GRAVITY_CM_S2)
         # Defining covariances (noise models) 
         pim_params.setAccelerometerCovariance(self.imu_accel_covar_density)
         pim_params.setGyroscopeCovariance(self.imu_gyro_covar_density)
@@ -233,7 +238,7 @@ class FactorGraph:
                 anchor = gt.symbol('a', target_id)
                 if target_id not in self.seen_anchors:
                     # Add a prior only the first time this anchor is observed.
-                    anchor_pos = anchors.anchors_dict[target_id]
+                    anchor_pos = ANCHORS.anchors_dict[target_id]
                     graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
                     initial_values.insert(anchor, gt.Point3(*anchor_pos))
                     self.seen_anchors.add(target_id)
@@ -266,11 +271,10 @@ class FactorGraph:
         """
         x_old, v_old, b_old = gt.symbol('x', state_id-1), gt.symbol('v', state_id-1), gt.symbol('b', state_id-1)
         x_new, v_new, b_new = gt.symbol('x', state_id),   gt.symbol('v', state_id),   gt.symbol('b', state_id)
-        # IMU Preintegration
-        prev_ts = timed_imu_samples[0].timestamp_ns # preintegration from (start, end]
+        # IMU Preintegration in the interval (start, end]
+        prev_ts = timed_imu_samples[0].timestamp_ns 
         for imu_sample in timed_imu_samples[1:]: 
-            # NOTE TODO convert to proper units, check for monotonic necessary or not? 
-            dt = (imu_sample.timestamp_ns-prev_ts) # convert to S 
+            dt = (imu_sample.timestamp_ns-prev_ts) / NANOSECONDS_PER_SECOND # needs to be in seconds for preintegration 
             self.pim.integrateMeasurement(imu_sample.acceleration, imu_sample.angular_velocity, dt) 
             prev_ts = imu_sample.timestamp_ns
 
