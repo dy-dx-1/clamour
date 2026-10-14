@@ -93,7 +93,7 @@ class FactorGraph:
             self._add_imu_link(new_state_id, graph, initial_values, imu_data)
 
         ## External measurements 
-        self.add_ranging_data(new_state_id, graph, initial_values, range_observations)
+        self._add_ranging_data(new_state_id, graph, initial_values, range_observations)
 
         ## Updating graph and internal data with the posterior
         self.isam.update(graph, initial_values)
@@ -165,7 +165,7 @@ class FactorGraph:
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
         # POSITION LOCK 
-        self.add_ranging_data(state_key, graph, initial_values, range_observations)
+        self._add_ranging_data(state_key, graph, initial_values, range_observations)
         # GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
         post_pose = self.isam.calculateEstimate().atPose3(x0) 
@@ -217,12 +217,12 @@ class FactorGraph:
             print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')
             return False 
 
-    def add_ranging_data(self, state_id, graph, initial_values, range_observations:list[RangeObservation]): 
+    def _add_ranging_data(self, state_key, graph, initial_values, range_observations:list[RangeObservation]): 
         """
         Adds anchor and tag range observations to a graph state without adding a prior or solving for it.
         """
-        print(f"Adding range observations {range_observations}", 'info', 'loc')
-        x = gt.symbol('x', state_id) 
+        print(f"Adding range observations {[f"{ro.target_id}: {ro.distance_cm}cm" for ro in range_observations]}", 'info', 'loc')
+        x = gt.symbol('x', state_key) 
         for observation in range_observations:
             target_id = observation.target_id
             distance = observation.distance_cm
@@ -242,9 +242,9 @@ class FactorGraph:
                 n_pos = observation.target_pose.coordinates
                 n_cov = observation.target_pose.covar
                 if n_cov is None:
-                    raise ValueError(f"Tag range observation for target {target_id} has no pose covariance")
-                # Adding the other tag's position to the graph with a special ID that tracks his position and the time
-                neighbor = gt.symbol('t', int(f'{target_id}000{state_id}')) 
+                    raise ValueError(f"Tag range observation for target {target_id} has no pose covariance. This shouldn't happen, check why the task.py check didn't work.")
+                # Adding the other tag's position to the graph with a special ID that tracks it's position and the state
+                neighbor = gt.symbol('t', int(f'{target_id}000{state_key}')) 
                 # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
                 # If an indeterminate system is thrown when ranging with neighbors, printing out the matrix and checking that it's invertible 
                 # is a good debugging step, as gt.noiseModel.Gaussian.Covariance will attempt to invert it to get the Information Matrix
