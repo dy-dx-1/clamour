@@ -325,13 +325,14 @@ class StateEstimator:
         for message in batch.messages:
             if message.update_type == UpdateType.TOPOLOGY:
                 self.update_neighbors(message.topology)
-            elif message.update_type == UpdateType.RANGING: 
+            elif (message.update_type == UpdateType.RANGING and self._message_is_in_batch_interval(message, batch)):
                 range_messages.append(message)
-            elif message.update_type == UpdateType.PEDOMETER: 
+            elif (message.update_type == UpdateType.PEDOMETER and self._message_is_in_batch_interval(message, batch)):
                 step_messages.append(message)
 
-        # Verify timestamps for each message match boundary 
-        # TODO 
+        # Ranging is intentionally retained as a list here.  The first FG pass
+        # will coalesce all accepted observations into this state; any future
+        # per-anchor mean/median policy belongs in that factor-building step.
 
         # Create the new state and integrate the info from the sensor batch. 
         # if no IMU data is provided, a constant velocity model will be used 
@@ -352,6 +353,15 @@ class StateEstimator:
         
         # Optimise and publish
         self.publish_state(range_messages[-1] if range_messages else None)
+
+    @staticmethod
+    def _message_is_in_batch_interval(message: UpdateMessage, batch: SensorBatch) -> bool:
+        """Accept only events in this half-open state interval.
+
+        Stale and future range/step messages are discarded for now.  A later
+        reorder buffer may retain late events and attach them to historical graph states *if needed*. 
+        """
+        return batch.start_time_ns < message.timestamp <= batch.boundary_time_ns
 
     def _apply_batched_ranges(self, messages: list[UpdateMessage]) -> None:
         """Apply a batched range observation list to the estimator backend."""
