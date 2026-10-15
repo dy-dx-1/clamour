@@ -316,8 +316,9 @@ class LSM6DSV320X(IMU):
         
         RETURNS:
         - A list of tuples in the form [(timestamp, accel_data, gyro_data), ...]
-            - Missing data for a sample is returned as None.
             - accel_data is in mg's, gyro_data is in mdps and timestamp is in TICKS (32-bit based) 
+            - Only complete timestamp/accel/gyro groups are returned. Incomplete
+              groups are retained across reads or discarded when superseded.
         """
         samples: list[RawIMUSample] = []
         ### Checking how many words are in the FIFO 
@@ -336,14 +337,12 @@ class LSM6DSV320X(IMU):
                     residual_words = 0 
                     break 
 
-                # A TAG_CNT transition closes the previous temporal group.  It
-                # may be incomplete on malformed data, in which case preserve
-                # the existing API behaviour and return its None fields.
+                # A TAG_CNT transition closes the previous temporal group. Drop
+                # it when incomplete: RawIMUSample never exposes partial groups.
                 if self._fifo_partial_tag_count is None:
                     self._fifo_partial_tag_count = tag_cnt
                     self._fifo_partial_sample = [None, None, None]
                 elif tag_cnt != self._fifo_partial_tag_count:
-                    samples.append(tuple(self._fifo_partial_sample))
                     self._fifo_partial_tag_count = tag_cnt
                     self._fifo_partial_sample = [None, None, None]
 
@@ -362,8 +361,8 @@ class LSM6DSV320X(IMU):
 
                 # Complete groups can be returned now; only incomplete groups
                 # need to survive until the next FIFO read.
-                if all(value is not None for value in sample):
-                    samples.append(tuple(sample))
+                if sample[0] is not None and sample[1] is not None and sample[2] is not None:
+                    samples.append((sample[0], sample[1], sample[2]))
                     self._fifo_partial_tag_count = None
                     self._fifo_partial_sample = None
             residual_words -= n_words 

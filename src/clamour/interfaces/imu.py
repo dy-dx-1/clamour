@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 import numpy as np 
 from numpy.typing import NDArray
 
-# Expected format is (timestamp, acceleration, gyro) 
-# timestamps in raw ticks
-# acceleration in mg and gyro in mdps 
-RawIMUSample = tuple[int | None, NDArray[np.float64] | None, NDArray[np.float64] | None]
+# Complete FIFO sample: (timestamp, acceleration, gyro).
+# Timestamp is in raw ticks; acceleration is in mg and gyro in mdps.
+# Drivers must omit incomplete temporal groups rather than returning ``None``
+# members in this tuple.
+RawIMUSample = tuple[int, NDArray[np.float64], NDArray[np.float64]]
 
 
 class IMU(ABC):
@@ -68,7 +69,11 @@ class IMU(ABC):
 
     @abstractmethod
     def read_FIFO(self, apply_bias: bool = False, word_count: int | None = None) -> list[RawIMUSample]:
-        """Read up to ``word_count`` FIFO words as raw-tick sample tuples."""
+        """Read up to ``word_count`` FIFO words as complete raw-tick sample tuples.
+
+        Incomplete timestamp/acceleration/gyro groups must be omitted. A driver
+        may retain a group split across FIFO reads and return it once complete.
+        """
 
     @abstractmethod
     def discard_FIFO(self) -> None:

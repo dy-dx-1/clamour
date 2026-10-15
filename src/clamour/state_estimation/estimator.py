@@ -285,8 +285,6 @@ class StateEstimator:
         """Read all currently available FIFO words into self._pending_imu_samples."""
         raw_samples = self.imu.read_FIFO(apply_bias=False)
         for raw_tick, acceleration, angular_velocity in raw_samples:
-            if raw_tick is None or acceleration is None or angular_velocity is None:
-                continue
             sample = TimedIMUSample(
                 timestamp_ns=self.imu_clock_mapper.to_estimator_ns(raw_tick),
                 acceleration=acceleration,
