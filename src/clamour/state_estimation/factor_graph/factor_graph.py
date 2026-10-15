@@ -82,17 +82,24 @@ class FactorGraph:
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
     
-    def advance_to(self, state_boundary_ns:int, imu_data:list[TimedIMUSample], range_observations:list[RangeObservation]):
+    def advance_to(self, state_boundary_ns:int, imu_start_sample:TimedIMUSample | None,
+                   imu_data:list[TimedIMUSample], range_observations:list[RangeObservation]):
         """
         Creates a new state in the FG, linked to the previous by a motion factor and supported by external measurements if available. 
         Optimizes the graph and internal data with the posterior. 
         This function should be called every STATE_INTERVAL seconds by estimator.py 
+
+        ``imu_start_sample`` is held from the prior state boundary until the
+        first item in ``imu_data``.  It is ``None`` only before IMU bootstrap
+        or when no IMU is configured, in which case the constant-velocity
+        fallback is used.
         """
-        if imu_data and not hasattr(self, "pim"):
+        if imu_start_sample is not None and not hasattr(self, "pim"):
             raise ValueError("IMU samples were provided to a factor graph initialized without IMU covariance densities")
         # state_boundary_ns is the timestamp of the new cadence state, not
         # the first/last IMU sample or a range timestamp.  The coordinator owns
         # measurement validity; this only protects the graph's state timeline.
+        state_start_ns = self.last_state_time_ns
         dt_s = self._prepare_new_state(state_boundary_ns)
         
         ## Initialize the new section of the graph and the new state
@@ -104,10 +111,18 @@ class FactorGraph:
         v_new = gt.symbol('v', new_state_id)
 
         ## Motion factor 
-        if len(imu_data) == 0: 
+        if imu_start_sample is None:
             self._add_constant_velocity_link(new_state_id, graph, initial_values, dt_s)
         else:
-            self._add_imu_link(new_state_id, graph, initial_values, imu_data)
+            self._add_imu_link(
+                new_state_id,
+                graph,
+                initial_values,
+                state_start_ns,
+                state_boundary_ns,
+                imu_start_sample,
+                imu_data,
+            )
 
         ## External measurements 
         self._add_ranging_data(new_state_id, graph, initial_values, range_observations)
@@ -117,6 +132,8 @@ class FactorGraph:
         # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
         post = self.isam.calculateEstimate()
         self._state = gt.NavState(post.atPose3(x_new), post.atVector3(v_new))
+        if imu_start_sample is not None:
+            self.pim.resetIntegrationAndSetBias(post.atConstantBias(gt.symbol('b', new_state_id)))
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
         covariance = self.isam.marginalCovariance(x_new)
         self.covars = (
@@ -280,7 +297,9 @@ class FactorGraph:
                 # Adding range data 
                 graph.add(gt.RangeFactor3D(x, neighbor, distance, RANGING_NOISE))
 
-    def _add_imu_link(self, state_id, graph, initial_values, timed_imu_samples:list[TimedIMUSample]):
+    def _add_imu_link(self, state_id, graph, initial_values, interval_start_ns:int,
+                      interval_end_ns:int, start_sample:TimedIMUSample,
+                      timed_imu_samples:list[TimedIMUSample]):
         """
         Preintegrates IMU data to add a motion factor from the previous state to the next. \n 
         The new state is initialized with a prior defined by the preintegration. 
@@ -290,14 +309,16 @@ class FactorGraph:
         """
         x_old, v_old, b_old = gt.symbol('x', state_id-1), gt.symbol('v', state_id-1), gt.symbol('b', state_id-1)
         x_new, v_new, b_new = gt.symbol('x', state_id),   gt.symbol('v', state_id),   gt.symbol('b', state_id)
-        # IMU Preintegration in the interval (start, end]
-        prev_ts = timed_imu_samples[0].timestamp_ns 
-        for imu_sample in timed_imu_samples[1:]: 
-            dt = (imu_sample.timestamp_ns-prev_ts) / NANOSECONDS_PER_SECOND # needs to be in seconds for preintegration 
-            acceleration_cm_s2 = imu_sample.acceleration * MG_TO_CM_PER_S2
-            angular_velocity_rad_s = imu_sample.angular_velocity * MDPS_TO_RAD_PER_S
-            self.pim.integrateMeasurement(acceleration_cm_s2, angular_velocity_rad_s, dt)
-            prev_ts = imu_sample.timestamp_ns
+        # Zero-order hold: apply each measurement from its timestamp until the
+        # next sample, including both graph-state boundaries.  Consequently the
+        # integrated duration is exactly ``interval_end - interval_start``.
+        cursor_ns = interval_start_ns
+        held_sample = start_sample
+        for imu_sample in timed_imu_samples:
+            self._integrate_held_imu_sample(held_sample, imu_sample.timestamp_ns - cursor_ns)
+            cursor_ns = imu_sample.timestamp_ns
+            held_sample = imu_sample
+        self._integrate_held_imu_sample(held_sample, interval_end_ns - cursor_ns)
 
         # Adding pre-integrated data to the graph as a CombinedImuFactor
         # This removes the need of an independent BetweenFactor to track the bias (needed with ImuFactor)
@@ -311,8 +332,17 @@ class FactorGraph:
         initial_values.insert(v_new, dead_reckoned_state.velocity())
         initial_values.insert(b_new, current_bias)
 
-        # Clearing preintegration values for the next run 
-        self.pim.resetIntegration()
+    def _integrate_held_imu_sample(self, sample: TimedIMUSample, duration_ns: int) -> None:
+        """Integrate one zero-order-held IMU value for a positive duration."""
+        if duration_ns < 0:
+            raise ValueError("IMU samples must be chronological within a state interval")
+        if duration_ns == 0:
+            return
+        self.pim.integrateMeasurement(
+            sample.acceleration * MG_TO_CM_PER_S2,
+            sample.angular_velocity * MDPS_TO_RAD_PER_S,
+            duration_ns / NANOSECONDS_PER_SECOND,
+        )
 
     def _add_constant_velocity_link(self, current_state_id, graph, initial_values, dt_s: float):
         """

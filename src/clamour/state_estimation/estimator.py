@@ -42,11 +42,14 @@ class SensorBatch:
     """
     Measurements collected for one future graph-state interval.
 
-    Boundary and measurement times are integer nanoseconds on the shared estimator clock
+    ``imu_start_sample`` is the latest sample at or before ``start_time_ns``;
+    it supplies the initial zero-order-held value. Boundary and measurement
+    times are integer nanoseconds on the shared estimator clock.
     """
     start_time_ns: int
     boundary_time_ns: int
     messages: list[UpdateMessage] = field(default_factory=list)
+    imu_start_sample: TimedIMUSample | None = None
     imu_samples: list[TimedIMUSample] = field(default_factory=list)
 
 class StateEstimator: 
@@ -88,6 +91,9 @@ class StateEstimator:
 
         self._last_imu_clock_observation_ns: int | None = None
         self._pending_imu_samples: deque[TimedIMUSample] = deque()
+        # The latest measurement at or before the current state boundary.  Its
+        # value is held until the next sample for zero-order-hold integration.
+        self._held_imu_sample: TimedIMUSample | None = None
 
         self.state_csv, self.writer = self.initialize_csv()
 
@@ -126,6 +132,11 @@ class StateEstimator:
         Wait for a trilateration-sufficient update to arrive in the communication queue.
         Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
+        print(
+            "Estimator initialization started. Keep the tag stationary until full initialization completes.",
+            'info',
+            'loc',
+        )
         if self.imu is not None:
             # Clear FIFO and initialize our IMU clock mapper with fresh data 
             self.imu.discard_FIFO()
@@ -155,10 +166,14 @@ class StateEstimator:
                 elif self.estimator_type == 'FG':
                     accel_covar_density = self.imu.accel_covar_density_mg if self.imu is not None else None
                     gyro_covar_density = self.imu.gyro_covar_density_mg if self.imu is not None else None
+                    # Bootstrap assumes the tag is stationary.  Anchor the
+                    # first graph state at the instant fusion begins, rather
+                    # than at the earlier UWB acquisition time, so the first
+                    # IMU factor and the cadence scheduler share a boundary.
                     self.estimator = FactorGraph(
                         anchor_ros,
                         radians(raw_yaw),
-                        msg.timestamp,
+                        self.estimator_clock.now_ns(),
                         accel_covar_density,
                         gyro_covar_density,
                     )
@@ -210,9 +225,10 @@ class StateEstimator:
             # Force one IMU final read so samples below the watermark are included 
             # imu_samples will only contain interval-valid samples 
             if self.imu is not None:
-                imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
+                imu_start_sample, imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
                 self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift
             else:
+                imu_start_sample = None
                 imu_samples = []
 
             # Aggregate all messages and process them 
@@ -220,10 +236,10 @@ class StateEstimator:
                 start_time_ns=last_state_boundary,
                 boundary_time_ns=next_boundary,
                 messages=pending_messages,
+                imu_start_sample=imu_start_sample,
                 imu_samples=imu_samples,
             )
-            self._process_sensor_batch(batch)
-            pending_messages.clear() 
+            pending_messages = self._process_sensor_batch(batch)
 
             # Advance from the previous deadline rather than from ``now``.  When
             # processing overruns, the following iterations catch up by closing
@@ -240,13 +256,13 @@ class StateEstimator:
             except Empty:
                 return pending_messages
 
-    def _drain_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> list[TimedIMUSample]:
-        """Return IMU samples in (start_time_ns, boundary_time_ns], corrected for EstimatorClock time.
+    def _drain_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> tuple[TimedIMUSample | None, list[TimedIMUSample]]:
+        """Return the held start sample and samples in ``(start, boundary]``.
 
-        The pending deque is verified chronological on append, so a single O(n)
-        pass can retain the first post-boundary sample and stop. Samples at or
-        before the start are discarded because they were already assigned to an
-        earlier interval.
+        The graph uses the returned start sample as a zero-order-held control
+        value from the prior state boundary until the first new sample.  Keeping
+        only one sample makes this O(number of newly read samples) in time and
+        O(1) additional memory.
         """
         # The boundary always forces a final read.  Earlier watermark reads have
         # already appended their samples to the same pending deque.
@@ -259,9 +275,15 @@ class StateEstimator:
                 # the left avoids scanning/rebuilding the future FIFO backlog.
                 self._pending_imu_samples.appendleft(sample)
                 break
-            if sample.timestamp_ns > start_time_ns:
+            if sample.timestamp_ns <= start_time_ns:
+                self._held_imu_sample = sample
+            else:
                 interval_samples.append(sample)
-        return interval_samples
+
+        start_sample = self._held_imu_sample
+        if interval_samples:
+            self._held_imu_sample = interval_samples[-1]
+        return start_sample, interval_samples
 
     def _read_imu_fifo_into_pending(self) -> None:
         """Read all currently available FIFO words into self._pending_imu_samples."""
@@ -304,9 +326,10 @@ class StateEstimator:
         self.imu_clock_mapper.observe(raw_tick, estimator_time_ns)
         self._last_imu_clock_observation_ns = estimator_time_ns
 
-    def _process_sensor_batch(self, batch: SensorBatch) -> None:
+    def _process_sensor_batch(self, batch: SensorBatch) -> list[UpdateMessage]:
         """
-        Generates a new posterior state update with the estimator.
+        Generate a new posterior state update and retain range messages whose
+        event times belong to a future state interval.
         """
         # Parsing messages
         range_messages = [] 
@@ -319,12 +342,20 @@ class StateEstimator:
                 range_messages.append(message)
             elif message.update_type == UpdateType.PEDOMETER:
                 step_messages.append(message)
-        # Retaining only ranges in the boundary & grouping them if possible 
-        range_observations = self._coalesce_ranges( self._select_interval_ranges(range_messages, batch) )
+        interval_ranges, future_range_messages, interval_range_message = self._partition_interval_ranges(range_messages, batch)
+        range_observations = self._coalesce_ranges(interval_ranges)
 
         # Create the new state and integrate the info from the sensor batch. 
-        # if no IMU data is provided, a constant velocity model will be used 
-        self.estimator.advance_to(batch.boundary_time_ns, batch.imu_samples, range_observations) 
+        # Until the first usable IMU sample is available, use the range-only
+        # constant-velocity fallback.  Thereafter the held sample lets the IMU
+        # factor cover the whole cadence interval, even if no new sample lands
+        # inside a particular interval.
+        self.estimator.advance_to(
+            batch.boundary_time_ns,
+            batch.imu_start_sample,
+            batch.imu_samples,
+            range_observations,
+        )
             
         """ 
         PEDOMETER AND CUSTOM POSES NOT YET IMPLEMENTED
@@ -340,15 +371,37 @@ class StateEstimator:
         """
         
         # Optimise and publish
-        self.publish_state(range_messages[-1] if range_observations else None)
+        self.publish_state(interval_range_message if range_observations else None)
+        return future_range_messages
 
     @staticmethod
-    def _select_interval_ranges(messages: list[UpdateMessage], batch: SensorBatch) -> list[RangeObservation]:
-        """Extract RangeObservations from a list of UpdateMessages that are in the boundary interval of the SensorBatch"""
-        return [
-            observation for message in messages for observation in message.range_observations
-            if batch.start_time_ns < observation.event_time_ns <= batch.boundary_time_ns
-        ]
+    def _partition_interval_ranges(messages: list[UpdateMessage], batch: SensorBatch) -> tuple[list[RangeObservation], list[UpdateMessage], UpdateMessage | None]:
+        """Split ranges into the current interval, future intervals, and late drops."""
+        interval_observations = []
+        future_messages = []
+        interval_message = None
+        for message in messages:
+            future_observations = []
+            for observation in message.range_observations:
+                if observation.event_time_ns <= batch.start_time_ns:
+                    print(
+                        "WARNING: Dropping late range "
+                        f"to {observation.target_id} acquired at {observation.event_time_ns} ns; "
+                        f"current interval starts at {batch.start_time_ns} ns.",
+                        'info',
+                        'loc',
+                    )
+                    # TODO: Assign delayed measurements to their historical graph state.
+                elif observation.event_time_ns <= batch.boundary_time_ns:
+                    interval_observations.append(observation)
+                    interval_message = message
+                else:
+                    future_observations.append(observation)
+
+            if future_observations:
+                message.range_observations = future_observations
+                future_messages.append(message)
+        return interval_observations, future_messages, interval_message
 
     @staticmethod
     def _coalesce_ranges(observations: list[RangeObservation]) -> list[RangeObservation]:
