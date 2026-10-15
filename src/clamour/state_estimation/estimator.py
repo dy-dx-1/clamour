@@ -304,13 +304,13 @@ class StateEstimator:
         # An observation is newer than all samples currently in the FIFO.  Clear
         # that pre-estimation data before observing it so SensorClockMapper sees
         # raw ticks strictly in chronological order from this point forward.
-        self.imu.read_FIFO(apply_bias=False)
+        self.imu.discard_FIFO()
         self._update_sensor_clock_mapper()
 
     def _discard_preinitialization_imu_samples(self) -> None:
         """Avoid FIFO overflow while waiting for a ranging-based initial state."""
         if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
-            self.imu.read_FIFO(apply_bias=False)
+            self.imu.discard_FIFO()
 
     def _refresh_imu_clock_if_due(self) -> None:
         if self._last_imu_clock_observation_ns is None:

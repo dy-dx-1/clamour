@@ -71,6 +71,10 @@ class IMU(ABC):
         """Read up to ``word_count`` FIFO words as raw-tick sample tuples."""
 
     @abstractmethod
+    def discard_FIFO(self) -> None:
+        """Discard queued FIFO data and any driver-local partial sample state."""
+
+    @abstractmethod
     def get_timestamp(self) -> int:
         """Return the current raw hardware timestamp tick."""
 

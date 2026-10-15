@@ -83,6 +83,11 @@ class LSM6DSV320X(IMU):
         - i2c_bus: I2C bus, 1 by default 
         """
         self._sample_rate_hz = float(ODR_rate)
+        # A FIFO read can end in the middle of an accel/gyro/timestamp group.
+        # Retain only that one partial group for the next read; this is constant
+        # space and avoids losing valid samples at arbitrary FIFO read boundaries.
+        self._fifo_partial_tag_count: int | None = None
+        self._fifo_partial_sample: list[object | None] | None = None
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
         if not self.validate_connection(): 
@@ -223,7 +228,6 @@ class LSM6DSV320X(IMU):
         - CTRL8 (0x17) 
         - FUNCTIONS_ENABLE (0x50)
         """
-        # TODO check if replace all writes by write only if read differs
         ### Ensure BDU and IF_INC are turned on in the CTRL3 reg as we depend on these in this class. 
         if self.bus.read_byte_data(self.TAD, 0x12)!=0x44: self.bus.write_byte_data(self.TAD, 0x12, 0x44)
 
@@ -315,9 +319,7 @@ class LSM6DSV320X(IMU):
             - Missing data for a sample is returned as None.
             - accel_data is in mg's, gyro_data is in mdps and timestamp is in TICKS (32-bit based) 
         """
-        samples = []
-        previous_tag_cnt = None # Used to group samples that belong together temporally 
-        current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
+        samples: list[RawIMUSample] = []
         ### Checking how many words are in the FIFO 
         diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, self.fifo_capacity_words)
         ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
@@ -330,23 +332,25 @@ class LSM6DSV320X(IMU):
                 word = FIFO_data[i*7:(i+1)*7]
                 tag_type =  word[0] >> 3       # 5 MSBs 
                 tag_cnt  = (word[0]>>1) & 0b11 # Bits 1 and 2 
-                # Detect transition to new FIFO timeslot 
-                # this assumes that *any* change in TAG_CNT corresponds to a new timeslot (verified through testing) 
-                # in other words, TAG_CNT can only increase by units of 1, sequentially, until it wraps after 3 
-                if previous_tag_cnt is not None and tag_cnt != previous_tag_cnt: 
-                    current_sample_idx += 1 
-                # Extract and save data 
-                X_data = (word[2]<<8) | word[1]
-                Y_data = (word[4]<<8) | word[3]
-                Z_data = (word[6]<<8) | word[5]
                 if tag_type==0x00: # FIFO empty (can happen due to read timing differences), stop reading 
                     residual_words = 0 
                     break 
-                # Ensuring that a sample exists for this current_sample_idx 
-                # While loop behaves as an if, but is more robust in case of an unexpected >1 idx jump 
-                while current_sample_idx >= len(samples):
-                    samples.append([None, None, None])
-                sample = samples[current_sample_idx]
+
+                # A TAG_CNT transition closes the previous temporal group.  It
+                # may be incomplete on malformed data, in which case preserve
+                # the existing API behaviour and return its None fields.
+                if self._fifo_partial_tag_count is None:
+                    self._fifo_partial_tag_count = tag_cnt
+                    self._fifo_partial_sample = [None, None, None]
+                elif tag_cnt != self._fifo_partial_tag_count:
+                    samples.append(tuple(self._fifo_partial_sample))
+                    self._fifo_partial_tag_count = tag_cnt
+                    self._fifo_partial_sample = [None, None, None]
+
+                X_data = (word[2]<<8) | word[1]
+                Y_data = (word[4]<<8) | word[3]
+                Z_data = (word[6]<<8) | word[5]
+                sample = self._fifo_partial_sample
                 if tag_type==0x01: # According to p.114 datasheet 
                     sample[2] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x02: 
@@ -355,9 +359,21 @@ class LSM6DSV320X(IMU):
                     sample[0] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
                 else: 
                     print(f"unknown type in FIFO!: {hex(tag_type)}")
-                previous_tag_cnt = tag_cnt
+
+                # Complete groups can be returned now; only incomplete groups
+                # need to survive until the next FIFO read.
+                if all(value is not None for value in sample):
+                    samples.append(tuple(sample))
+                    self._fifo_partial_tag_count = None
+                    self._fifo_partial_sample = None
             residual_words -= n_words 
-        return [tuple(sample) for sample in samples]
+        return samples
+
+    def discard_FIFO(self) -> None:
+        """Clear hardware FIFO contents and any partial group held by the parser."""
+        self.read_FIFO(apply_bias=False)
+        self._fifo_partial_tag_count = None
+        self._fifo_partial_sample = None
 
     def get_temp(self): 
         """
