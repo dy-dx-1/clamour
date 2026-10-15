@@ -1,14 +1,15 @@
 import csv
-from collections import defaultdict, deque
-from dataclasses import dataclass, field
-from math import ceil, radians
-from queue import Empty
-from statistics import median
 from time import sleep
-from typing import Callable, ContextManager, Literal
-from multiprocessing.synchronize import Lock
+
 import numpy as np
 from numpy.typing import NDArray
+from statistics import median
+from math import ceil, radians
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from queue import Empty
+from typing import Callable, ContextManager, Literal
+from multiprocessing.synchronize import Lock
 
 from .ekf import CustomEKF
 from .factor_graph import FactorGraph
@@ -74,6 +75,8 @@ class StateEstimator:
     ARGS: 
     - tag: Tag object to track 
     - tag_lock: Multiprocessing Lock for the tag
+    - imu_factory: function that creates an IMU instance or None if not available 
+    - estimator_clock: EstimatorClock object that will serve as common clock time
     - estimator_type: EKF or Factor Graph
     - pose_callback: Function that takes a Pose and prints it on pose update # TODO remove? just put inside?
     - communication_queue: Queue where pose updates / messages to process appear 
@@ -142,13 +145,15 @@ class StateEstimator:
         Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
         if self.imu is not None:
-            self._initialize_imu_clock_mapper()
+            # Clear FIFO and initialize our IMU clock mapper with fresh data 
+            self.imu.discard_FIFO()
+            self._update_sensor_clock_mapper()
         while self.estimator is None:
             # No graph state exists yet, so pre-initialisation samples cannot be
             # integrated.  The deterministic discard makes that intentional
             # rather than relying on continuous-mode FIFO overwrite semantics.
-            if self.imu is not None:
-                self._discard_preinitialization_imu_samples()
+            if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
+                self.imu.discard_FIFO()
             try:
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
             except Empty:
@@ -163,21 +168,21 @@ class StateEstimator:
                 raw_yaw = self.correct_yaw(msg.measured_yaw)
 
                 if self.estimator_type == 'EKF':
-                    self.estimator = CustomEKF(anchor_data, raw_yaw)
+                    self.estimator = CustomEKF(anchor_ros, raw_yaw)
                     self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
                 elif self.estimator_type == 'FG':
                     accel_covar_density = self.imu.accel_covar_density_mg if self.imu is not None else None
                     gyro_covar_density = self.imu.gyro_covar_density_mg if self.imu is not None else None
                     self.estimator = FactorGraph(
-                        msg.range_observations,
+                        anchor_ros,
                         radians(raw_yaw),
                         msg.timestamp,
                         accel_covar_density,
                         gyro_covar_density,
                     )
-
                 # Estimator initialized. Internalise and publish the posterior.
                 self.publish_state(msg)
+
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
 
     def _run_processing_loop(self) -> None: 
@@ -202,8 +207,11 @@ class StateEstimator:
             # Fetching measurements from comm queue.  Retain them until the
             # interval closes; recreating this list on each poll would lose events.
             pending_messages.extend(self._drain_communication_queue())
-            if self.imu is not None:
-                self._monitor_imu_fifo()
+
+            # If IMU present, empty it's FIFO if sufficiently full 
+            if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
+                self._read_imu_fifo_into_pending()
+
             now = self.estimator_clock.now_ns()
             if now < next_boundary:
                 # Keep latency low without using a repeated fixed sleep, which
@@ -214,9 +222,11 @@ class StateEstimator:
                     sleep_ns = min(sleep_ns, self.imu_fifo_poll_interval_ns)
                 sleep(sleep_ns / 1_000_000_000)
                 continue
-            # Drain once more so we don't miss messages at boundary 
+
+            # Drain comm queue once more so we don't miss messages at boundary 
             pending_messages.extend(self._drain_communication_queue()) 
             # Force one IMU final read so samples below the watermark are included 
+            # imu_samples will only contain interval-valid samples 
             if self.imu is not None:
                 imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
                 self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift
@@ -237,17 +247,7 @@ class StateEstimator:
             # processing overruns, the following iterations catch up by closing
             # the missed state intervals instead of permanently shifting cadence.
             last_state_boundary = next_boundary
-            next_boundary += STATE_INTERVAL_NS
-
-    def _monitor_imu_fifo(self) -> None:
-        """Drain a sufficiently full FIFO into the estimator-owned pending buffer.
-
-        Reading early does not close an estimator interval or integrate a factor.
-        ``_drain_imu_samples`` later selects these timestamped samples for the
-        appropriate state interval.
-        """
-        if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
-            self._read_imu_fifo_into_pending()
+            next_boundary += STATE_INTERVAL_NS        
 
     def _drain_communication_queue(self) -> list[UpdateMessage]:
         """Returns a list of all currently available producer events and clears the queue"""
@@ -282,7 +282,7 @@ class StateEstimator:
         return interval_samples
 
     def _read_imu_fifo_into_pending(self) -> None:
-        """Read all currently available FIFO words without assigning a state yet."""
+        """Read all currently available FIFO words into self._pending_imu_samples."""
         raw_samples = self.imu.read_FIFO(apply_bias=False)
         for raw_tick, acceleration, angular_velocity in raw_samples:
             if raw_tick is None or acceleration is None or angular_velocity is None:
@@ -299,26 +299,11 @@ class StateEstimator:
                 raise RuntimeError("IMU samples are not chronological after clock conversion")
             self._pending_imu_samples.append(sample)
 
-    def _initialize_imu_clock_mapper(self) -> None:
-        """Establish a clock anchor after intentionally dropping startup FIFO data."""
-        # An observation is newer than all samples currently in the FIFO.  Clear
-        # that pre-estimation data before observing it so SensorClockMapper sees
-        # raw ticks strictly in chronological order from this point forward.
-        self.imu.discard_FIFO()
-        self._update_sensor_clock_mapper()
-
-    def _discard_preinitialization_imu_samples(self) -> None:
-        """Avoid FIFO overflow while waiting for a ranging-based initial state."""
-        if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
-            self.imu.discard_FIFO()
-
     def _refresh_imu_clock_if_due(self) -> None:
         if self._last_imu_clock_observation_ns is None:
             return
-
         if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns < IMU_CLOCK_REFRESH_INTERVAL_NS:
             return
-
         self._update_sensor_clock_mapper()
 
     def _update_sensor_clock_mapper(self) -> None:
@@ -331,14 +316,8 @@ class StateEstimator:
         self._last_imu_clock_observation_ns = estimator_time_ns
 
     def _process_sensor_batch(self, batch: SensorBatch) -> None:
-        """Skeleton for one state transition in the new fusion architecture.
-
-        The eventual order is deliberate: preintegrate IMU, create the new state
-        and its motion factor, add interval observations, then optimise once.  The
-        existing estimator implementations cannot yet perform that whole contract,
-        so the range block below is a temporary compatibility adapter.  It batches
-        ranges into one legacy backend call while leaving step and pose events out
-        of the old pseudo-measurement paths.
+        """
+        Generates a new posterior state update with the estimator.
         """
         # Parsing messages
         range_messages = [] 
