@@ -287,8 +287,8 @@ class FactorGraph:
         prev_ts = timed_imu_samples[0].timestamp_ns 
         for imu_sample in timed_imu_samples[1:]: 
             dt = (imu_sample.timestamp_ns-prev_ts) / NANOSECONDS_PER_SECOND # needs to be in seconds for preintegration 
-            acceleration_cm_s2 = np.asarray(imu_sample.acceleration, dtype=float) * MG_TO_CM_PER_S2
-            angular_velocity_rad_s = np.asarray(imu_sample.angular_velocity, dtype=float) * MDPS_TO_RAD_PER_S
+            acceleration_cm_s2 = imu_sample.acceleration * MG_TO_CM_PER_S2
+            angular_velocity_rad_s = imu_sample.angular_velocity * MDPS_TO_RAD_PER_S
             self.pim.integrateMeasurement(acceleration_cm_s2, angular_velocity_rad_s, dt)
             prev_ts = imu_sample.timestamp_ns
 

@@ -7,6 +7,8 @@ from statistics import median
 from time import sleep
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
+import numpy as np
+from numpy.typing import NDArray
 
 from .ekf import CustomEKF
 from .factor_graph import FactorGraph
@@ -37,10 +39,20 @@ IMU_FIFO_POLL_SAFETY_FACTOR = 0.5
 
 @dataclass(frozen=True)
 class TimedIMUSample:
-    """IMU sample on the shared EstimatorClock time"""
+    """IMU sample on the shared EstimatorClock time with 3-axis NumPy vectors."""
     timestamp_ns: int
-    acceleration: object | None
-    angular_velocity: object | None
+    acceleration: NDArray[np.float64]
+    angular_velocity: NDArray[np.float64]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.acceleration, np.ndarray):
+            raise TypeError("IMU acceleration must be a NumPy array")
+        if self.acceleration.shape != (3,):
+            raise ValueError(f"IMU acceleration must have shape (3,), got {self.acceleration.shape}")
+        if not isinstance(self.angular_velocity, np.ndarray):
+            raise TypeError("IMU angular velocity must be a NumPy array")
+        if self.angular_velocity.shape != (3,):
+            raise ValueError(f"IMU angular velocity must have shape (3,), got {self.angular_velocity.shape}")
 
 @dataclass
 class SensorBatch:

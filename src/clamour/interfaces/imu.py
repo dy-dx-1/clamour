@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 import numpy as np 
+from numpy.typing import NDArray
 
 # Expected format is (timestamp, acceleration, gyro) 
 # timestamps in raw ticks
 # acceleration in mg and gyro in mdps 
-RawIMUSample = tuple[int | None, object | None, object | None]
+RawIMUSample = tuple[int | None, NDArray[np.float64] | None, NDArray[np.float64] | None]
 
 
 class IMU(ABC):
