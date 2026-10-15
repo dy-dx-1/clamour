@@ -21,14 +21,22 @@ class IMU(ABC):
     # Bias is not an abstractclass requirement as it needs to be defined in config.py . IMU samples should NOT be bias corrected. 
     @property
     @abstractmethod
-    def accel_scale_factor_mg(self) -> np.ndarray: 
+    def accel_scale_factor_mg(self) -> np.ndarray:
         """3x3 scale factor matrix in mgs. Will be overwritten by config value on IMU instanciation.
            Here to highlight that the IMU must internally apply this to it's FIFO-read values."""
+    @accel_scale_factor_mg.setter
+    @abstractmethod
+    def accel_scale_factor_mg(self, value: np.ndarray) -> None:
+        """Set a finite 3x3 accelerometer calibration matrix in mg units."""
     @property
     @abstractmethod
-    def gyro_scale_factor_mg(self) -> np.ndarray: 
+    def gyro_scale_factor_mdps(self) -> np.ndarray:
         """3x3 scale factor matrix in mdps. Will be overwritten by config value on IMU instanciation.
-           Here to highlight that the IMU must internally apply this to it's FIFO-read values."""        
+           Here to highlight that the IMU must internally apply this to it's FIFO-read values."""
+    @gyro_scale_factor_mdps.setter
+    @abstractmethod
+    def gyro_scale_factor_mdps(self, value: np.ndarray) -> None:
+        """Set a finite 3x3 gyroscope calibration matrix in mdps units."""
 
     ### ACCEL/GYRO COVARIANCE  
     # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 

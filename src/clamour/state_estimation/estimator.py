@@ -1,8 +1,6 @@
 import csv
 from time import sleep
 
-import numpy as np
-from numpy.typing import NDArray
 from statistics import median
 from math import ceil, radians
 from collections import defaultdict, deque
@@ -17,8 +15,9 @@ from ..estimator_clock import EstimatorClock, SensorClockMapper
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
 from ..interfaces import IMU, Tag, Pose
+from ..sensor_events import RangeObservation, TimedIMUSample
 from ..contextManagedQueue import ContextManagedQueue
-from ..messages.updateMessage import RangeObservation, UpdateMessage
+from ..messages.updateMessage import UpdateMessage
 from ..messages.soundMessage import SoundMessage
 from ..messages.types import UpdateType
 from ..rooms import Floorplan
@@ -37,23 +36,6 @@ IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000
 IMU_FIFO_WATERMARK_FRACTION = 0.70
 IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE = 3 # Words per grouped FIFO sample: ex: accel, gyro, timestamp 
 IMU_FIFO_POLL_SAFETY_FACTOR = 0.5       
-
-@dataclass(frozen=True)
-class TimedIMUSample:
-    """IMU sample on the shared EstimatorClock time with 3-axis NumPy vectors."""
-    timestamp_ns: int
-    acceleration: NDArray[np.float64]
-    angular_velocity: NDArray[np.float64]
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.acceleration, np.ndarray):
-            raise TypeError("IMU acceleration must be a NumPy array")
-        if self.acceleration.shape != (3,):
-            raise ValueError(f"IMU acceleration must have shape (3,), got {self.acceleration.shape}")
-        if not isinstance(self.angular_velocity, np.ndarray):
-            raise TypeError("IMU angular velocity must be a NumPy array")
-        if self.angular_velocity.shape != (3,):
-            raise ValueError(f"IMU angular velocity must have shape (3,), got {self.angular_velocity.shape}")
 
 @dataclass
 class SensorBatch:
@@ -305,7 +287,16 @@ class StateEstimator:
         self._update_sensor_clock_mapper()
 
     def _update_sensor_clock_mapper(self) -> None:
-        """Update the IMU tick mapping without discarding unread FIFO samples."""
+        """Update the IMU tick mapping after mapping every queued FIFO sample.
+
+        A current hardware-clock read is newer than FIFO samples already in the
+        device.  Observing it first would make those samples appear out of
+        order to ``SensorClockMapper``.  The initial observation is the sole
+        exception: initialization explicitly discarded the FIFO immediately
+        before calling this method.
+        """
+        if self._last_imu_clock_observation_ns is not None:
+            self._read_imu_fifo_into_pending()
         before_ns = self.estimator_clock.now_ns()
         raw_tick = self.imu.get_timestamp()
         after_ns = self.estimator_clock.now_ns()

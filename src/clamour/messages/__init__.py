@@ -1,1 +1,1 @@
-from updateMessage import RangeObservation
+from ..sensor_events import RangeObservation

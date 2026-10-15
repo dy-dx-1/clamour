@@ -1,18 +1,5 @@
-from dataclasses import dataclass
-
-from ..interfaces import Pose
+from ..sensor_events import RangeObservation
 from .types import UpdateType
-
-
-@dataclass(frozen=True)
-class RangeObservation:
-    """One UWB range with its own acquisition time on the estimator clock."""
-
-    target_id: int
-    distance_cm: float
-    event_time_ns: int
-    is_anchor: bool
-    target_pose: Pose | None = None
 
 class UpdateMessage:
     """

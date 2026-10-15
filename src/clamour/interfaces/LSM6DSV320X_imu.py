@@ -83,6 +83,12 @@ class LSM6DSV320X(IMU):
         - i2c_bus: I2C bus, 1 by default 
         """
         self._sample_rate_hz = float(ODR_rate)
+        self._accel_scale_factor_mg = np.array([
+            [1.0017558373609916, 0.0, 0.0],
+            [0.006256910346063383, 1.0018358510192535, 0.0],
+            [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945],
+        ], dtype=float)
+        self._gyro_scale_factor_mdps = np.eye(3, dtype=float)
         # A FIFO read can end in the middle of an accel/gyro/timestamp group.
         # Retain only that one partial group for the next read; this is constant
         # space and avoids losing valid samples at arbitrary FIFO read boundaries.
@@ -116,15 +122,28 @@ class LSM6DSV320X(IMU):
     ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
     @property
     def accel_scale_factor_mg(self):
-        return np.array([[1.0017558373609916,      0.0,                  0.0],
-                        [0.006256910346063383,    1.0018358510192535,   0.0],
-                        [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
+        return self._accel_scale_factor_mg
+
+    @accel_scale_factor_mg.setter
+    def accel_scale_factor_mg(self, value: np.ndarray) -> None:
+        self._accel_scale_factor_mg = self._validated_scale_factor(value, "accelerometer")
 
     @property
     def gyro_scale_factor_mdps(self):
-        return np.array([[1,0,0],
-                        [0,1,0],
-                        [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others.
+        return self._gyro_scale_factor_mdps
+
+    @gyro_scale_factor_mdps.setter
+    def gyro_scale_factor_mdps(self, value: np.ndarray) -> None:
+        self._gyro_scale_factor_mdps = self._validated_scale_factor(value, "gyroscope")
+
+    @staticmethod
+    def _validated_scale_factor(value: np.ndarray, sensor_name: str) -> np.ndarray:
+        scale_factor = np.asarray(value, dtype=float)
+        if scale_factor.shape != (3, 3):
+            raise ValueError(f"{sensor_name} scale factor must have shape (3, 3), got {scale_factor.shape}")
+        if not np.all(np.isfinite(scale_factor)):
+            raise ValueError(f"{sensor_name} scale factor must contain only finite values")
+        return scale_factor.copy()
 
     @property
     def accel_covar_density_mg(self):

@@ -1,9 +1,8 @@
 import gtsam as gt 
 import numpy as np 
 
-from ..estimator import TimedIMUSample
+from ...sensor_events import RangeObservation, TimedIMUSample
 from ...custom_terminal import print 
-from ...messages import RangeObservation
 from ...interfaces import Anchors, Pose
 from ...estimator_clock import NANOSECONDS_PER_SECOND
 from ...config import (ANCHOR_POS_UNCERTAINTY_CM,
@@ -17,6 +16,8 @@ ANCHORS = Anchors()
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY_CM] * 3)
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15)  # 15 cm
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
+INITIAL_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 1.0)  # cm/s; stationary bootstrap
+CONSTANT_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 50.0)  # cm/s; deliberately loose
 
 GRAVITY_CM_S2 = 980.665  # cm/s^2
 MG_TO_CM_PER_S2 = GRAVITY_CM_S2 / 1000
@@ -58,7 +59,7 @@ class FactorGraph:
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values()
         # Defining IMU objects if present 
-        if imu_accel_covar_density_mg2_s is not None and self.imu_gyro_covar_density is not None:
+        if imu_accel_covar_density_mg2_s is not None and imu_gyro_covar_density_mdps2_s is not None:
             self.imu_accel_covar_density = imu_accel_covar_density_mg2_s * MG_TO_CM_PER_S2**2
             self.imu_gyro_covar_density = imu_gyro_covar_density_mdps2_s * MDPS_TO_RAD_PER_S**2
             self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
@@ -171,7 +172,8 @@ class FactorGraph:
         NOTE: **Currently supposing graph is initialized while stationnary!**
         NOTE: To avoid imprecise/unstable measures, ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
         """     
-        x0 = gt.symbol('x', state_key)  
+        x0 = gt.symbol('x', state_key)
+        v0 = gt.symbol('v', state_key)
         # ROTATION LOCK 
         anchor_observations = [observation for observation in range_observations if observation.is_anchor]
         throwaway_pos = ANCHORS.get_centroid_for(*(observation.target_id for observation in anchor_observations))
@@ -179,6 +181,11 @@ class FactorGraph:
                                       gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
+        # Bootstrap is explicitly stationary.  This both seeds V(0) for the
+        # first CombinedImuFactor and prevents an unconstrained velocity key.
+        initial_velocity = np.zeros(3)
+        graph.add(gt.PriorFactorVector(v0, initial_velocity, INITIAL_VELOCITY_NOISE))
+        initial_values.insert(v0, initial_velocity)
         # POSITION LOCK 
         self._add_ranging_data(state_key, graph, initial_values, range_observations)
         # GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
@@ -332,6 +339,7 @@ class FactorGraph:
             return delta_body
         ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # ~~~constant velocity so very loose (except on z cause expect less mvt that way)
         x = gt.symbol('x', current_state_id)
+        v = gt.symbol('v', current_state_id)
         ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
         # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
         # which would directly be ~equivalent to blindly trilaterating and discarding each step. 
@@ -343,3 +351,9 @@ class FactorGraph:
         relative_mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )  
         graph.add(gt.BetweenFactorPose3(x_prev, x, relative_mvt, ODOMETRY_NOISE))
         initial_values.insert(x, self._state.compose(relative_mvt))
+        # Carry the velocity through range-only intervals so every state has a
+        # valid V(k), including the path used by ``advance_to`` to form NavState.
+        v_prev = gt.symbol('v', current_state_id - 1)
+        previous_velocity = self._state.velocity()
+        graph.add(gt.BetweenFactorVector(v_prev, v, np.zeros(3), CONSTANT_VELOCITY_NOISE))
+        initial_values.insert(v, previous_velocity)
