@@ -6,36 +6,45 @@ from ...custom_terminal import print
 from ...messages import RangeObservation
 from ...interfaces import Anchors, Pose
 from ...estimator_clock import NANOSECONDS_PER_SECOND
-from ...config import (ANCHOR_POS_UNCERTAINTY,
-                        IMU_ACCEL_INITIAL_BIAS_MG, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
-                        IMU_GYRO_INITIAL_BIAS_MDPS,  IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
+from ...config import (ANCHOR_POS_UNCERTAINTY_CM,
+                       IMU_ACCEL_INITIAL_BIAS_MG, IMU_ACCEL_INITIAL_BIAS_STD_MG, IMU_ACCEL_WALK_COV_MG2_PER_S,
+                       IMU_GYRO_INITIAL_BIAS_MDPS, IMU_GYRO_INITIAL_BIAS_STD_MDPS, IMU_GYRO_WALK_COV_MDPS2_PER_S)
 ANCHORS = Anchors()
 
 ### Defining noise models 
-# The graph operates internally with CM for spatial units and RAD for angular. 
-# The posterior pose accessed externally is in CM-based units, BUT with DEG for angular 
-ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY]) # uncertainty in anchor placement
-RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
-ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1]) # NOTE TODO might be removed in the future if zero movement update is not reintegrated
+# GTSAM factors use cm-based spatial units and radians for angular quantities.
+# Pose converts the posterior angles back to degrees at the public boundary.
+ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY_CM] * 3)
+RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15)  # 15 cm
+ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 
+GRAVITY_CM_S2 = 980.665  # cm/s^2
+MG_TO_CM_PER_S2 = GRAVITY_CM_S2 / 1000
+MDPS_TO_RAD_PER_S = 0.001*np.pi/180
 IMU_ACCEL_INITIAL_BIAS = IMU_ACCEL_INITIAL_BIAS_MG  * MG_TO_CM_PER_S2
 IMU_GYRO_INITIAL_BIAS  = IMU_GYRO_INITIAL_BIAS_MDPS * MDPS_TO_RAD_PER_S
-IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
-IMU_INITIAL_BIAS_COV = np.concatenate(IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV)
-GRAVITY_CM_S2 = 980.665 # cm/s^2 
+IMU_ACCEL_WALK_COV = IMU_ACCEL_WALK_COV_MG2_PER_S * MG_TO_CM_PER_S2**2
+IMU_GYRO_WALK_COV = IMU_GYRO_WALK_COV_MDPS2_PER_S * MDPS_TO_RAD_PER_S**2
+IMU_BIAS_STD_DEV = np.concatenate((
+            IMU_ACCEL_INITIAL_BIAS_STD_MG * MG_TO_CM_PER_S2,
+            IMU_GYRO_INITIAL_BIAS_STD_MDPS * MDPS_TO_RAD_PER_S,
+        ))
+IMU_INTEGRATION_COVAR = (1e-5)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
+
 
 class FactorGraph: 
-    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, initial_state_time_ns:int, imu_accel_covar_density:float, imu_gyro_covar_density:float):
+    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, initial_state_time_ns:int, imu_accel_covar_density_mg2_s:float | None = None, imu_gyro_covar_density_mdps2_s:float | None = None):
         """
         Factor Graph based 3D pose estimator. 
         - range_observations: Range observations used to initialize the graph; at least 3 anchors are required to fully initialize the prior position.
-        - prior_yaw: prior yaw value on initialization **[rad]** 
+        - prior_yaw: prior yaw value on initialization **[rad]**
+        - imu_accel_covar_density_mg2_s: accelerometer measurement covariance density in (mg^2)*s
+        - imu_gyro_covar_density_mdps2_s: gyroscope measurement covariance density in (mdps^2)*s
         - initial_state_time_ns: EstimatorClock timestamp of the initial graph state
-        NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
         NOTE on units: 
         - All angle units are **radians** 
         - All spatial units are **cm-based**
-            - The graph doesn't care about this unit as long as it's fully internally consistent, but enforcing cm until we have proper code-wide documentation and unit standardisation to be safer. (For example, gravity vector in graph should be updated if change of units)
+            - IMU samples and covariance densities are converted from mg/mdps-based units at the graph boundary.
         """
         self.last_state_time_ns = initial_state_time_ns
         
@@ -49,9 +58,9 @@ class FactorGraph:
         graph = gt.NonlinearFactorGraph() 
         initial_values = gt.Values()
         # Defining IMU objects if present 
-        if imu_accel_covar_density and imu_gyro_covar_density: 
-            self.imu_accel_covar_density = imu_accel_covar_density 
-            self.imu_gyro_covar_density  = imu_gyro_covar_density
+        if imu_accel_covar_density_mg2_s is not None and self.imu_gyro_covar_density is not None:
+            self.imu_accel_covar_density = imu_accel_covar_density_mg2_s * MG_TO_CM_PER_S2**2
+            self.imu_gyro_covar_density = imu_gyro_covar_density_mdps2_s * MDPS_TO_RAD_PER_S**2
             self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
         # Initializing the state by locking rotation and position 
         # Internal state tracker is a NavState for Pose3 and Velocity. Public access is the pose() property, which formats it into a Pose container.
@@ -68,7 +77,7 @@ class FactorGraph:
         """The posterior `Pose` in it's corresponding units after running the estimator, or the last estimate if we didn't run it yet"""
         position = self._state.t()  # 1D array [x, y, z]
         rot = self._state.R().ypr() # 1D array [yaw, pitch, roll]
-        return Pose(position[0], position[1], position[2], heading=rot[0], pitch=rot[1], roll=rot[2], covar=self.covars)
+        return Pose(position[0], position[1], position[2], heading=np.rad2deg(rot[0]), pitch=np.rad2deg(rot[1]), roll=np.rad2deg(rot[2]), covar=self.covars)
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
     
@@ -78,6 +87,8 @@ class FactorGraph:
         Optimizes the graph and internal data with the posterior. 
         This function should be called every STATE_INTERVAL seconds by estimator.py 
         """
+        if imu_data and not hasattr(self, "pim"):
+            raise ValueError("IMU samples were provided to a factor graph initialized without IMU covariance densities")
         # state_boundary_ns is the timestamp of the new cadence state, not
         # the first/last IMU sample or a range timestamp.  The coordinator owns
         # measurement validity; this only protects the graph's state timeline.
@@ -134,7 +145,7 @@ class FactorGraph:
         x_prev = gt.symbol('x', current_state_id - 1)
         pose = self.pose
         previous_pose = gt.Pose3(
-            gt.Rot3.Ypr(pose.heading, 0, 0),
+            gt.Rot3.Ypr(np.deg2rad(pose.heading), 0, 0),
             gt.Point3(*pose.coordinates),
         )
         zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
@@ -200,7 +211,8 @@ class FactorGraph:
         # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve through time  
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
         imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS)
-        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_INITIAL_BIAS_COV))
+        bias_noise = gt.noiseModel.Diagonal.Sigmas(IMU_BIAS_STD_DEV)
+        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, bias_noise))
         initial.insert(gt.symbol('b', state_key), imu_bias) 
 
         # Creating the preintegration object 
@@ -275,7 +287,9 @@ class FactorGraph:
         prev_ts = timed_imu_samples[0].timestamp_ns 
         for imu_sample in timed_imu_samples[1:]: 
             dt = (imu_sample.timestamp_ns-prev_ts) / NANOSECONDS_PER_SECOND # needs to be in seconds for preintegration 
-            self.pim.integrateMeasurement(imu_sample.acceleration, imu_sample.angular_velocity, dt) 
+            acceleration_cm_s2 = np.asarray(imu_sample.acceleration, dtype=float) * MG_TO_CM_PER_S2
+            angular_velocity_rad_s = np.asarray(imu_sample.angular_velocity, dtype=float) * MDPS_TO_RAD_PER_S
+            self.pim.integrateMeasurement(acceleration_cm_s2, angular_velocity_rad_s, dt)
             prev_ts = imu_sample.timestamp_ns
 
         # Adding pre-integrated data to the graph as a CombinedImuFactor

@@ -28,26 +28,24 @@ ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph)
 ### IMU control - Set IMU_TYPE to None for constant velocity model 
 IMU_TYPE = "LSM6DSV320X" 
 # The following parameters are specific to each individual hardware unit 
-# Scale factor 
-# NOTE TODO fix all units in this section 
+# Scale factors are dimensionless corrections applied to measurements in mg and mdps.
 IMU_ACCEL_SCALE_FACTOR_MG = np.array([[1.0017558373609916,      0.0,                  0.0],
                                      [0.006256910346063383,    1.0018358510192535,   0.0],
                                      [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
 IMU_GYRO_SCALE_FACTOR_MDPS  =  np.array([[1.0,0.0,0.0],
                                     [0.0,1.0,0.0],
                                     [0.0,0.0,1.0]])
-# Initial bias from calibration, the FG estimates its drift automatically
+# Initial bias from calibration; the FG estimates its drift automatically.
+# Acceleration bias is in mg, angular-rate bias is in mdps.
 IMU_ACCEL_INITIAL_BIAS_MG   = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
 IMU_GYRO_INITIAL_BIAS_MDPS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
-# Covariance on the bias. Variance of the initial bias value when calibrating. 
-IMU_ACCEL_INITIAL_BIAS_COV = None 
-IMU_GYRO_INITIAL_BIAS_COV  = None 
-# Accelerometer and Gyro bias random walk covariance (requires Allan variance analysis) 
-# As of 21sept 2026, placeholders as it'll be enough to validate IMU integration. We don't dead-reckon for long without range factors to correct. 
-# GTSAM expects these values to be /s as it will *s during pre-integration 
-# NOTE These should simply be unidimensional values - array conversion will be done by GTSAM 
-IMU_ACCEL_WALK_COV = 0.032**2 # units: (mg**2)/s
-IMU_GYRO_WALK_COV  = 5.73**2  # units: (mdps**2)/s
+# Per-axis standard deviations of the initial bias in mg and mdps, respectively.
+IMU_ACCEL_INITIAL_BIAS_STD_MG = None
+IMU_GYRO_INITIAL_BIAS_STD_MDPS = None
+# Accelerometer and gyro bias random-walk covariance densities. These are
+# variances per second and require Allan-variance analysis for calibration.
+IMU_ACCEL_WALK_COV_MG2_PER_S = 0.032**2  # (mg^2)/s
+IMU_GYRO_WALK_COV_MDPS2_PER_S = 5.73**2  # (mdps^2)/s
 
 ### Output control 
 ## Terminal
@@ -69,8 +67,7 @@ ANCHORS = ({'id': 1, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 121.3},
            {'id': 6, 'level': 0, 'x': 458.2, 'y': 604.0, 'z': 146}, 
            {'id': 7, 'level': 0, 'x':  22.3, 'y':  45.8, 'z': 219}, 
            {'id': 8, 'level': 0, 'x': 504.5, 'y': 419.4, 'z': 107})
-ANCHOR_POS_UNCERTAINTY = 5 # +- precision on the anchor's coordinates (cm) 
-.0
+ANCHOR_POS_UNCERTAINTY_CM = 5.0  # +/- precision on each anchor coordinate, in cm
 
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 
 assert TAG_TYPE in ("Bitcraze", "Pozyx") 
@@ -99,28 +96,30 @@ assert ESTIMATOR_TYPE in ("EKF", "FG") # these match the types accepted and expe
 # IMU parameter types and shapes
 # all dtypes must be floats to work well with GTSAM 
 assert IMU_TYPE is None or (IMU_TYPE in ["LSM6DSV320X"])
-assert isinstance(IMU_ACCEL_SCALE_FACTOR, np.ndarray)
-assert np.issubdtype(IMU_ACCEL_SCALE_FACTOR.dtype, float)
-assert IMU_ACCEL_SCALE_FACTOR.shape == (3, 3)
-assert isinstance(IMU_GYRO_SCALE_FACTOR, np.ndarray)
-assert np.issubdtype(IMU_GYRO_SCALE_FACTOR.dtype, float)
-assert IMU_GYRO_SCALE_FACTOR.shape == (3, 3)
-assert isinstance(IMU_ACCEL_INITIAL_BIAS, np.ndarray)
-assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS.dtype, float)
-assert IMU_ACCEL_INITIAL_BIAS.shape == (3,)
-assert isinstance(IMU_GYRO_INITIAL_BIAS, np.ndarray)
-assert np.issubdtype(IMU_GYRO_INITIAL_BIAS.dtype, float)
-assert IMU_GYRO_INITIAL_BIAS.shape == (3,)
-assert IMU_ACCEL_INITIAL_BIAS_COV is None or (
-    isinstance(IMU_ACCEL_INITIAL_BIAS_COV, np.ndarray)
-    and np.issubdtype(IMU_ACCEL_INITIAL_BIAS_COV.dtype, float)
-    and IMU_ACCEL_INITIAL_BIAS_COV.shape == (1, 3)
-)
-assert IMU_GYRO_INITIAL_BIAS_COV is None or (
-    isinstance(IMU_GYRO_INITIAL_BIAS_COV, np.ndarray)
-    and np.issubdtype(IMU_GYRO_INITIAL_BIAS_COV.dtype, float)
-    and IMU_GYRO_INITIAL_BIAS_COV.shape == (1, 3)
-)
-assert isinstance(IMU_ACCEL_WALK_COV, float)
-assert isinstance(IMU_GYRO_WALK_COV, float)
-
+assert isinstance(IMU_ACCEL_SCALE_FACTOR_MG, np.ndarray)
+assert np.issubdtype(IMU_ACCEL_SCALE_FACTOR_MG.dtype, float)
+assert IMU_ACCEL_SCALE_FACTOR_MG.shape == (3, 3)
+assert isinstance(IMU_GYRO_SCALE_FACTOR_MDPS, np.ndarray)
+assert np.issubdtype(IMU_GYRO_SCALE_FACTOR_MDPS.dtype, float)
+assert IMU_GYRO_SCALE_FACTOR_MDPS.shape == (3, 3)
+assert isinstance(IMU_ACCEL_INITIAL_BIAS_MG, np.ndarray)
+assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS_MG.dtype, float)
+assert IMU_ACCEL_INITIAL_BIAS_MG.shape == (3,)
+assert isinstance(IMU_GYRO_INITIAL_BIAS_MDPS, np.ndarray)
+assert np.issubdtype(IMU_GYRO_INITIAL_BIAS_MDPS.dtype, float)
+assert IMU_GYRO_INITIAL_BIAS_MDPS.shape == (3,)
+if ESTIMATOR_TYPE == "FG":
+    assert IMU_ACCEL_INITIAL_BIAS_STD_MG is not None
+    assert IMU_GYRO_INITIAL_BIAS_STD_MDPS is not None
+    assert isinstance(IMU_ACCEL_INITIAL_BIAS_STD_MG, np.ndarray)
+    assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS_STD_MG.dtype, float)
+    assert IMU_ACCEL_INITIAL_BIAS_STD_MG.shape == (3,)
+    assert np.all(np.isfinite(IMU_ACCEL_INITIAL_BIAS_STD_MG))
+    assert np.all(IMU_ACCEL_INITIAL_BIAS_STD_MG > 0)
+    assert isinstance(IMU_GYRO_INITIAL_BIAS_STD_MDPS, np.ndarray)
+    assert np.issubdtype(IMU_GYRO_INITIAL_BIAS_STD_MDPS.dtype, float)
+    assert IMU_GYRO_INITIAL_BIAS_STD_MDPS.shape == (3,)
+    assert np.all(np.isfinite(IMU_GYRO_INITIAL_BIAS_STD_MDPS))
+    assert np.all(IMU_GYRO_INITIAL_BIAS_STD_MDPS > 0)
+assert isinstance(IMU_ACCEL_WALK_COV_MG2_PER_S, float)
+assert isinstance(IMU_GYRO_WALK_COV_MDPS2_PER_S, float)

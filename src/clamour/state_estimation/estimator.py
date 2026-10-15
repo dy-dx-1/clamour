@@ -1,7 +1,7 @@
 import csv
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from math import ceil
+from math import ceil, radians
 from queue import Empty
 from statistics import median
 from time import sleep
@@ -154,7 +154,15 @@ class StateEstimator:
                     self.estimator = CustomEKF(anchor_data, raw_yaw)
                     self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
                 elif self.estimator_type == 'FG':
-                    self.estimator = FactorGraph(msg.range_observations, raw_yaw, msg.timestamp)
+                    accel_covar_density = self.imu.accel_covar_density_mg if self.imu is not None else None
+                    gyro_covar_density = self.imu.gyro_covar_density_mg if self.imu is not None else None
+                    self.estimator = FactorGraph(
+                        msg.range_observations,
+                        radians(raw_yaw),
+                        msg.timestamp,
+                        accel_covar_density,
+                        gyro_covar_density,
+                    )
 
                 # Estimator initialized. Internalise and publish the posterior.
                 self.publish_state(msg)
