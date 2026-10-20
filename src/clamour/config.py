@@ -23,7 +23,7 @@ SMART_TX_POWER = True      # Enable or disable smart TX power - Only works for 6
 TX_POWER_CONFIG = None     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
 ### State estimation control 
-ESTIMATOR_TYPE = "EKF"     # EKF or FG (Factor Graph) 
+ESTIMATOR_TYPE = "FG"     # EKF or FG (Factor Graph) 
 
 ### IMU control - Set IMU_TYPE to None for constant velocity model 
 IMU_TYPE = "LSM6DSV320X" 
@@ -40,8 +40,9 @@ IMU_GYRO_SCALE_FACTOR_MDPS  =  np.array([[1.0,0.0,0.0],
 IMU_ACCEL_INITIAL_BIAS_MG   = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
 IMU_GYRO_INITIAL_BIAS_MDPS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
 # Per-axis standard deviations of the initial bias in mg and mdps, respectively.
-IMU_ACCEL_INITIAL_BIAS_STD_MG = None
-IMU_GYRO_INITIAL_BIAS_STD_MDPS = None
+# NOTE TEMP VALUES AWAITING CALIB TODO 
+IMU_ACCEL_INITIAL_BIAS_STD_MG = np.array([0.5, 0.5, 0.5])
+IMU_GYRO_INITIAL_BIAS_STD_MDPS = np.array([1.0, 1.0, 1.0])
 # Accelerometer and gyro bias random-walk covariance densities. These are
 # variances per second and require Allan-variance analysis for calibration.
 IMU_ACCEL_WALK_COV_MG2_PER_S = 0.032**2  # (mg^2)/s
@@ -54,7 +55,7 @@ DEVICE_MSGS = True     # Turn off/on device management-related terminal output
 TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
 LOC_MSGS    = True     # Turn off/on localization-related terminal output  
 ## CSV saving 
-SAVE_TO_CSV = False     # Save localization data to csv or not 
+SAVE_TO_CSV = True     # Save localization data to csv or not 
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 

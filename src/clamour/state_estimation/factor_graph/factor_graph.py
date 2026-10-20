@@ -60,8 +60,8 @@ class FactorGraph:
         initial_values = gt.Values()
         # Defining IMU objects if present 
         if imu_accel_covar_density_mg2_s is not None and imu_gyro_covar_density_mdps2_s is not None:
-            self.imu_accel_covar_density = imu_accel_covar_density_mg2_s * MG_TO_CM_PER_S2**2
-            self.imu_gyro_covar_density = imu_gyro_covar_density_mdps2_s * MDPS_TO_RAD_PER_S**2
+            self.imu_accel_covar_density = imu_accel_covar_density_mg2_s * np.eye(3) * MG_TO_CM_PER_S2**2
+            self.imu_gyro_covar_density = imu_gyro_covar_density_mdps2_s * np.eye(3) * MDPS_TO_RAD_PER_S**2
             self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
         # Initializing the state by locking rotation and position 
         # Internal state tracker is a NavState for Pose3 and Velocity. Public access is the pose() property, which formats it into a Pose container.
