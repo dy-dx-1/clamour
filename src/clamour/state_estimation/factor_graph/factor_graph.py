@@ -76,8 +76,8 @@ class FactorGraph:
     @property
     def pose(self) -> Pose:
         """The posterior `Pose` in it's corresponding units after running the estimator, or the last estimate if we didn't run it yet"""
-        position = self._state.t()  # 1D array [x, y, z]
-        rot = self._state.R().ypr() # 1D array [yaw, pitch, roll]
+        position = self._state.position()  # 1D array [x, y, z]
+        rot = self._state.attitude().ypr() # 1D array [yaw, pitch, roll]
         return Pose(position[0], position[1], position[2], heading=np.rad2deg(rot[0]), pitch=np.rad2deg(rot[1]), roll=np.rad2deg(rot[2]), covar=self.covars)
 
     ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
@@ -131,7 +131,7 @@ class FactorGraph:
         self.isam.update(graph, initial_values)
         # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
         post = self.isam.calculateEstimate()
-        self._state = gt.NavState(post.atPose3(x_new), post.atVector3(v_new))
+        self._state = gt.NavState(post.atPose3(x_new), post.atVector(v_new))
         if imu_start_sample is not None:
             self.pim.resetIntegrationAndSetBias(post.atConstantBias(gt.symbol('b', new_state_id)))
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
@@ -265,7 +265,8 @@ class FactorGraph:
         """
         Adds anchor and tag range observations to a graph state without adding a prior or solving for it.
         """
-        print(f"Adding range observations {[f"{ro.target_id}: {ro.distance_cm}cm" for ro in range_observations]}", 'info', 'loc')
+        range_str = lambda ro: f"{ro.target_id}: {ro.distance_cm}cm"
+        print(f"Adding range observations {[range_str(ro) for ro in range_observations]}", 'info', 'loc')
         x = gt.symbol('x', state_key) 
         for observation in range_observations:
             target_id = observation.target_id
@@ -380,7 +381,7 @@ class FactorGraph:
         delta_local_frame = constant_velocity_model(self._state) # Supposing constant velocity, what would be the local vector to the new state?
         relative_mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )  
         graph.add(gt.BetweenFactorPose3(x_prev, x, relative_mvt, ODOMETRY_NOISE))
-        initial_values.insert(x, self._state.compose(relative_mvt))
+        initial_values.insert(x, self._state.pose().compose(relative_mvt))
         # Carry the velocity through range-only intervals so every state has a
         # valid V(k), including the path used by ``advance_to`` to form NavState.
         v_prev = gt.symbol('v', current_state_id - 1)
