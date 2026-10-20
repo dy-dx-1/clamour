@@ -229,7 +229,8 @@ class LSM6DSV320X(IMU):
         """
         try: 
             check = (self.bus.read_byte_data(self.TAD, 0x0F) == 0x73)
-        except: 
+        except Exception as e: 
+            print(f"IMU validate connection raised: {e}")
             check = False 
         return check 
 
