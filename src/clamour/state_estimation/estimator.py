@@ -94,6 +94,10 @@ class StateEstimator:
         # The latest measurement at or before the current state boundary.  Its
         # value is held until the next sample for zero-order-hold integration.
         self._held_imu_sample: TimedIMUSample | None = None
+        # EstimatorClock time of the first graph state.  The processing loop
+        # starts its first interval here so the first IMU link and the cadence
+        # scheduler share the same boundary.  None for the EKF.
+        self._first_state_time_ns: int | None = None
 
         self.state_csv, self.writer = self.initialize_csv()
 
@@ -133,7 +137,7 @@ class StateEstimator:
         Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
         print(
-            "Estimator initialization started. Keep the tag stationary until full initialization completes.",
+            "Estimator initialization started. Keep the tag **stationary** until full initialization completes.",
             'info',
             'loc',
         )
@@ -170,10 +174,11 @@ class StateEstimator:
                     # first graph state at the instant fusion begins, rather
                     # than at the earlier UWB acquisition time, so the first
                     # IMU factor and the cadence scheduler share a boundary.
+                    self._first_state_time_ns = self.estimator_clock.now_ns()
                     self.estimator = FactorGraph(
                         anchor_ros,
                         radians(raw_yaw),
-                        self.estimator_clock.now_ns(),
+                        self._first_state_time_ns,
                         accel_covar_density,
                         gyro_covar_density,
                     )
@@ -196,7 +201,14 @@ class StateEstimator:
 
         NOTE: All sensor timings are compared on the same EstimatorClock reference 
         """
-        last_state_boundary = self.estimator_clock.now_ns()
+        # Start from the first graph state's time, not a fresh ``now``: time spent
+        # publishing the initial posterior must not open a gap between the graph's
+        # first state and the first interval.  If that boundary has already
+        # passed, the loop closes the missed intervals immediately.
+        if self._first_state_time_ns is not None:
+            last_state_boundary = self._first_state_time_ns
+        else:
+            last_state_boundary = self.estimator_clock.now_ns()
         next_boundary = last_state_boundary + STATE_INTERVAL_NS
         pending_messages: list[UpdateMessage] = []
         
@@ -309,13 +321,13 @@ class StateEstimator:
         self._update_sensor_clock_mapper()
 
     def _update_sensor_clock_mapper(self) -> None:
-        """Update the IMU tick mapping after mapping every queued FIFO sample.
+        """Update the IMU tick mapping after mapping the queued FIFO samples.
 
-        A current hardware-clock read is newer than FIFO samples already in the
-        device.  Observing it first would make those samples appear out of
-        order to ``SensorClockMapper``.  The initial observation is the sole
-        exception: initialization explicitly discarded the FIFO immediately
-        before calling this method.
+        A current hardware-clock read is newer than FIFO samples still in the
+        device.  ``SensorClockMapper`` tolerates this (observations are excluded
+        from its sample ordering check), since samples written during the drain
+        or the timestamp read cannot be avoided.  Draining first still keeps
+        most queued samples on the calibration in force when they were acquired.
         """
         if self._last_imu_clock_observation_ns is not None:
             self._read_imu_fifo_into_pending()

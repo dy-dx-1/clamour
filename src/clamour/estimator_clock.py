@@ -58,36 +58,46 @@ class SensorClockMapper:
 
         self.nominal_tick_ns = nominal_tick_ns
         self._modulus = (1 << counter_bits) if counter_bits is not None else None
-        self._last_raw_tick: int | None = None
-        self._wrap_offset = 0
+        # Two separate references, because observations and FIFO samples are two
+        # different streams.  An observation reads the live counter, so it is
+        # routinely newer than samples still queued in the FIFO.
+        # - Unwrapping reference: the latest tick from either stream.
+        # - Ordering reference: FIFO samples only, which must be chronological
+        #   among themselves.  Observations never take part in this check.
+        self._last_unwrapped_tick: int | None = None
+        self._last_sample_tick: int | None = None
         self._observations: deque[tuple[int, int]] = deque(maxlen=max_observations)
         self._scale_ns_per_tick: float | None = None
         self._offset_ns: float | None = None
         self._last_emitted_estimator_ns: int | None = None
 
     def _unwrap_tick(self, raw_tick: int) -> int:
-        """Unwrap ordered hardware ticks; FIFO samples must be supplied in order."""
+        """Return the unwrapped tick nearest the latest tick from either stream.
+
+        Picking the candidate within half a counter period of the reference
+        handles rollover whichever stream (observation or FIFO sample) crosses
+        it first.  Pure: performs no ordering check and does not update state.
+        """
         if raw_tick < 0:
             raise ValueError("raw_tick must be non-negative")
-        if self._modulus is not None:
-            raw_tick %= self._modulus
-            if self._last_raw_tick is not None:
-                # A large backwards jump is counter rollover; smaller backwards
-                # jumps mean the caller supplied samples out of chronological order.
-                if raw_tick < self._last_raw_tick:
-                    if self._last_raw_tick - raw_tick > self._modulus // 2:
-                        self._wrap_offset += self._modulus
-                    else:
-                        raise ValueError("sensor ticks arrived out of order")
-        elif self._last_raw_tick is not None and raw_tick < self._last_raw_tick:
-            raise ValueError("sensor ticks arrived out of order")
-
-        self._last_raw_tick = raw_tick
-        return self._wrap_offset + raw_tick
+        if self._modulus is None:
+            return raw_tick
+        raw_tick %= self._modulus
+        if self._last_unwrapped_tick is None:
+            return raw_tick
+        delta = (raw_tick - self._last_unwrapped_tick) % self._modulus
+        if delta >= self._modulus // 2:
+            delta -= self._modulus
+        return self._last_unwrapped_tick + delta
 
     def observe(self, raw_tick: int, estimator_time_ns: int) -> None:
-        """Add a paired clock observation and refresh the affine mapping."""
+        """Add a paired clock observation and refresh the affine mapping.
+
+        The observed tick may be newer than FIFO samples not yet converted;
+        that is expected and does not affect their ordering check.
+        """
         tick = self._unwrap_tick(raw_tick)
+        self._last_unwrapped_tick = tick
         self._observations.append((tick, estimator_time_ns))
 
         if len(self._observations) == 1:
@@ -122,6 +132,10 @@ class SensorClockMapper:
         if self._scale_ns_per_tick is None or self._offset_ns is None:
             raise RuntimeError("clock mapper needs an initial paired observation")
         tick = self._unwrap_tick(raw_tick)
+        if self._last_sample_tick is not None and tick < self._last_sample_tick:
+            raise ValueError("sensor ticks arrived out of order")
+        self._last_unwrapped_tick = tick
+        self._last_sample_tick = tick
         estimator_time_ns = round(self._scale_ns_per_tick * tick + self._offset_ns)
         if self._last_emitted_estimator_ns is not None:
             estimator_time_ns = max(estimator_time_ns, self._last_emitted_estimator_ns)
