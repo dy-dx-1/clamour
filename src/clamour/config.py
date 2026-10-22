@@ -92,7 +92,8 @@ if TX_POWER_CONFIG: # If specified, TX POWER CONFIG must be list in LSB order of
     assert type(TX_POWER_CONFIG[0])== int
 
 # Estimator, only supporting EKF or Factor Graphs 
-assert ESTIMATOR_TYPE in ("EKF", "FG") # these match the types accepted and expected by the class StateEstimator 
+assert ESTIMATOR_TYPE in ("EKF", "FG") # these match the types accepted and expected by the class StateEstimator
+assert not (ESTIMATOR_TYPE == "EKF" and IMU_TYPE is not None) # the legacy EKF is constant-velocity only; set IMU_TYPE = None
 
 # IMU parameter types and shapes
 # all dtypes must be floats to work well with GTSAM 

@@ -9,8 +9,7 @@ from queue import Empty
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
 
-from .ekf import CustomEKF
-from .factor_graph import FactorGraph
+# NOTE: CustomEKF and FactorGraph are imported in initialize_estimator so the EKF can run without gtsam installed
 from ..estimator_clock import EstimatorClock, SensorClockMapper
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV
@@ -94,9 +93,9 @@ class StateEstimator:
         # The latest measurement at or before the current state boundary.  Its
         # value is held until the next sample for zero-order-hold integration.
         self._held_imu_sample: TimedIMUSample | None = None
-        # EstimatorClock time of the first graph state.  The processing loop
+        # EstimatorClock time of the first estimator state.  The processing loop
         # starts its first interval here so the first IMU link and the cadence
-        # scheduler share the same boundary.  None for the EKF.
+        # scheduler share the same boundary.
         self._first_state_time_ns: int | None = None
 
         self.state_csv, self.writer = self.initialize_csv()
@@ -164,17 +163,19 @@ class StateEstimator:
                 self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses
                 raw_yaw = self.correct_yaw(msg.measured_yaw)
 
+                self._first_state_time_ns = self.estimator_clock.now_ns()
                 if self.estimator_type == 'EKF':
-                    self.estimator = CustomEKF(anchor_ros, raw_yaw)
-                    self.estimator.incorporate_ranging_data(msg.timestamp, msg.range_observations, raw_yaw)
+                    from .ekf import CustomEKF
+                    self.estimator = CustomEKF(anchor_ros, raw_yaw, self._first_state_time_ns, STATE_INTERVAL)
+                    self.estimator.incorporate_ranging_data(msg.range_observations, raw_yaw)
                 elif self.estimator_type == 'FG':
+                    from .factor_graph import FactorGraph
                     accel_covar_density = self.imu.accel_covar_density_mg if self.imu is not None else None
                     gyro_covar_density = self.imu.gyro_covar_density_mg if self.imu is not None else None
                     # Bootstrap assumes the tag is stationary.  Anchor the
                     # first graph state at the instant fusion begins, rather
                     # than at the earlier UWB acquisition time, so the first
                     # IMU factor and the cadence scheduler share a boundary.
-                    self._first_state_time_ns = self.estimator_clock.now_ns()
                     self.estimator = FactorGraph(
                         anchor_ros,
                         radians(raw_yaw),
