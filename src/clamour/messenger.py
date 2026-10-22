@@ -45,7 +45,7 @@ class Messenger:
             topology=topology,
             range_observations=range_observations,
         )
-
+        message.sent_ns = self.estimator_clock.now_ns()  # Used by the estimator to measure range delivery delay
         self.multiprocess_communication_queue.put(UpdateMessage.save(message))
 
     def send_topology_update(self, topology: dict) -> None:
