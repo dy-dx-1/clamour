@@ -451,3 +451,10 @@ class LSM6DSV320X(IMU):
         # From p.85, the conversion is 1LSB=21.7microseconds 
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
         return int.from_bytes(raw_bytes, 'little') if return_ticks else int.from_bytes(raw_bytes, 'little')*21.7
+
+    def step_event(self)->bool:
+        """
+        Polls EMB_FUNC_SRC to see if a step event was detected
+        """
+        EMB_FUNC_SRC = self.bus.read_byte_data(self.TAD, 0x64)
+        return bool(EMB_FUNC_SRC&0x20) 
