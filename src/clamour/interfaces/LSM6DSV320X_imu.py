@@ -458,3 +458,10 @@ class LSM6DSV320X(IMU):
         """
         EMB_FUNC_SRC = self.bus.read_byte_data(self.TAD, 0x64)
         return bool(EMB_FUNC_SRC&0x20) 
+
+    def step_count(self)->int: 
+        """
+        Current step count from STEP_COUNTER_L and STEP_COUNTER_H registers
+        Step count rolls over after 2^16
+        """
+        return int.from_bytes(bytes(self.bus.read_i2c_block_data(self.TAD, 0x62, 2)), 'little')

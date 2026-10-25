@@ -15,4 +15,12 @@ with LSM6DSV320X(120, 2, 500, False) as imu:
         step = imu.step_event() 
         if step: 
             print(f"Step detected!") 
+
+"""
+with LSM6DSV320X(120, 2, 500, False) as imu: 
+    while True: 
+        steps = imu.step_count() 
+        print(f"step count: {steps}") 
+        sleep(1)  
+"""
         
