@@ -277,11 +277,18 @@ class LSM6DSV320X(IMU):
         self.bus.write_byte_data(self.TAD, 0x11, mode<<4 | ODR_bits)
 
         ### Enable timestamp - FUNCTIONS_ENABLE - 0x50
-        # NOTE for now not touching other functions 
         current = self.bus.read_byte_data(self.TAD, 0x50) 
         TIMESTAMP_EN = 1<<6 
         self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
-
+        ### Configuring pedometer 
+        ## Enableing at EMB_FUNC_EN_A 
+        current = self.bus.read_byte_data(self.TAD, 0x04)
+        self.bus.write_byte_data(self.TAD, 0x04, current|(1<<3))
+        ## Enableing MLC at EMB_FUNC_B for false positive detection
+        # Don't care about the FSM or FIFO compression
+        self.bus.write_byte_data(self.TAD, 0x05, 1<<4)
+        ## Enableing false positive detection PEDO_CMD_REG 
+        self.bus.write_byte_data(self.TAD, 0x83, 1<<2) 
         ### Configuring FIFO 
         self.fifo_config(data_freq = ODR_rate) 
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
