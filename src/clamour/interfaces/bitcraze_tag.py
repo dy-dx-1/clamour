@@ -2,7 +2,7 @@ from ..custom_terminal import print
 
 from .tag import Tag
 from .containers import Pose
-from .dw_1000 import DW1000
+from dw_1000_spi import DW1000
 from .anchors import Anchors
 
 import numpy as np 
