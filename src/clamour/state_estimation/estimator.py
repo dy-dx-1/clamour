@@ -452,13 +452,13 @@ class StateEstimator:
                     lateness_ns = batch.start_time_ns - observation.event_time_ns
                     if RANGE_TIMING_STATS:
                         self._range_timing.drop_latenesses_ns.append(lateness_ns)
-                    print(
-                        "WARNING: Dropping late range "
-                        f"to {observation.target_id} acquired at {observation.event_time_ns} ns; "
-                        f"current interval starts at {batch.start_time_ns} ns (late by {lateness_ns / 1_000_000:.1f} ms).",
-                        'info',
-                        'loc',
-                    )
+                    #print(
+                    #    "WARNING: Dropping late range "
+                    #    f"to {observation.target_id} acquired at {observation.event_time_ns} ns; "
+                    #    f"current interval starts at {batch.start_time_ns} ns (late by {lateness_ns / 1_000_000:.1f} ms).",
+                    #    'info',
+                    #    'loc',
+                    #)
                     # TODO: Assign delayed measurements to their historical graph state.
                 elif observation.event_time_ns <= batch.boundary_time_ns:
                     interval_observations.append(observation)
@@ -540,7 +540,7 @@ class StateEstimator:
         with self.tag_lock:
             self.tag.pose = pose
  
-        self.pose_callback(pose)
+        #self.pose_callback(pose)
 
         if SAVE_TO_CSV and message is not None:
             self.save_to_csv(message)
