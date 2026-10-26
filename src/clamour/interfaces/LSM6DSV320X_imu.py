@@ -281,6 +281,8 @@ class LSM6DSV320X(IMU):
         TIMESTAMP_EN = 1<<6 
         self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
         ### Configuring pedometer 
+        ## Enable embedded functions registers in FUNC_CFG_ACCESS
+        self.bus.write_byte_data(self.TAD, 0x01, 0x80)
         ## Enableing at EMB_FUNC_EN_A 
         current = self.bus.read_byte_data(self.TAD, 0x04)
         self.bus.write_byte_data(self.TAD, 0x04, current|(1<<3))
