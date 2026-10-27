@@ -96,7 +96,12 @@ class LSM6DSV320X(IMU):
         self._fifo_partial_sample: list[object | None] | None = None
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
-        if not self.validate_connection(): 
+        # Ensure the main register bank is selected (FUNC_CFG_ACCESS persists across sessions while powered)
+        try:
+            self.bus.write_byte_data(self.TAD, 0x01, 0x00)
+        except OSError:
+            pass # No ACK: let validate_connection() report the failure
+        if not self.validate_connection():
             raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
         else:
             self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
@@ -290,8 +295,10 @@ class LSM6DSV320X(IMU):
         # Don't care about the FSM or FIFO compression
         self.bus.write_byte_data(self.TAD, 0x05, 1<<4)
         ## Enableing false positive detection PEDO_CMD_REG 
-        self.bus.write_byte_data(self.TAD, 0x83, 1<<2) 
-        ### Configuring FIFO 
+        self.bus.write_byte_data(self.TAD, 0x83, 1<<2)
+        ## Return to the main register bank (FUNC_CFG_ACCESS), else main registers are inaccessible
+        self.bus.write_byte_data(self.TAD, 0x01, 0x00)
+        ### Configuring FIFO
         self.fifo_config(data_freq = ODR_rate) 
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
 
