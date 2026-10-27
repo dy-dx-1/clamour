@@ -1,4 +1,5 @@
 import smbus2
+import time
 from typing import Literal 
 import numpy as np
 
@@ -96,16 +97,21 @@ class LSM6DSV320X(IMU):
         self._fifo_partial_sample: list[object | None] | None = None
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
-        # Ensure the main register bank is selected (FUNC_CFG_ACCESS persists across sessions while powered)
+        # Global reset (SW_POR in FUNC_CFG_ACCESS) so every session starts from power-up defaults,
+        # as register contents (banks, embedded functions, pages) persist across sessions while powered
         try:
-            self.bus.write_byte_data(self.TAD, 0x01, 0x00)
+            self.bus.write_byte_data(self.TAD, 0x01, 1<<2)
         except OSError:
-            pass # No ACK: let validate_connection() report the failure
-        if not self.validate_connection():
-            raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
-        else:
-            self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
-            print("SUCCESSFULLY CONNECTED TO IMU")
+            pass # The device may not ACK while resetting
+        # Reset duration isn't specified in the datasheet: poll WHO_AM_I until the device responds
+        deadline = time.monotonic() + 0.5
+        while not self.validate_connection(report_errors=False):
+            if time.monotonic() > deadline:
+                self.validate_connection() # Report the failure cause
+                raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
+            time.sleep(0.005)
+        self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate)
+        print("SUCCESSFULLY CONNECTED TO IMU")
 
     def __enter__(self):
         return self 
@@ -228,14 +234,14 @@ class LSM6DSV320X(IMU):
             apply_bias,
         )
 
-    def validate_connection(self): 
+    def validate_connection(self, report_errors:bool=True):
         """
-        Reads the WHO_AM_I register (0x0F) and checks it's value to confirm if a connection is properly established. 
+        Reads the WHO_AM_I register (0x0F) and checks it's value to confirm if a connection is properly established.
         """
-        try: 
+        try:
             check = (self.bus.read_byte_data(self.TAD, 0x0F) == 0x73)
-        except Exception as e: 
-            print(f"IMU validate connection raised: {e}")
+        except Exception as e:
+            if report_errors: print(f"IMU validate connection raised: {e}")
             check = False 
         return check 
 
@@ -295,7 +301,13 @@ class LSM6DSV320X(IMU):
         # Don't care about the FSM or FIFO compression
         self.bus.write_byte_data(self.TAD, 0x05, 1<<4)
         ## Enableing false positive detection PEDO_CMD_REG 
-        self.bus.write_byte_data(self.TAD, 0x83, 1<<2)
+        # PEDO_CMD_REG is on embedded advanced features page 1, written indirectly (write procedure p.156)
+        self.bus.write_byte_data(self.TAD, 0x17, 1<<6)           # PAGE_RW: PAGE_WRITE = 1
+        self.bus.write_byte_data(self.TAD, 0x02, 0b0001<<4 | 1)  # PAGE_SEL: page 1 (bit 0 must be 1)
+        self.bus.write_byte_data(self.TAD, 0x08, 0x83)           # PAGE_ADDRESS
+        self.bus.write_byte_data(self.TAD, 0x09, 1<<2)           # PAGE_VALUE: FP_REJECTION_EN
+        self.bus.write_byte_data(self.TAD, 0x17, 0x00)           # PAGE_RW: PAGE_WRITE = 0
+        self.bus.write_byte_data(self.TAD, 0x02, 1)              # PAGE_SEL: back to page 0
         ## Return to the main register bank (FUNC_CFG_ACCESS), else main registers are inaccessible
         self.bus.write_byte_data(self.TAD, 0x01, 0x00)
         ### Configuring FIFO
@@ -461,16 +473,14 @@ class LSM6DSV320X(IMU):
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
         return int.from_bytes(raw_bytes, 'little') if return_ticks else int.from_bytes(raw_bytes, 'little')*21.7
 
-    def step_event(self)->bool:
+    def step_count(self)->int:
         """
-        Polls EMB_FUNC_SRC to see if a step event was detected
-        """
-        EMB_FUNC_SRC = self.bus.read_byte_data(self.TAD, 0x64)
-        return bool(EMB_FUNC_SRC&0x20) 
-
-    def step_count(self)->int: 
-        """
-        Current step count from STEP_COUNTER_L and STEP_COUNTER_H registers
+        Current step count from STEP_COUNTER_L and STEP_COUNTER_H registers (embedded functions bank)
         Step count rolls over after 2^16
         """
-        return int.from_bytes(bytes(self.bus.read_i2c_block_data(self.TAD, 0x62, 2)), 'little')
+        self.bus.write_byte_data(self.TAD, 0x01, 0x80) # FUNC_CFG_ACCESS: embedded functions bank
+        try:
+            data = self.bus.read_i2c_block_data(self.TAD, 0x62, 2)
+        finally:
+            self.bus.write_byte_data(self.TAD, 0x01, 0x00) # Back to main bank
+        return data[0] | (data[1] << 8)
