@@ -62,7 +62,7 @@ class PozyxTag(Tag):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.clear_anchors() 
         self.reset()
-        print("PozyxTag.__exit__() completed.", 'ok', 'gen')
+        print("PozyxTag.__exit__() completed.", 'ok', 'device')
 
     @property
     def tag_id(self):
