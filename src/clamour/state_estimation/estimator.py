@@ -25,6 +25,10 @@ from ..rooms import Floorplan
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
 STATE_INTERVAL = 0.1  # seconds
 STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
+# Ranges are sent in batches, so the oldest range of a batch reaches the queue late.
+# Tolerance covers one failed TWR exchange (2 × 15 ms DW listen timeouts) plus margin for queue transit.
+RANGE_LATENESS_NS = 35 * 1_000_000
+assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
 # The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift 
 IMU_CLOCK_REFRESH_INTERVAL = 1.0  # seconds; ten times the state interval
 IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000)
@@ -35,9 +39,6 @@ IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000
 IMU_FIFO_WATERMARK_FRACTION = 0.70
 IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE = 3 # Words per grouped FIFO sample: ex: accel, gyro, timestamp 
 IMU_FIFO_POLL_SAFETY_FACTOR = 0.5
-# Range timing diagnostics: periodically prints range delivery delays and late drops
-RANGE_TIMING_STATS = True
-RANGE_TIMING_STATS_PERIOD_NS = 5 * 1_000_000_000
 
 @dataclass
 class SensorBatch:
@@ -53,41 +54,6 @@ class SensorBatch:
     messages: list[UpdateMessage] = field(default_factory=list)
     imu_start_sample: TimedIMUSample | None = None
     imu_samples: list[TimedIMUSample] = field(default_factory=list)
-
-@dataclass
-class RangeTimingStats:
-    """
-    Range timing diagnostics over one reporting window, used to size a lateness watermark.
-    - delivery delay: enqueue time - acquisition time, per range
-    - batch span: newest - oldest acquisition time within one message
-    - drop lateness: interval start - acquisition time, per dropped range
-    NOTE: queue transit time is not included in the delivery delay.
-    """
-    window_start_ns: int
-    delivery_delays_ns: list[int] = field(default_factory=list)
-    drop_latenesses_ns: list[int] = field(default_factory=list)
-    max_batch_span_ns: int = 0
-
-    def record_message(self, message: UpdateMessage) -> None:
-        event_times = [observation.event_time_ns for observation in message.range_observations]
-        if not event_times or message.sent_ns is None:
-            return
-        self.delivery_delays_ns.extend(message.sent_ns - event_time for event_time in event_times)
-        self.max_batch_span_ns = max(self.max_batch_span_ns, max(event_times) - min(event_times))
-
-    def summary(self, now_ns: int) -> str:
-        to_ms = lambda ns: ns / 1_000_000
-        count = len(self.delivery_delays_ns)
-        dropped = len(self.drop_latenesses_ns)
-        text = f"Range timing over {to_ms(now_ns - self.window_start_ns) / 1000:.1f}s: {count} ranges, {dropped} dropped"
-        if count:
-            delays = sorted(self.delivery_delays_ns)
-            p95 = delays[ceil(0.95 * count) - 1]
-            text += (f" ({100 * dropped / count:.1f}%) | delivery delay p95 {to_ms(p95):.1f} ms, max {to_ms(delays[-1]):.1f} ms"
-                     f" | max batch span {to_ms(self.max_batch_span_ns):.1f} ms")
-        if dropped:
-            text += f" | drop lateness max {to_ms(max(self.drop_latenesses_ns)):.1f} ms"
-        return text
 
 class StateEstimator:
     """
@@ -135,8 +101,6 @@ class StateEstimator:
         # starts its first interval here so the first IMU link and the cadence
         # scheduler share the same boundary.
         self._first_state_time_ns: int | None = None
-
-        self._range_timing = RangeTimingStats(estimator_clock.now_ns())
 
         self.state_csv, self.writer = self.initialize_csv()
 
@@ -240,7 +204,8 @@ class StateEstimator:
             - Add all measures to the new state and use IMU info as a motion link. If no IMU, assume constant-velocity.
             - Update the estimator posterior and publish it 
 
-        NOTE: All sensor timings are compared on the same EstimatorClock reference 
+        NOTE: All sensor timings are compared on the same EstimatorClock reference
+        NOTE: Each interval is closed RANGE_LATENESS_NS after its boundary, which delays publishing by the same amount
         """
         # Start from the first graph state's time, not a fresh ``now``: time spent
         # publishing the initial posterior must not open a gap between the graph's
@@ -262,12 +227,16 @@ class StateEstimator:
             if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
                 self._read_imu_fifo_into_pending()
 
+            # Wait RANGE_LATENESS_NS past the boundary before closing the interval, so
+            # batched ranges acquired just before it can still reach the queue.
+            # Later events are kept as future measurements by their event time.
             now = self.estimator_clock.now_ns()
-            if now < next_boundary:
+            close_time = next_boundary + RANGE_LATENESS_NS
+            if now < close_time:
                 # Keep latency low without using a repeated fixed sleep, which
                 # would accumulate scheduler drift over a long run.  In IMU mode,
                 # wake often enough to service the FIFO before it can overflow.
-                sleep_ns = next_boundary - now
+                sleep_ns = close_time - now
                 if self.imu is not None:
                     sleep_ns = min(sleep_ns, self.imu_fifo_poll_interval_ns)
                 sleep(sleep_ns / 1_000_000_000)
@@ -293,8 +262,6 @@ class StateEstimator:
                 imu_samples=imu_samples,
             )
             pending_messages = self._process_sensor_batch(batch)
-            if RANGE_TIMING_STATS:
-                self._report_range_timing_if_due()
 
             # Advance from the previous deadline rather than from ``now``.  When
             # processing overruns, the following iterations catch up by closing
@@ -307,20 +274,9 @@ class StateEstimator:
         pending_messages = []
         while True:
             try:
-                message = UpdateMessage.load(*self.com_queue.get_nowait())
+                pending_messages.append(UpdateMessage.load(*self.com_queue.get_nowait()))
             except Empty:
                 return pending_messages
-            if RANGE_TIMING_STATS and message.update_type == UpdateType.RANGING:
-                self._range_timing.record_message(message)  # Recorded once here, before any future-interval split
-            pending_messages.append(message)
-
-    def _report_range_timing_if_due(self) -> None:
-        """Print the range timing summary and start a new window once the reporting period has elapsed."""
-        now_ns = self.estimator_clock.now_ns()
-        if now_ns - self._range_timing.window_start_ns < RANGE_TIMING_STATS_PERIOD_NS:
-            return
-        print(self._range_timing.summary(now_ns), 'info', 'loc')
-        self._range_timing = RangeTimingStats(now_ns)
 
     def _drain_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> tuple[TimedIMUSample | None, list[TimedIMUSample]]:
         """Return the held start sample and samples in ``(start, boundary]``.
@@ -440,7 +396,8 @@ class StateEstimator:
         self.publish_state(interval_range_message if range_observations else None)
         return future_range_messages
 
-    def _partition_interval_ranges(self, messages: list[UpdateMessage], batch: SensorBatch) -> tuple[list[RangeObservation], list[UpdateMessage], UpdateMessage | None]:
+    @staticmethod
+    def _partition_interval_ranges(messages: list[UpdateMessage], batch: SensorBatch) -> tuple[list[RangeObservation], list[UpdateMessage], UpdateMessage | None]:
         """Split ranges into the current interval, future intervals, and late drops."""
         interval_observations = []
         future_messages = []
@@ -449,16 +406,13 @@ class StateEstimator:
             future_observations = []
             for observation in message.range_observations:
                 if observation.event_time_ns <= batch.start_time_ns:
-                    lateness_ns = batch.start_time_ns - observation.event_time_ns
-                    if RANGE_TIMING_STATS:
-                        self._range_timing.drop_latenesses_ns.append(lateness_ns)
-                    #print(
-                    #    "WARNING: Dropping late range "
-                    #    f"to {observation.target_id} acquired at {observation.event_time_ns} ns; "
-                    #    f"current interval starts at {batch.start_time_ns} ns (late by {lateness_ns / 1_000_000:.1f} ms).",
-                    #    'info',
-                    #    'loc',
-                    #)
+                    print(
+                        "WARNING: Dropping late range "
+                        f"to {observation.target_id} acquired at {observation.event_time_ns} ns; "
+                        f"current interval starts at {batch.start_time_ns} ns.",
+                        'error',
+                        'loc',
+                    )
                     # TODO: Assign delayed measurements to their historical graph state.
                 elif observation.event_time_ns <= batch.boundary_time_ns:
                     interval_observations.append(observation)
