@@ -18,14 +18,12 @@ class UpdateMessage:
     - range_observations: list[RangeObservation]
     - slots
     - topology: dict
-    - sent_ns: estimator-frame time at which the message was enqueued (diagnostics only)
     """
 
     def __init__(self, update_type: UpdateType, timestamp_ns: int,
                  measured_yaw: float = 0.0,
                  slots: list | None = None, topology: dict | None = None,
-                 range_observations: list[RangeObservation] | None = None,
-                 sent_ns: int | None = None):
+                 range_observations: list[RangeObservation] | None = None):
         self.update_type = update_type
 
         # Canonical estimator-time value in nanoseconds. Producers should stamp
@@ -37,7 +35,6 @@ class UpdateMessage:
 
         self.slots = slots
         self.topology = topology if topology is not None else {}
-        self.sent_ns = sent_ns
 
     @staticmethod
     def save(message):
