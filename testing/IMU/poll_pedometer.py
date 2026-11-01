@@ -19,9 +19,12 @@ with LSM6DSV320X(120, 2, 500, False) as imu:
 """
 
 with LSM6DSV320X(120, 2, 500, False) as imu: 
+    prev = 0 
     while True: 
         steps = imu.step_count() 
-        print(f"step count: {steps}") 
+        if steps!=prev: 
+            print(f"step count: {steps}") 
+            prev = steps 
         sleep(1)  
 
         
