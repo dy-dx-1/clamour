@@ -303,6 +303,10 @@ class StateEstimator:
                 interval_samples.append(sample)
 
         start_sample = self._held_imu_sample
+        # DEBUG: next_ahead_ms > 0 is how far the first unaccepted sample lies past the boundary
+        next_ahead_ms = (self._pending_imu_samples[0].timestamp_ns - boundary_time_ns) / 1e6 if self._pending_imu_samples else None
+        print(f"IMU drain: held={start_sample is not None} n_interval={len(interval_samples)} "
+              f"n_pending={len(self._pending_imu_samples)} next_ahead_ms={next_ahead_ms}", 'info', 'loc')
         if interval_samples:
             self._held_imu_sample = interval_samples[-1]
         return start_sample, interval_samples
