@@ -388,3 +388,13 @@ class FactorGraph:
         previous_velocity = self._state.velocity()
         graph.add(gt.BetweenFactorVector(v_prev, v, np.zeros(3), CONSTANT_VELOCITY_NOISE))
         initial_values.insert(v, previous_velocity)
+        # With an IMU, carry the bias so every state has a B(k) for a later CombinedImuFactor.
+        # The between noise is the bias random walk accumulated over dt_s.
+        if hasattr(self, "pim"):
+            b_prev, b = gt.symbol('b', current_state_id - 1), gt.symbol('b', current_state_id)
+            bias_walk_noise = gt.noiseModel.Diagonal.Sigmas(np.concatenate((
+                np.full(3, np.sqrt(IMU_ACCEL_WALK_COV * dt_s)),
+                np.full(3, np.sqrt(IMU_GYRO_WALK_COV * dt_s)),
+            )))
+            graph.add(gt.BetweenFactorConstantBias(b_prev, b, gt.imuBias.ConstantBias(), bias_walk_noise))
+            initial_values.insert(b, self.pim.biasHat())
