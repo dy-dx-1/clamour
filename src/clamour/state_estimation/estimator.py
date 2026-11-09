@@ -498,7 +498,7 @@ class StateEstimator:
         with self.tag_lock:
             self.tag.pose = pose
  
-        #self.pose_callback(pose)
+        self.pose_callback(pose)
 
         if SAVE_TO_CSV and message is not None:
             self.save_to_csv(message)
