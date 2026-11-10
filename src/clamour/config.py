@@ -9,7 +9,7 @@ Defines all configuration parameters for Clamour and validates they can be used 
 - Anchor definition 
 """
 ### Tag type and ID 
-TAG_TYPE = "Bitcraze"      # Manufacturer of the tag. Bitcraze or Pozyx
+TAG_TYPE = "Synthetic"      # Manufacturer of the tag. Bitcraze, Pozyx or Synthetic
 TAG_ID = 11                # Tag IDs must be >10. This ONLY applies for BC tags. Pozyx breaks ranging when enforcing IDs, dk why, already wasted 4h+ on it. 
 ### DW1000 and UWB config - only applicable for Bitcraze Tags
 DW1000_BUS =  0            # SPI bus where the deck is connected 
@@ -47,8 +47,8 @@ IMU_GYRO_WALK_COV_MDPS2_PER_S = 5.73**2  # (mdps^2)/s
 ## Terminal
 GEN_MSGS    = True     # Turn off/on general terminal output 
 DEVICE_MSGS = True     # Turn off/on device management-related terminal output  
-TDMA_MSGS   = False     # Turn off/on TDMA-related terminal output  
-LOC_MSGS    = False     # Turn off/on localization-related terminal output  
+TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
+LOC_MSGS    = True     # Turn off/on localization-related terminal output  
 ## CSV saving 
 SAVE_TO_CSV = False     # Save localization data to csv or not 
 ## Dynamic MIST sends position updates through a socket to use with utils/dynamic_MIST.py
@@ -70,7 +70,7 @@ ANCHORS = ({'id': 1, 'level': 0, 'x': 473.6, 'y': 219.4, 'z': 121.3},
 ANCHOR_POS_UNCERTAINTY_CM = 5.0  # +/- precision on each anchor coordinate, in cm
 
 ### ----------------------- VALIDATION CHECKS ----------------------- ### 
-assert TAG_TYPE in ("Bitcraze", "Pozyx") 
+assert TAG_TYPE in ("Bitcraze", "Pozyx", "Synthetic") 
 assert 10<TAG_ID<0xFFFF
 
 from .tdma.timing import SCHEDULING_SLOT_COUNT 

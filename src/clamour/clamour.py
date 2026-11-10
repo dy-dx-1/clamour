@@ -15,6 +15,7 @@ from .runnableProcess import RunnableProcess
 from .soundmanager import SoundManager
 from .interfaces.bitcraze_tag import BitcrazeTag
 from .interfaces.pozyx_tag import PozyxTag
+from .interfaces.synthetic_tag import SyntheticTag
 from .custom_terminal import print
 
 #################################################### CONFIG PARAMETERS
@@ -31,6 +32,8 @@ match TAG_TYPE:
                                           tx_power_settings = TX_POWER_CONFIG)
     case "Pozyx": 
         TAG_FACTORY = lambda: PozyxTag() 
+    case "Synthetic": 
+        TAG_FACTORY = lambda: SyntheticTag(tag_id=TAG_ID)
     case _: 
         raise ValueError(f"Invalid tag type: {TAG_TYPE}. Check your config file.")
 
