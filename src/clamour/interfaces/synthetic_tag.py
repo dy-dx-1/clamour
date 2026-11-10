@@ -93,4 +93,4 @@ class SyntheticTag(Tag):
 
     def ranging(self, target_id:int) -> tuple[int|None, Pose|None]:
         dist_vect = np.array(FAKE_POS) - np.array(ANCHORS_DICT[target_id])
-        return round(np.linalg.norm(dist_vect))
+        return round(np.linalg.norm(dist_vect)), None 
