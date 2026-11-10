@@ -8,11 +8,13 @@ from dataclasses import dataclass, field
 from queue import Empty
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
+import socket 
+import struct 
 
 # NOTE: CustomEKF and FactorGraph are imported in initialize_estimator so the EKF can run without gtsam installed
 from ..estimator_clock import EstimatorClock, SensorClockMapper
 from ..custom_terminal import print 
-from ..config import SAVE_TO_CSV
+from ..config import SAVE_TO_CSV, DYNAMIC_MIST, UDP_HOST, UDP_PORT
 from ..interfaces import IMU, Tag, Pose
 from ..sensor_events import RangeObservation, TimedIMUSample
 from ..contextManagedQueue import ContextManagedQueue
@@ -103,6 +105,9 @@ class StateEstimator:
         self._first_state_time_ns: int | None = None
 
         self.state_csv, self.writer = self.initialize_csv()
+        if DYNAMIC_MIST:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock_dest = (UDP_HOST, UDP_PORT)
 
         self.floorplan = Floorplan() # NOTE TODO: currently unused 
         self.current_room = self.floorplan.rooms['24'] 
@@ -115,6 +120,8 @@ class StateEstimator:
                 self._run_processing_loop()
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
+            if DYNAMIC_MIST: 
+                self._socket.close() 
             raise e
 
     def _configure_imu(self, imu: IMU | None) -> None:
@@ -499,6 +506,10 @@ class StateEstimator:
             self.tag.pose = pose
  
         self.pose_callback(pose)
+
+        if DYNAMIC_MIST: 
+            packet = struct.pack("<ifff", self.tag.tag_id, *self.tag.pose.coordinates)
+            self._socket.sendto(packet, self.sock_dest)
 
         if SAVE_TO_CSV and message is not None:
             self.save_to_csv(message)

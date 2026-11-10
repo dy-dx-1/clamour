@@ -56,6 +56,10 @@ TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output
 LOC_MSGS    = True     # Turn off/on localization-related terminal output  
 ## CSV saving 
 SAVE_TO_CSV = False     # Save localization data to csv or not 
+## Dynamic MIST sends position updates through a socket to use with utils/dynamic_MIST.py
+DYNAMIC_MIST = False 
+UDP_HOST = "127.0.0.1" # host and port need to match dynamic_MIST
+UDP_PORT = 5005
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 
