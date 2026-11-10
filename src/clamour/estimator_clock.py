@@ -126,6 +126,7 @@ class SensorClockMapper:
             mapped_observation = scale * tick + offset
             if mapped_observation < self._last_emitted_estimator_ns:
                 self._offset_ns += self._last_emitted_estimator_ns - mapped_observation
+        print("UPDATED ESTIMATOR CLOCK", f" scale: {round(self._scale_ns_per_tick)}", f" offset: {round(self._offset_ns)}")
 
     def to_estimator_ns(self, raw_tick: int) -> int:
         """Convert the next ordered sensor tick using the latest calibration."""

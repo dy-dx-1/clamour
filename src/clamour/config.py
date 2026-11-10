@@ -13,12 +13,7 @@ TAG_TYPE = "Bitcraze"      # Manufacturer of the tag. Bitcraze or Pozyx
 TAG_ID = 11                # Tag IDs must be >10. This ONLY applies for BC tags. Pozyx breaks ranging when enforcing IDs, dk why, already wasted 4h+ on it. 
 ### DW1000 and UWB config - only applicable for Bitcraze Tags
 DW1000_BUS =  0            # SPI bus where the deck is connected 
-DW1000_CS  =  0            # Chip select # where  the deck is connected 
-UWB_CHANNEL = 2            # Any in [1,2,3,4,5,7]
-UWB_PRF = 64               # 16 or 64 MHz
-UWB_BITRATE = 6.8          # 110kps, 850kps or 6.8Mbps
-UWB_PREAMBLE_LENGTH = 128  # Any in [64,128,256,512,1024,1536,2048,4096] symbols
-UWB_PREAMBLE_CODE = 9     
+DW1000_CS  =  0            # Chip select # where  the deck is connected  
 SMART_TX_POWER = True      # Enable or disable smart TX power - Only works for 6.8Mbps bitrate 
 TX_POWER_CONFIG = None     # Overwrites default TX power setting if different from None. MUST be a list[int] where each element is a byte value of the 0x1E register in LSB order (ex: [0x67, 0x67, 0x67, 0x67]) 
 
@@ -52,10 +47,14 @@ IMU_GYRO_WALK_COV_MDPS2_PER_S = 5.73**2  # (mdps^2)/s
 ## Terminal
 GEN_MSGS    = True     # Turn off/on general terminal output 
 DEVICE_MSGS = True     # Turn off/on device management-related terminal output  
-TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
-LOC_MSGS    = True     # Turn off/on localization-related terminal output  
+TDMA_MSGS   = False     # Turn off/on TDMA-related terminal output  
+LOC_MSGS    = False     # Turn off/on localization-related terminal output  
 ## CSV saving 
 SAVE_TO_CSV = False     # Save localization data to csv or not 
+## Dynamic MIST sends position updates through a socket to use with utils/dynamic_MIST.py
+DYNAMIC_MIST = False 
+UDP_HOST = "127.0.0.1" # host and port need to match dynamic_MIST
+UDP_PORT = 5005
 
 ### Anchor definition 
 # Anchors are represented by dicts in a tuple 

@@ -52,7 +52,11 @@ class FactorGraph:
         ## Graph trackers 
         self._state_counter = -1   # How many state nodes have been added to the graph
         self.seen_anchors = set()  # Anchors we have previously seen; to avoid re-adding prior factors
-        self.isam = gt.ISAM2() 
+        # QR is slower than the default Cholesky but tolerates the badly scaled information matrix
+        # (tight IMU/bias constraints vs loose ranges/velocity) that can make Cholesky report an indeterminate system.
+        isam_params = gt.ISAM2Params()
+        isam_params.setFactorization("QR")
+        self.isam = gt.ISAM2(isam_params)
 
         ## Initializing graph 
         initial_state_key = self.state_counter 

@@ -8,11 +8,13 @@ from dataclasses import dataclass, field
 from queue import Empty
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
+import socket 
+import struct 
 
 # NOTE: CustomEKF and FactorGraph are imported in initialize_estimator so the EKF can run without gtsam installed
 from ..estimator_clock import EstimatorClock, SensorClockMapper
 from ..custom_terminal import print 
-from ..config import SAVE_TO_CSV
+from ..config import SAVE_TO_CSV, DYNAMIC_MIST, UDP_HOST, UDP_PORT
 from ..interfaces import IMU, Tag, Pose
 from ..sensor_events import RangeObservation, TimedIMUSample
 from ..contextManagedQueue import ContextManagedQueue
@@ -30,7 +32,7 @@ STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
 RANGE_LATENESS_NS = 35 * 1_000_000
 assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
 # The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift 
-IMU_CLOCK_REFRESH_INTERVAL = 1.0  # seconds; ten times the state interval
+IMU_CLOCK_REFRESH_INTERVAL = 15.0  # seconds; ten times the state interval
 IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000)
 # FIFO emptying safeties - we empty the FIFO before the limit to avoid losing info
 # poll_interval = SF × time_to_overflow
@@ -103,6 +105,9 @@ class StateEstimator:
         self._first_state_time_ns: int | None = None
 
         self.state_csv, self.writer = self.initialize_csv()
+        if DYNAMIC_MIST:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock_dest = (UDP_HOST, UDP_PORT)
 
         self.floorplan = Floorplan() # NOTE TODO: currently unused 
         self.current_room = self.floorplan.rooms['24'] 
@@ -115,6 +120,8 @@ class StateEstimator:
                 self._run_processing_loop()
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
+            if DYNAMIC_MIST: 
+                self._socket.close() 
             raise e
 
     def _configure_imu(self, imu: IMU | None) -> None:
@@ -498,7 +505,12 @@ class StateEstimator:
         with self.tag_lock:
             self.tag.pose = pose
  
-        #self.pose_callback(pose)
+        self.pose_callback(pose)
+
+        if DYNAMIC_MIST: 
+            meters = [coord/100 for coord in self.tag.pose.coordinates]
+            packet = struct.pack("<ifff", self.tag.tag_id, *meters)
+            self._socket.sendto(packet, self.sock_dest)
 
         if SAVE_TO_CSV and message is not None:
             self.save_to_csv(message)

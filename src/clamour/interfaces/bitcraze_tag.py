@@ -10,6 +10,13 @@ from typing import Literal
 import time  
 import struct
 
+# Typical BC UWB settings
+BC_CHANNEL = 2           # Any in [1,2,3,4,5,7]
+BC_PRF = 64              # 16 or 64 MHz
+BC_BITRATE = 6.8         # 110kps, 850kps or 6.8Mbps
+BC_PREAMBLE_LENGTH = 128 # Any in [64,128,256,512,1024,1536,2048,4096] symbols
+BC_PREAMBLE_CODE = 9 
+
 ALL_ANCHORS = Anchors().anchors_dict # Dict {id: (x, y, z)} of all the known anchors
 
 SPEED_OF_LIGHT = 299_792_458
@@ -45,13 +52,11 @@ class BitcrazeTag(Tag):
         TODO 
     """
     def __init__(self, tag_id:int, dw1000_bus:int, dw1000_cs:int, 
-                 channel:int, PRF:int, bitrate:int, 
-                 preamble_length:int, preamble_code:int,
                  smart_tx_power:bool, tx_power_settings:list[int]|None=None):
 
         self._id = tag_id        # NOTE: It's expected that all ID's used are max 2bytes (<0xFFFF). Should be enforced by config.py
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
-        self._dw = DW1000(dw1000_bus, dw1000_cs, channel, PRF, bitrate, preamble_length, preamble_code, smart_tx_power, tx_power_settings)
+        self._dw = DW1000(dw1000_bus, dw1000_cs, BC_CHANNEL, BC_PRF, BC_BITRATE, BC_PREAMBLE_LENGTH, BC_PREAMBLE_CODE, smart_tx_power, tx_power_settings)
 
         self._active_tags = dict()      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 
