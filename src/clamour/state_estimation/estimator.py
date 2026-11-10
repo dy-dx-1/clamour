@@ -508,7 +508,8 @@ class StateEstimator:
         self.pose_callback(pose)
 
         if DYNAMIC_MIST: 
-            packet = struct.pack("<ifff", self.tag.tag_id, *self.tag.pose.coordinates)
+            meters = [coord/100 for coord in self.tag.pose.coordinates]
+            packet = struct.pack("<ifff", self.tag.tag_id, *meters)
             self._socket.sendto(packet, self.sock_dest)
 
         if SAVE_TO_CSV and message is not None:
