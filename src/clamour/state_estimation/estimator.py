@@ -32,7 +32,7 @@ STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
 RANGE_LATENESS_NS = 35 * 1_000_000
 assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
 # The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift 
-IMU_CLOCK_REFRESH_INTERVAL = 1.0  # seconds; ten times the state interval
+IMU_CLOCK_REFRESH_INTERVAL = 15.0  # seconds; ten times the state interval
 IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000)
 # FIFO emptying safeties - we empty the FIFO before the limit to avoid losing info
 # poll_interval = SF × time_to_overflow

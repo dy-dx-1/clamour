@@ -47,8 +47,8 @@ IMU_GYRO_WALK_COV_MDPS2_PER_S = 5.73**2  # (mdps^2)/s
 ## Terminal
 GEN_MSGS    = True     # Turn off/on general terminal output 
 DEVICE_MSGS = True     # Turn off/on device management-related terminal output  
-TDMA_MSGS   = True     # Turn off/on TDMA-related terminal output  
-LOC_MSGS    = True     # Turn off/on localization-related terminal output  
+TDMA_MSGS   = False     # Turn off/on TDMA-related terminal output  
+LOC_MSGS    = False     # Turn off/on localization-related terminal output  
 ## CSV saving 
 SAVE_TO_CSV = False     # Save localization data to csv or not 
 ## Dynamic MIST sends position updates through a socket to use with utils/dynamic_MIST.py
