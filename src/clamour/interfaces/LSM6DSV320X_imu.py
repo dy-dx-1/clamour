@@ -1,6 +1,9 @@
 import smbus2
+import time
 from typing import Literal 
 import numpy as np
+
+from .imu import IMU, RawIMUSample
 
 ######################## DATASHEET CONFIGURATION BITS FOR IMU ########################
 # ODR bit value to set for a desired rate in Hz 
@@ -52,24 +55,7 @@ def uint16_to_int16(value:int)->int:
     """ 
     return value - 0x10000 if value & 0x8000 else value
 
-class LSM6DSV320X: 
-    ### ACCEL/GYRO COVARIANCE  
-    # Measurement values (from datasheet) (GTSAM expects them in setAccelerometerCovariance/setGyroscopeCovariance) 
-    # GTSAM expects a density as it will multiply per 1/delta_t during pre-integration 
-    accel_covar_density_mg = 0.060**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (mg**2)*s 
-    gyro_covar_density_mdps  = 3.8**2 # Units: (mdps**2)*s
- 
-    ### ACCEL/GYRO CALIBRATION VALUES: calibrated_measure = scale_factor @ (raw_measure-bias)
-    ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
-    ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
-    ## Units are in mgs and mdps. 
-    # Scale Factor (always used internally) 
-    accel_scale_factor = np.array([[1.0017558373609916,      0.0,                  0.0],
-                                   [0.006256910346063383,    1.0018358510192535,   0.0],
-                                   [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945]])
-    gyro_scale_factor  =  np.array([[1,0,0],
-                                    [0,1,0],
-                                    [0,0,1]]) # didn't have rate table, so this cannot be calibrated. Not as important as the others. 
+class LSM6DSV320X(IMU): 
     # Bias (general fixed rough values for the class) 
     # Clamour uses the values in config.py, not here. These are just for testing when importing this file.
     # convert_accel_bytes_to_mgs() and convert_gyro_bytes_to_mdps() have params to return or not bias compensated values for this. 
@@ -89,8 +75,6 @@ class LSM6DSV320X:
         - Accel/gyro values are always returned in **mg** and **mdps** units 
             - Values are always scale-corrected
             - Bias correction is optional so they can be applied by an external estimator if desired (ex: GTSAM). See class attributes.
-        - Remember that accel/gyro scale factor, bias and bias random walk covar all are HARDWARE UNIT SPECIFIC. 
-            - NOTE TODO: Should shift these from class attributes to facilitate per-unit definition? 
 
         ARGS: 
         - ODR_rate: Output Data Rate in Hz (must match High Perf mode see p.65 manual)
@@ -99,25 +83,102 @@ class LSM6DSV320X:
         - SDO_state: True for 'HIGH' and False for 'LOW', defines the Target Address 
         - i2c_bus: I2C bus, 1 by default 
         """
+        self._sample_rate_hz = float(ODR_rate)
+        self._accel_scale_factor_mg = np.array([
+            [1.0017558373609916, 0.0, 0.0],
+            [0.006256910346063383, 1.0018358510192535, 0.0],
+            [-0.0050975506470306515, -0.000828014063373834, 1.0032780653565945],
+        ], dtype=float)
+        self._gyro_scale_factor_mdps = np.eye(3, dtype=float)
+        # A FIFO read can end in the middle of an accel/gyro/timestamp group.
+        # Retain only that one partial group for the next read; this is constant
+        # space and avoids losing valid samples at arbitrary FIFO read boundaries.
+        self._fifo_partial_tag_count: int | None = None
+        self._fifo_partial_sample: list[object | None] | None = None
         self.TAD = 0x6A if not SDO_state else 0x6B 
         self.bus = smbus2.SMBus(i2c_bus)
-        if not self.validate_connection(): 
-            raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
-        else:
-            self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate) 
-            print("SUCCESSFULLY CONNECTED TO IMU")
+        # Global reset (SW_POR in FUNC_CFG_ACCESS) so every session starts from power-up defaults,
+        # as register contents (banks, embedded functions, pages) persist across sessions while powered
+        try:
+            self.bus.write_byte_data(self.TAD, 0x01, 1<<2)
+        except OSError:
+            pass # The device may not ACK while resetting
+        # Reset duration isn't specified in the datasheet: poll WHO_AM_I until the device responds
+        deadline = time.monotonic() + 0.5
+        while not self.validate_connection(report_errors=False):
+            if time.monotonic() > deadline:
+                self.validate_connection() # Report the failure cause
+                raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
+            time.sleep(0.005)
+        self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate)
+        print("SUCCESSFULLY CONNECTED TO IMU")
 
     def __enter__(self):
         return self 
 
     def __exit__(self, exc_type, exc_val, exc_tb): 
-        self.bus.close() 
+        self.close()
+
+    def close(self) -> None:
+        self.bus.close()
 
     def __del__(self): 
         try: 
             self.bus.close() 
         except: 
             pass
+
+    ### ACCEL/GYRO CALIBRATION VALUES: calibrated_measure = scale_factor @ (raw_measure-bias)
+    ## NOTE THESE ARE PRELIMINARY & SPECIFIC TO THE UNIQUE PHYSICAL UNIT THEY WERE CALCULATED FOR! (2026-09-10)
+    ## Clamour overwrites the scale factor with the definition in config.py. These are rough placeholders for the class
+    @property
+    def accel_scale_factor_mg(self):
+        return self._accel_scale_factor_mg
+
+    @accel_scale_factor_mg.setter
+    def accel_scale_factor_mg(self, value: np.ndarray) -> None:
+        self._accel_scale_factor_mg = self._validated_scale_factor(value, "accelerometer")
+
+    @property
+    def gyro_scale_factor_mdps(self):
+        return self._gyro_scale_factor_mdps
+
+    @gyro_scale_factor_mdps.setter
+    def gyro_scale_factor_mdps(self, value: np.ndarray) -> None:
+        self._gyro_scale_factor_mdps = self._validated_scale_factor(value, "gyroscope")
+
+    @staticmethod
+    def _validated_scale_factor(value: np.ndarray, sensor_name: str) -> np.ndarray:
+        scale_factor = np.asarray(value, dtype=float)
+        if scale_factor.shape != (3, 3):
+            raise ValueError(f"{sensor_name} scale factor must have shape (3, 3), got {scale_factor.shape}")
+        if not np.all(np.isfinite(scale_factor)):
+            raise ValueError(f"{sensor_name} scale factor must contain only finite values")
+        return scale_factor.copy()
+
+    @property
+    def accel_covar_density_mg(self):
+        return 0.060**2    # VALUE SPECIFIC TO LOW-G, HIGH-PERF mode! Units: (mg**2)*s 
+
+    @property
+    def gyro_covar_density_mg(self):
+        return 3.8**2 # Units: (mdps**2)*s
+
+    @property
+    def fifo_capacity_words(self) -> int:
+        return 256
+
+    @property
+    def timestamp_tick_ns(self) -> float:
+        return 21_700
+
+    @property
+    def timestamp_counter_bits(self) -> int:
+        return 32
+
+    @property
+    def sample_rate_hz(self) -> float:
+        return self._sample_rate_hz
 
     @staticmethod
     def _apply_scalar_calibration(x:float, y:float, z:float, bias:np.ndarray,
@@ -155,7 +216,7 @@ class LSM6DSV320X:
             self.LSB_TO_MG * uint16_to_int16(y),
             self.LSB_TO_MG * uint16_to_int16(z),
             self.accel_bias,
-            self.accel_scale_factor,
+            self.accel_scale_factor_mg,
             apply_bias,
         )
 
@@ -169,17 +230,18 @@ class LSM6DSV320X:
             self.LSB_TO_MDPS * uint16_to_int16(roll),
             self.LSB_TO_MDPS * uint16_to_int16(yaw),
             self.gyro_bias,
-            self.gyro_scale_factor,
+            self.gyro_scale_factor_mdps,
             apply_bias,
         )
 
-    def validate_connection(self): 
+    def validate_connection(self, report_errors:bool=True):
         """
-        Reads the WHO_AM_I register (0x0F) and checks it's value to confirm if a connection is properly established. 
+        Reads the WHO_AM_I register (0x0F) and checks it's value to confirm if a connection is properly established.
         """
-        try: 
+        try:
             check = (self.bus.read_byte_data(self.TAD, 0x0F) == 0x73)
-        except: 
+        except Exception as e:
+            if report_errors: print(f"IMU validate connection raised: {e}")
             check = False 
         return check 
 
@@ -197,7 +259,6 @@ class LSM6DSV320X:
         - CTRL8 (0x17) 
         - FUNCTIONS_ENABLE (0x50)
         """
-        # TODO check if replace all writes by write only if read differs
         ### Ensure BDU and IF_INC are turned on in the CTRL3 reg as we depend on these in this class. 
         if self.bus.read_byte_data(self.TAD, 0x12)!=0x44: self.bus.write_byte_data(self.TAD, 0x12, 0x44)
 
@@ -227,12 +288,29 @@ class LSM6DSV320X:
         self.bus.write_byte_data(self.TAD, 0x11, mode<<4 | ODR_bits)
 
         ### Enable timestamp - FUNCTIONS_ENABLE - 0x50
-        # NOTE for now not touching other functions 
         current = self.bus.read_byte_data(self.TAD, 0x50) 
         TIMESTAMP_EN = 1<<6 
         self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
-
-        ### Configuring FIFO 
+        ### Configuring pedometer 
+        ## Enable embedded functions registers in FUNC_CFG_ACCESS
+        self.bus.write_byte_data(self.TAD, 0x01, 0x80)
+        ## Enableing at EMB_FUNC_EN_A 
+        current = self.bus.read_byte_data(self.TAD, 0x04)
+        self.bus.write_byte_data(self.TAD, 0x04, current|(1<<3))
+        ## Enableing MLC at EMB_FUNC_B for false positive detection
+        # Don't care about the FSM or FIFO compression
+        self.bus.write_byte_data(self.TAD, 0x05, 1<<4)
+        ## Enableing false positive detection PEDO_CMD_REG 
+        # PEDO_CMD_REG is on embedded advanced features page 1, written indirectly (write procedure p.156)
+        self.bus.write_byte_data(self.TAD, 0x17, 1<<6)           # PAGE_RW: PAGE_WRITE = 1
+        self.bus.write_byte_data(self.TAD, 0x02, 0b0001<<4 | 1)  # PAGE_SEL: page 1 (bit 0 must be 1)
+        self.bus.write_byte_data(self.TAD, 0x08, 0x83)           # PAGE_ADDRESS
+        self.bus.write_byte_data(self.TAD, 0x09, 1<<2)           # PAGE_VALUE: FP_REJECTION_EN
+        self.bus.write_byte_data(self.TAD, 0x17, 0x00)           # PAGE_RW: PAGE_WRITE = 0
+        self.bus.write_byte_data(self.TAD, 0x02, 1)              # PAGE_SEL: back to page 0
+        ## Return to the main register bank (FUNC_CFG_ACCESS), else main registers are inaccessible
+        self.bus.write_byte_data(self.TAD, 0x01, 0x00)
+        ### Configuring FIFO
         self.fifo_config(data_freq = ODR_rate) 
         print(f"CONFIG COMPLETE, TEMP READING: {self.get_temp()}") 
 
@@ -274,9 +352,9 @@ class LSM6DSV320X:
         ### Checking DIFF_FIFO which is split between FIFO_STATUS1 and FIFO_STATUS2 registers 
         ## It gives the number of words (1 word = 7 bytes) that are in FIFO 
         lo, st2 = self.bus.read_i2c_block_data(self.TAD, 0x1B, 2)  # STATUS1+STATUS2 together
-        return min(((st2 & 0x01) << 8) | lo, 256)
+        return min(((st2 & 0x01) << 8) | lo, self.fifo_capacity_words)
 
-    def read_FIFO(self, apply_bias:bool)->list[tuple]: 
+    def read_FIFO(self, apply_bias: bool = False, word_count: int | None = None) -> list[RawIMUSample]:
         """
         Reads all of the data present in the FIFO. 
 
@@ -286,15 +364,13 @@ class LSM6DSV320X:
         
         RETURNS:
         - A list of tuples in the form [(timestamp, accel_data, gyro_data), ...]
-            - Missing data for a sample is returned as None.
-            - accel_data is in mg's, gyro_data is in mdps and timestamp is in BYTES
-                (so that deltas can be calculated before converting twice).
+            - accel_data is in mg's, gyro_data is in mdps and timestamp is in TICKS (32-bit based) 
+            - Only complete timestamp/accel/gyro groups are returned. Incomplete
+              groups are retained across reads or discarded when superseded.
         """
-        samples = []
-        previous_tag_cnt = None # Used to group samples that belong together temporally 
-        current_sample_idx = 0  # The idx groups samples temporally. TODO track at a class level to ensure coherence between read_FIFO calls? Or would become too big? Check if needed when pre-integration is setup. 
+        samples: list[RawIMUSample] = []
         ### Checking how many words are in the FIFO 
-        diff_FIFO = self.get_FIFO_count() 
+        diff_FIFO = self.get_FIFO_count() if word_count is None else min(word_count, self.fifo_capacity_words)
         ### Reading FIFO_DATA_OUT_TAG and DATA registers (automatically wraps around with block read)
         residual_words = diff_FIFO 
         while residual_words>0: 
@@ -305,23 +381,23 @@ class LSM6DSV320X:
                 word = FIFO_data[i*7:(i+1)*7]
                 tag_type =  word[0] >> 3       # 5 MSBs 
                 tag_cnt  = (word[0]>>1) & 0b11 # Bits 1 and 2 
-                # Detect transition to new FIFO timeslot 
-                # this assumes that *any* change in TAG_CNT corresponds to a new timeslot (verified through testing) 
-                # in other words, TAG_CNT can only increase by units of 1, sequentially, until it wraps after 3 
-                if previous_tag_cnt is not None and tag_cnt != previous_tag_cnt: 
-                    current_sample_idx += 1 
-                # Extract and save data 
-                X_data = (word[2]<<8) | word[1]
-                Y_data = (word[4]<<8) | word[3]
-                Z_data = (word[6]<<8) | word[5]
                 if tag_type==0x00: # FIFO empty (can happen due to read timing differences), stop reading 
                     residual_words = 0 
                     break 
-                # Ensuring that a sample exists for this current_sample_idx 
-                # While loop behaves as an if, but is more robust in case of an unexpected >1 idx jump 
-                while current_sample_idx >= len(samples):
-                    samples.append([None, None, None])
-                sample = samples[current_sample_idx]
+
+                # A TAG_CNT transition closes the previous temporal group. Drop
+                # it when incomplete: RawIMUSample never exposes partial groups.
+                if self._fifo_partial_tag_count is None:
+                    self._fifo_partial_tag_count = tag_cnt
+                    self._fifo_partial_sample = [None, None, None]
+                elif tag_cnt != self._fifo_partial_tag_count:
+                    self._fifo_partial_tag_count = tag_cnt
+                    self._fifo_partial_sample = [None, None, None]
+
+                X_data = (word[2]<<8) | word[1]
+                Y_data = (word[4]<<8) | word[3]
+                Z_data = (word[6]<<8) | word[5]
+                sample = self._fifo_partial_sample
                 if tag_type==0x01: # According to p.114 datasheet 
                     sample[2] = self.convert_gyro_bytes_to_mdps(X_data, Y_data, Z_data, apply_bias)
                 elif tag_type==0x02: 
@@ -330,9 +406,21 @@ class LSM6DSV320X:
                     sample[0] = X_data | (Y_data<<16) # Timestamp is just 4 bytes so we take the first 4
                 else: 
                     print(f"unknown type in FIFO!: {hex(tag_type)}")
-                previous_tag_cnt = tag_cnt
+
+                # Complete groups can be returned now; only incomplete groups
+                # need to survive until the next FIFO read.
+                if sample[0] is not None and sample[1] is not None and sample[2] is not None:
+                    samples.append((sample[0], sample[1], sample[2]))
+                    self._fifo_partial_tag_count = None
+                    self._fifo_partial_sample = None
             residual_words -= n_words 
-        return [tuple(sample) for sample in samples]
+        return samples
+
+    def discard_FIFO(self) -> None:
+        """Clear hardware FIFO contents and any partial group held by the parser."""
+        self.read_FIFO(apply_bias=False)
+        self._fifo_partial_tag_count = None
+        self._fifo_partial_sample = None
 
     def get_temp(self): 
         """
@@ -376,11 +464,23 @@ class LSM6DSV320X:
                                                y = data[2] | (data[3] << 8),
                                                z = data[4] | (data[5] << 8), apply_bias=apply_bias) 
 
-    def get_timestamp(self)->int: 
+    def get_timestamp(self, return_ticks=True)->int: 
         """
         Gets the timestamp data from the 0x40, 0x41, 0x42 and 0x43 registers. 
-        Returns timestamp in microseconds 
+        Returns timestamp in 32-bit based ticks or in micro-seconds 
         """
         # From p.85, the conversion is 1LSB=21.7microseconds 
         raw_bytes = bytes(self.bus.read_i2c_block_data(self.TAD, 0x40, 4))
-        return int.from_bytes(raw_bytes, 'little')*21.7
+        return int.from_bytes(raw_bytes, 'little') if return_ticks else int.from_bytes(raw_bytes, 'little')*21.7
+
+    def step_count(self)->int:
+        """
+        Current step count from STEP_COUNTER_L and STEP_COUNTER_H registers (embedded functions bank)
+        Step count rolls over after 2^16
+        """
+        self.bus.write_byte_data(self.TAD, 0x01, 0x80) # FUNC_CFG_ACCESS: embedded functions bank
+        try:
+            data = self.bus.read_i2c_block_data(self.TAD, 0x62, 2)
+        finally:
+            self.bus.write_byte_data(self.TAD, 0x01, 0x00) # Back to main bank
+        return data[0] | (data[1] << 8)

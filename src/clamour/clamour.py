@@ -1,41 +1,59 @@
 from multiprocessing import Lock, Queue
+from contextlib import nullcontext
 from time import sleep
+from typing import ContextManager
 
 from .state_estimation import StateEstimator, CustomOdometry # TODO eval if removing customodometry, check bottom functions
+from .estimator_clock import EstimatorClock
 from .tdma_node import TDMANode
 from .contextManagedQueue import ContextManagedQueue
 from .contextManagedProcess import ContextManagedProcess
 #from .pedometer import Pedometer
-from .interfaces import Pose
+from .interfaces import IMU, LSM6DSV320X, Pose
 from .messages.customOdometryMessage import CustomOdometryMessage
 from .runnableProcess import RunnableProcess
 from .soundmanager import SoundManager
 from .interfaces.bitcraze_tag import BitcrazeTag
 from .interfaces.pozyx_tag import PozyxTag
+from .interfaces.synthetic_tag import SyntheticTag
 from .custom_terminal import print
 
 #################################################### CONFIG PARAMETERS
 from .config import (TAG_TYPE, TAG_ID, DW1000_BUS, DW1000_CS, 
-                     UWB_CHANNEL, UWB_BITRATE, UWB_PRF, UWB_PREAMBLE_CODE, UWB_PREAMBLE_LENGTH,
                      SMART_TX_POWER, TX_POWER_CONFIG,
-                     ESTIMATOR_TYPE)
+                     ESTIMATOR_TYPE, IMU_TYPE, IMU_ACCEL_SCALE_FACTOR_MG, IMU_GYRO_SCALE_FACTOR_MDPS)
 
 match TAG_TYPE:
     case "Bitcraze": 
-        TAG_FACTORY = lambda: BitcrazeTag(tag_id = TAG_ID, 
+        TAG_FACTORY = lambda: BitcrazeTag(tag_id     = TAG_ID, 
                                           dw1000_bus = DW1000_BUS, 
-                                          dw1000_cs = DW1000_CS, 
-                                          channel = UWB_CHANNEL, 
-                                          PRF=UWB_PRF,
-                                          bitrate=UWB_BITRATE,
-                                          preamble_length=UWB_PREAMBLE_LENGTH,
-                                          preamble_code=UWB_PREAMBLE_CODE,
-                                          smart_tx_power=SMART_TX_POWER,
-                                          tx_power_settings=TX_POWER_CONFIG)
+                                          dw1000_cs  = DW1000_CS, 
+                                          smart_tx_power    = SMART_TX_POWER,
+                                          tx_power_settings = TX_POWER_CONFIG)
     case "Pozyx": 
         TAG_FACTORY = lambda: PozyxTag() 
+    case "Synthetic": 
+        TAG_FACTORY = lambda: SyntheticTag(tag_id=TAG_ID)
     case _: 
         raise ValueError(f"Invalid tag type: {TAG_TYPE}. Check your config file.")
+
+def create_imu() -> ContextManager[IMU | None]:
+    """Construct the configured IMU inside the estimator process to avoid passing the live I2C object"""
+    match IMU_TYPE:
+        case None:
+            return nullcontext(None)
+        case "LSM6DSV320X":
+            imu = LSM6DSV320X(
+                ODR_rate=120,
+                accelerometer_scale=2,
+                gyro_dps_scale=500,
+                SDO_state=False,
+            )
+            imu.accel_scale_factor_mg = IMU_ACCEL_SCALE_FACTOR_MG
+            imu.gyro_scale_factor_mdps  = IMU_GYRO_SCALE_FACTOR_MDPS
+            return imu
+        case _:
+            raise ValueError(f"Invalid IMU type: {IMU_TYPE}. Check your config file.")
 
 #################################################### CLAMOUR
 def keep_alive(process: RunnableProcess) -> None:
@@ -54,12 +72,17 @@ class Clamour:
         # The different levels of context managers are required to ensure everything starts and stops cleanly.
         with TAG_FACTORY() as shared_tag: # Type of tag defined in config file 
             shared_tag_lock = Lock()
-            tag_id = shared_tag.tag_id
+            tag_id = shared_tag.tag_id # TODO remove 
+            # One immutable epoch is passed to every local producer before any
+            # child process starts, making their monotonic timestamps comparable.
+            estimator_clock = EstimatorClock.start()
             with ContextManagedQueue() as sound_queue:
                 sound_processing_queue = sound_queue if sound else None # Passing None instead of a sound queue to the StateEstimator turns off the sound function
-                estimator = StateEstimator(shared_tag, shared_tag_lock, ESTIMATOR_TYPE, pose_callback, communication_queue, sound_processing_queue)
+                estimator = StateEstimator(shared_tag, shared_tag_lock, create_imu,
+                                           estimator_clock, ESTIMATOR_TYPE, pose_callback,
+                                           communication_queue, sound_processing_queue)
                 #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
-                tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id)
+                tdma_node = TDMANode(communication_queue, shared_tag, shared_tag_lock, tag_id, estimator_clock)
                 if sound:
                     sound_player = SoundManager(sound_queue)
                 with ContextManagedProcess(target=estimator.run) as estimator_process:
@@ -71,7 +94,7 @@ class Clamour:
 
                         #    if sound:  was like this before, indented under pedometer, just couldn'T run it yet
                         #        keep_alive(sound_player)
-                        if sound: 
+                        if sound:
                             keep_alive(sound_player)
 
     # TODO NOTE : eval if we need start_non_blocking and _on_custom_pose_update and what's their point 
@@ -80,7 +103,10 @@ class Clamour:
         for custom_odometry in self.custom_odometries:
             custom_odometry.set_pose_listener(self._on_custom_pose_update)
 
-        clamour_process = ContextManagedProcess(target=self.start, args=[sound, pose_callback, self.communication_queue])
+        clamour_process = ContextManagedProcess(
+            target=self.start,
+            args=[sound, pose_callback, self.communication_queue],
+        )
         clamour_process.start()
 
     def _on_custom_pose_update(self, custom_odometry: CustomOdometry, pose: Pose, timestamp: float):
