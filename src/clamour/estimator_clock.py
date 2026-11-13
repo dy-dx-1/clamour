@@ -98,6 +98,10 @@ class SensorClockMapper:
         """
         tick = self._unwrap_tick(raw_tick)
         self._last_unwrapped_tick = tick
+        # Innovation: error of the previous mapping at this observation, i.e. the
+        # timestamp error samples carried just before this refresh.
+        innovation_ns = None if self._scale_ns_per_tick is None else (
+            estimator_time_ns - (self._scale_ns_per_tick * tick + self._offset_ns))
         self._observations.append((tick, estimator_time_ns))
 
         if len(self._observations) == 1:
@@ -126,7 +130,10 @@ class SensorClockMapper:
             mapped_observation = scale * tick + offset
             if mapped_observation < self._last_emitted_estimator_ns:
                 self._offset_ns += self._last_emitted_estimator_ns - mapped_observation
-        print("UPDATED ESTIMATOR CLOCK", f" scale: {round(self._scale_ns_per_tick)}", f" offset: {round(self._offset_ns)}")
+        scale_ppm = (self._scale_ns_per_tick / self.nominal_tick_ns - 1) * 1e6
+        innovation = "n/a" if innovation_ns is None else f"{innovation_ns / 1000:+.1f}us"
+        print(f"UPDATED ESTIMATOR CLOCK  t: {estimator_time_ns / 1e9:.1f}s  "
+              f"scale: {scale_ppm:+.3f}ppm  innovation: {innovation}")
 
     def to_estimator_ns(self, raw_tick: int) -> int:
         """Convert the next ordered sensor tick using the latest calibration."""
