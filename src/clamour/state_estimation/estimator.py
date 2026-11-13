@@ -32,9 +32,8 @@ STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
 RANGE_LATENESS_NS = 35 * 1_000_000
 assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
 # The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift.
-# The fit lags a drifting oscillator by ~half its window (interval x observations), and
-# that lag accumulates as error over each interval.  5 s x 16 observations = 80 s window:
-# ~20 us error at the ~0.1 ppm/s warm-up drift measured, while still averaging pairing noise.
+# 5s was the value decided after testing. It's a cheap check and tracks temp changes due to startup easily. 
+# Could even be longer, as the error is very small, but it really doesn't cost much to do it every 5s. 
 IMU_CLOCK_REFRESH_INTERVAL_NS = round(5.0 * 1_000_000_000)
 IMU_CLOCK_FIT_OBSERVATIONS = 16
 # Stationary IMU initialization: clock observations at these delays (s) after the first one.  
