@@ -130,10 +130,10 @@ class SensorClockMapper:
             mapped_observation = scale * tick + offset
             if mapped_observation < self._last_emitted_estimator_ns:
                 self._offset_ns += self._last_emitted_estimator_ns - mapped_observation
-        scale_ppm = (self._scale_ns_per_tick / self.nominal_tick_ns - 1) * 1e6
-        innovation = "n/a" if innovation_ns is None else f"{innovation_ns / 1000:+.1f}us"
-        print(f"UPDATED ESTIMATOR CLOCK  t: {estimator_time_ns / 1e9:.1f}s  "
-              f"scale: {scale_ppm:+.3f}ppm  innovation: {innovation}")
+        # For debugging estimator clock refresh frequency 
+        #scale_ppm = (self._scale_ns_per_tick / self.nominal_tick_ns - 1) * 1e6
+        #innovation = "n/a" if innovation_ns is None else f"{innovation_ns / 1000:+.1f}us"
+        #print(f"UPDATED ESTIMATOR CLOCK  t: {estimator_time_ns / 1e9:.1f} scale: {scale_ppm:+.3f}ppm  innovation: {innovation}")
 
     def to_estimator_ns(self, raw_tick: int) -> int:
         """Convert the next ordered sensor tick using the latest calibration."""

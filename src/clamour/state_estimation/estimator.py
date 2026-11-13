@@ -31,9 +31,16 @@ STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
 # Tolerance covers one failed TWR exchange (2 × 15 ms DW listen timeouts) plus margin for queue transit.
 RANGE_LATENESS_NS = 35 * 1_000_000
 assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
-# The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift 
-IMU_CLOCK_REFRESH_INTERVAL = 15.0  # seconds; ten times the state interval
-IMU_CLOCK_REFRESH_INTERVAL_NS = round(IMU_CLOCK_REFRESH_INTERVAL * 1_000_000_000)
+# The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift.
+# The fit lags a drifting oscillator by ~half its window (interval x observations), and
+# that lag accumulates as error over each interval.  5 s x 16 observations = 80 s window:
+# ~20 us error at the ~0.1 ppm/s warm-up drift measured, while still averaging pairing noise.
+IMU_CLOCK_REFRESH_INTERVAL_NS = round(5.0 * 1_000_000_000)
+IMU_CLOCK_FIT_OBSERVATIONS = 16
+# Stationary IMU initialization: clock observations at these delays (s) after the first one.  
+# The nominal tick rate is ~0.6% off. Early increasingly spaced observations
+# correct the scale quickly while growing the baseline that averages pairing noise.
+IMU_INIT_OBSERVATION_DELAYS = (0.25, 0.5, 1.0, 2.0)
 # FIFO emptying safeties - we empty the FIFO before the limit to avoid losing info
 # poll_interval = SF × time_to_overflow
 # time_to_overflow = (capacity_words - watermark_words) / fifo_word_rate
@@ -130,7 +137,8 @@ class StateEstimator:
         if imu is None:
             return
 
-        self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits)
+        self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits,
+                                                  IMU_CLOCK_FIT_OBSERVATIONS)
         self.imu_fifo_watermark_words = ceil(imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
         fifo_word_rate = imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
         if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= imu.fifo_capacity_words:
@@ -152,9 +160,7 @@ class StateEstimator:
             'loc',
         )
         if self.imu is not None:
-            # Clear FIFO and initialize our IMU clock mapper with fresh data 
-            self.imu.discard_FIFO()
-            self._update_sensor_clock_mapper()
+            self._initialize_imu()
         while self.estimator is None:
             # No graph state exists yet, so pre-initialisation samples cannot be
             # integrated.  The deterministic discard makes that intentional
@@ -198,6 +204,25 @@ class StateEstimator:
                 self.publish_state(msg)
 
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
+
+    def _initialize_imu(self) -> None:
+        """
+        Stationary IMU initialization, run before listening for ranging observations.
+        Calibrates the IMU clock mapping with observations at IMU_INIT_OBSERVATION_DELAYS.
+        """
+        self.imu.discard_FIFO()
+        self._update_sensor_clock_mapper()
+        start_ns = self._last_imu_clock_observation_ns
+        for delay in IMU_INIT_OBSERVATION_DELAYS:
+            due_ns = start_ns + round(delay * 1_000_000_000)
+            while (now := self.estimator_clock.now_ns()) < due_ns:
+                if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
+                    self._read_imu_fifo_into_pending()
+                sleep(min(due_ns - now, self.imu_fifo_poll_interval_ns) / 1_000_000_000)
+            self._update_sensor_clock_mapper()  # Also drains the FIFO into pending samples
+
+        # TODO: estimate the initial attitude here. Can discard FIFO samples instead of moving into pending if use SFLP block 
+        self._pending_imu_samples.clear()
 
     def _run_processing_loop(self) -> None: 
         """
