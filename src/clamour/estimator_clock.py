@@ -1,0 +1,144 @@
+"""
+Common timebase primitives for sensor fusion.
+
+Estimator time is an integer count of nanoseconds since one host monotonic epoch.
+Never mix it with wall-clock time or TDMA logical time.  
+"""
+
+from __future__ import annotations
+
+from collections import deque
+from dataclasses import dataclass
+from time import monotonic_ns
+
+NANOSECONDS_PER_SECOND = 1_000_000_000
+
+@dataclass(frozen=True)
+class EstimatorClock:
+    """Process-shareable estimator clock with a single monotonic host epoch."""
+
+    epoch_monotonic_ns: int
+
+    @classmethod
+    def start(cls) -> "EstimatorClock":
+        """Create once in ``Clamour.start`` before sensor processes are spawned."""
+        return cls(epoch_monotonic_ns=monotonic_ns())
+
+    def now_ns(self) -> int:
+        return monotonic_ns() - self.epoch_monotonic_ns
+
+class SensorClockMapper:
+    """
+    Map one wrapping hardware counter onto :class:`EstimatorClock` time.
+
+    ``observe`` receives occasional paired hardware/host readings and estimates
+    ``estimator_ns = scale * unwrapped_ticks + offset``.  The rolling fit tracks oscillator drift. 
+
+    Configure with:
+    - ``nominal_tick_ns`` : Nanoseconds per hardware clock tick.
+    - ``counter_bits``    : Counter width when the hardware clock wraps.
+    - ``max_observations``: Number of recent paired readings used by the rolling
+        fit. A larger window smooths pairing noise but adapts more slowly to clock
+        drift; the limit also bounds retained calibration data.
+
+    To use: 
+    1. Call ``observe()`` with a (raw_tick, estimator_time) pairing  
+    2. Use ``to_estimator_ns()`` to convert raw_ticks to estimator time 
+    3. Periodically call ``observe()`` again to keep the estimate relevant 
+    """
+
+    def __init__(self, nominal_tick_ns: float, counter_bits: int | None = None,
+                 max_observations: int = 64):
+        if nominal_tick_ns <= 0:
+            raise ValueError("nominal_tick_ns must be positive")
+        if counter_bits is not None and counter_bits <= 0:
+            raise ValueError("counter_bits must be positive")
+        if max_observations < 2:
+            raise ValueError("max_observations must be at least two")
+
+        self.nominal_tick_ns = nominal_tick_ns
+        self._modulus = (1 << counter_bits) if counter_bits is not None else None
+        # Two separate references, because observations and FIFO samples are two
+        # different streams.  An observation reads the live counter, so it is
+        # routinely newer than samples still queued in the FIFO.
+        # - Unwrapping reference: the latest tick from either stream.
+        # - Ordering reference: FIFO samples only, which must be chronological
+        #   among themselves.  Observations never take part in this check.
+        self._last_unwrapped_tick: int | None = None
+        self._last_sample_tick: int | None = None
+        self._observations: deque[tuple[int, int]] = deque(maxlen=max_observations)
+        self._scale_ns_per_tick: float | None = None
+        self._offset_ns: float | None = None
+        self._last_emitted_estimator_ns: int | None = None
+
+    def _unwrap_tick(self, raw_tick: int) -> int:
+        """Return the unwrapped tick nearest the latest tick from either stream.
+
+        Picking the candidate within half a counter period of the reference
+        handles rollover whichever stream (observation or FIFO sample) crosses
+        it first.  Pure: performs no ordering check and does not update state.
+        """
+        if raw_tick < 0:
+            raise ValueError("raw_tick must be non-negative")
+        if self._modulus is None:
+            return raw_tick
+        raw_tick %= self._modulus
+        if self._last_unwrapped_tick is None:
+            return raw_tick
+        delta = (raw_tick - self._last_unwrapped_tick) % self._modulus
+        if delta >= self._modulus // 2:
+            delta -= self._modulus
+        return self._last_unwrapped_tick + delta
+
+    def observe(self, raw_tick: int, estimator_time_ns: int) -> None:
+        """Add a paired clock observation and refresh the affine mapping.
+
+        The observed tick may be newer than FIFO samples not yet converted;
+        that is expected and does not affect their ordering check.
+        """
+        tick = self._unwrap_tick(raw_tick)
+        self._last_unwrapped_tick = tick
+        self._observations.append((tick, estimator_time_ns))
+
+        if len(self._observations) == 1:
+            scale = self.nominal_tick_ns
+            offset = estimator_time_ns - scale * tick
+        else:
+            ticks, times = zip(*self._observations)
+            mean_tick = sum(ticks) / len(ticks)
+            mean_time = sum(times) / len(times)
+            denominator = sum((tick - mean_tick) ** 2 for tick in ticks)
+            scale = self.nominal_tick_ns if denominator == 0 else sum(
+                (tick - mean_tick) * (timestamp - mean_time)
+                for tick, timestamp in zip(ticks, times)
+            ) / denominator
+            if scale <= 0:
+                # A bad host pairing must not invert time.  Keep the nominal rate
+                # rather than allowing time to run backwards.
+                scale = self.nominal_tick_ns
+            offset = mean_time - scale * mean_tick
+        self._scale_ns_per_tick = scale
+        self._offset_ns = offset
+
+        # Clock-fit noise must not make future FIFO samples appear before a
+        # sample that was already admitted to the estimator timeline.
+        if self._last_emitted_estimator_ns is not None:
+            mapped_observation = scale * tick + offset
+            if mapped_observation < self._last_emitted_estimator_ns:
+                self._offset_ns += self._last_emitted_estimator_ns - mapped_observation
+        print("UPDATED ESTIMATOR CLOCK", f" scale: {round(self._scale_ns_per_tick)}", f" offset: {round(self._offset_ns)}")
+
+    def to_estimator_ns(self, raw_tick: int) -> int:
+        """Convert the next ordered sensor tick using the latest calibration."""
+        if self._scale_ns_per_tick is None or self._offset_ns is None:
+            raise RuntimeError("clock mapper needs an initial paired observation")
+        tick = self._unwrap_tick(raw_tick)
+        if self._last_sample_tick is not None and tick < self._last_sample_tick:
+            raise ValueError("sensor ticks arrived out of order")
+        self._last_unwrapped_tick = tick
+        self._last_sample_tick = tick
+        estimator_time_ns = round(self._scale_ns_per_tick * tick + self._offset_ns)
+        if self._last_emitted_estimator_ns is not None:
+            estimator_time_ns = max(estimator_time_ns, self._last_emitted_estimator_ns)
+        self._last_emitted_estimator_ns = estimator_time_ns
+        return estimator_time_ns

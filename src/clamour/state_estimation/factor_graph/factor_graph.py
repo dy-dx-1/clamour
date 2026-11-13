@@ -1,46 +1,75 @@
 import gtsam as gt 
 import numpy as np 
 
+from ...sensor_events import RangeObservation, TimedIMUSample
 from ...custom_terminal import print 
 from ...interfaces import Anchors, Pose
-from ...config import (ANCHOR_POS_UNCERTAINTY,
-                        IMU_ACCEL_INITIAL_BIAS, IMU_ACCEL_INITIAL_BIAS_COV, IMU_ACCEL_WALK_COV,
-                        IMU_GYRO_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS_COV, IMU_GYRO_WALK_COV)
+from ...estimator_clock import NANOSECONDS_PER_SECOND
+from ...config import (ANCHOR_POS_UNCERTAINTY_CM,
+                       IMU_ACCEL_INITIAL_BIAS_MG, IMU_ACCEL_INITIAL_BIAS_STD_MG, IMU_ACCEL_WALK_COV_MG2_PER_S,
+                       IMU_GYRO_INITIAL_BIAS_MDPS, IMU_GYRO_INITIAL_BIAS_STD_MDPS, IMU_GYRO_WALK_COV_MDPS2_PER_S)
+ANCHORS = Anchors()
 
-anchors = Anchors()
 ### Defining noise models 
-## Units in cm, like the rest of the graph
-ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY, ANCHOR_POS_UNCERTAINTY]) # uncertainty in anchor placement
-RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15) # precise 1D measurement ~ 15cm
+# GTSAM factors use cm-based spatial units and radians for angular quantities.
+# Pose converts the posterior angles back to degrees at the public boundary.
+ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY_CM] * 3)
+RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15)  # 15 cm
 ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
-IMU_INTEGRATION_COVAR = (1e-7)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
-#IMU_INITIAL_BIAS_COV = np.concatenate((IMU_ACCEL_INITIAL_BIAS_COV, IMU_GYRO_INITIAL_BIAS_COV))
-# TODO CURR COMMENTED OUT BECAUSE NONE UNTIL VALUES 
+INITIAL_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 1.0)  # cm/s; stationary bootstrap
+CONSTANT_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 50.0)  # cm/s; deliberately loose
+
+GRAVITY_CM_S2 = 980.665  # cm/s^2
+MG_TO_CM_PER_S2 = GRAVITY_CM_S2 / 1000
+MDPS_TO_RAD_PER_S = 0.001*np.pi/180
+IMU_ACCEL_INITIAL_BIAS = IMU_ACCEL_INITIAL_BIAS_MG  * MG_TO_CM_PER_S2
+IMU_GYRO_INITIAL_BIAS  = IMU_GYRO_INITIAL_BIAS_MDPS * MDPS_TO_RAD_PER_S
+IMU_ACCEL_WALK_COV = IMU_ACCEL_WALK_COV_MG2_PER_S * MG_TO_CM_PER_S2**2
+IMU_GYRO_WALK_COV = IMU_GYRO_WALK_COV_MDPS2_PER_S * MDPS_TO_RAD_PER_S**2
+IMU_BIAS_STD_DEV = np.concatenate((
+            IMU_ACCEL_INITIAL_BIAS_STD_MG * MG_TO_CM_PER_S2,
+            IMU_GYRO_INITIAL_BIAS_STD_MDPS * MDPS_TO_RAD_PER_S,
+        ))
+IMU_INTEGRATION_COVAR = (1e-5)**2 * np.eye(3) # Represents uncertainty due to the discrete numerical integration method. Low importance & hardware independent. Value set to common GTSAM example's. 
+
+
 class FactorGraph: 
-    def __init__(self, anchors_range_data:list[tuple[int, int]], prior_yaw:float, timestamp:float):
+    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, initial_state_time_ns:int, imu_accel_covar_density_mg2_s:float | None = None, imu_gyro_covar_density_mdps2_s:float | None = None):
         """
         Factor Graph based 3D pose estimator. 
-        - anchors_range_data: [(anchor_id, range), ...] At least 3 are required to fully initialize the prior position 
-        - prior_yaw: prior yaw value on initialization **[rad]** 
-        - timestamp: timestamp of the initial data, will serve as reference for subsequent updates to calculate dt 
-        NOTE TODO ensure unit coherence between feeding IMU and internal treatment. Where do we convert? 
+        - range_observations: Range observations used to initialize the graph; at least 3 anchors are required to fully initialize the prior position.
+        - prior_yaw: prior yaw value on initialization **[rad]**
+        - imu_accel_covar_density_mg2_s: accelerometer measurement covariance density in (mg^2)*s
+        - imu_gyro_covar_density_mdps2_s: gyroscope measurement covariance density in (mdps^2)*s
+        - initial_state_time_ns: EstimatorClock timestamp of the initial graph state
         NOTE on units: 
         - All angle units are **radians** 
         - All spatial units are **cm-based**
-            - The graph doesn't care about this unit as long as it's fully internally consistent, but enforcing cm until we have proper code-wide documentation and unit standardisation to be safer. (For example, gravity vector in graph should be updated if change of units)
+            - IMU samples and covariance densities are converted from mg/mdps-based units at the graph boundary.
         """
-        self.last_measurement_time = timestamp   # Will be updated during subsequent call of validate_update by incorporate_ranging_data 
-        self.dt = None 
+        self.last_state_time_ns = initial_state_time_ns
         
-        # Graph trackers 
-        self._state_counter = -1   # Keeps track of how many state nodes have been added to the graph
-        self.seen_anchors = set() # Keeps track of the anchors we have previously seen, to avoid re-adding prior factors
-        self.isam = gt.ISAM2() 
-        self.pim  = self.create_imu_pim_obj() # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
+        ## Graph trackers 
+        self._state_counter = -1   # How many state nodes have been added to the graph
+        self.seen_anchors = set()  # Anchors we have previously seen; to avoid re-adding prior factors
+        # QR is slower than the default Cholesky but tolerates the badly scaled information matrix
+        # (tight IMU/bias constraints vs loose ranges/velocity) that can make Cholesky report an indeterminate system.
+        isam_params = gt.ISAM2Params()
+        isam_params.setFactorization("QR")
+        self.isam = gt.ISAM2(isam_params)
 
-        # Creating prior factor that locks rotation and position at initial estimate
-        # Internal state tracker is a NavState for Pose and Velocity 
-        self.state = self.insert_init_prior(prior_yaw, anchors_range_data) 
+        ## Initializing graph 
+        initial_state_key = self.state_counter 
+        graph = gt.NonlinearFactorGraph() 
+        initial_values = gt.Values()
+        # Defining IMU objects if present 
+        if imu_accel_covar_density_mg2_s is not None and imu_gyro_covar_density_mdps2_s is not None:
+            self.imu_accel_covar_density = imu_accel_covar_density_mg2_s * np.eye(3) * MG_TO_CM_PER_S2**2
+            self.imu_gyro_covar_density = imu_gyro_covar_density_mdps2_s * np.eye(3) * MDPS_TO_RAD_PER_S**2
+            self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
+        # Initializing the state by locking rotation and position 
+        # Internal state tracker is a NavState for Pose3 and Velocity. Public access is the pose() property, which formats it into a Pose container.
+        self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, range_observations) 
 
     ### Properties
     @property
@@ -48,33 +77,139 @@ class FactorGraph:
         self._state_counter += 1 
         return self._state_counter 
 
+    @property
+    def pose(self) -> Pose:
+        """The posterior `Pose` in it's corresponding units after running the estimator, or the last estimate if we didn't run it yet"""
+        position = self._state.position()  # 1D array [x, y, z]
+        rot = self._state.attitude().ypr() # 1D array [yaw, pitch, roll]
+        return Pose(position[0], position[1], position[2], heading=np.rad2deg(rot[0]), pitch=np.rad2deg(rot[1]), roll=np.rad2deg(rot[2]), covar=self.covars)
+
+    ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
+    
+    def advance_to(self, state_boundary_ns:int, imu_start_sample:TimedIMUSample | None,
+                   imu_data:list[TimedIMUSample], range_observations:list[RangeObservation]):
+        """
+        Creates a new state in the FG, linked to the previous by a motion factor and supported by external measurements if available. 
+        Optimizes the graph and internal data with the posterior. 
+        This function should be called every STATE_INTERVAL seconds by estimator.py 
+
+        ``imu_start_sample`` is held from the prior state boundary until the
+        first item in ``imu_data``.  It is ``None`` only before IMU bootstrap
+        or when no IMU is configured, in which case the constant-velocity
+        fallback is used.
+        """
+        if imu_start_sample is not None and not hasattr(self, "pim"):
+            raise ValueError("IMU samples were provided to a factor graph initialized without IMU covariance densities")
+        # state_boundary_ns is the timestamp of the new cadence state, not
+        # the first/last IMU sample or a range timestamp.  The coordinator owns
+        # measurement validity; this only protects the graph's state timeline.
+        state_start_ns = self.last_state_time_ns
+        dt_s = self._prepare_new_state(state_boundary_ns)
+        
+        ## Initialize the new section of the graph and the new state
+        graph = gt.NonlinearFactorGraph()
+        initial_values = gt.Values()
+
+        new_state_id = self.state_counter
+        x_new = gt.symbol('x', new_state_id)
+        v_new = gt.symbol('v', new_state_id)
+
+        ## Motion factor 
+        if imu_start_sample is None:
+            self._add_constant_velocity_link(new_state_id, graph, initial_values, dt_s)
+        else:
+            self._add_imu_link(
+                new_state_id,
+                graph,
+                initial_values,
+                state_start_ns,
+                state_boundary_ns,
+                imu_start_sample,
+                imu_data,
+            )
+
+        ## External measurements 
+        self._add_ranging_data(new_state_id, graph, initial_values, range_observations)
+
+        ## Updating graph and internal data with the posterior
+        self.isam.update(graph, initial_values)
+        # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
+        post = self.isam.calculateEstimate()
+        self._state = gt.NavState(post.atPose3(x_new), post.atVector(v_new))
+        if imu_start_sample is not None:
+            self.pim.resetIntegrationAndSetBias(post.atConstantBias(gt.symbol('b', new_state_id)))
+        # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
+        covariance = self.isam.marginalCovariance(x_new)
+        self.covars = (
+            covariance[3, 3],
+            covariance[4, 4],
+            covariance[5, 5],
+            covariance[3, 4],
+            covariance[3, 5],
+            covariance[4, 5],
+        )   
+
+    def zero_movement_update(self, state_boundary_ns: int) -> None:
+        """Temporarily constrain the next pose to the current one after an input gap.
+
+        This mirrors the EKF's synthetic zero-movement update to limit drift from
+        the constant-velocity model. It is valid only when an idle input queue
+        really means the tag is stationary; it will be replaced by IMU-based
+        propagation and stationary detection.
+        """
+        self._prepare_new_state(state_boundary_ns)
+
+        graph = gt.NonlinearFactorGraph()
+        initial_values = gt.Values()
+
+        current_state_id = self.state_counter
+        x = gt.symbol('x', current_state_id)
+        x_prev = gt.symbol('x', current_state_id - 1)
+        pose = self.pose
+        previous_pose = gt.Pose3(
+            gt.Rot3.Ypr(np.deg2rad(pose.heading), 0, 0),
+            gt.Point3(*pose.coordinates),
+        )
+        zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
+
+        graph.add(gt.BetweenFactorPose3(x_prev, x, zero_motion, ZERO_MOVEMENT_NOISE))
+        initial_values.insert(x, previous_pose)
+
+        self.isam.update(graph, initial_values)
+        post_pose = self.isam.calculateEstimate().atPose3(x)
+        self._state = gt.NavState(post_pose, np.zeros(3))
+        
+    def pedometer_update():
+        pass 
+    def custom_odometry_update():
+        pass
+
     ### -------------------------------------------------- INTERNAL COMPUTATION METHODS --------------------------------------------------
-    def insert_init_prior(self, yaw_prior:float, anchors_range_data:list[tuple[int, int]])->gt.NavState: 
+    def _insert_init_prior(self, state_key, graph, initial_values, yaw_prior:float, range_observations:list[RangeObservation])->gt.NavState: 
         """
-        Only to be used in __init__! Updates the graph and internal state with a prior that locks rotation and range factors that lock position. 
-        As of 2026-08-20, the rotation lock is needed while we don't have an IMU. 
-        No way to measure rotation, so we don't track/update it. However, to avoid an inderterminate system in the graph, we need to initialize it to a known value.
-        
-        Therefore, we insert a prior with very loose covariance on a rough position, but tight on the rotation. 
-        The position component of the prior is simply the centroid of the anchors. This is inaccurate and only serves to put a rough guess that will be corrected by the anchors. 
-        We then call add_ranging_data which will lock the position appropriately with range factors. 
-        
-        NOTE: To avoid imprecise/unstable measures, one should ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
-        """
-        # NOTE TODO harmonize this with IMU implementation in main loop. Currently initiating as 0 velocity initially. 
-        ### ROTATION LOCK 
-        throwaway_pos = anchors.get_centroid_for(*(data[0] for data in anchors_range_data))
-        state_key = self.state_counter
-        x0 = gt.symbol('x', state_key) 
-        graph = gt.NonlinearFactorGraph() 
-        initial_values = gt.Values() 
+        Constrains the initial state of the graph with a rotation lock & sufficient range data to multilaterate the position. 
+
+        Only to be used in __init__! \n 
+        NOTE: **Currently supposing graph is initialized while stationnary!**
+        NOTE: To avoid imprecise/unstable measures, ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
+        """     
+        x0 = gt.symbol('x', state_key)
+        v0 = gt.symbol('v', state_key)
+        # ROTATION LOCK 
+        anchor_observations = [observation for observation in range_observations if observation.is_anchor]
+        throwaway_pos = ANCHORS.get_centroid_for(*(observation.target_id for observation in anchor_observations))
         graph.add(gt.PriorFactorPose3(x0, 
                                       gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
                                       gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
         initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
-        ### POSITION LOCK 
-        self.add_ranging_data(x0, state_key, graph, initial_values, anchors_range_data, tags_ranging_data=[])
-        ### GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
+        # Bootstrap is explicitly stationary.  This both seeds V(0) for the
+        # first CombinedImuFactor and prevents an unconstrained velocity key.
+        initial_velocity = np.zeros(3)
+        graph.add(gt.PriorFactorVector(v0, initial_velocity, INITIAL_VELOCITY_NOISE))
+        initial_values.insert(v0, initial_velocity)
+        # POSITION LOCK 
+        self._add_ranging_data(state_key, graph, initial_values, range_observations)
+        # GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
         post_pose = self.isam.calculateEstimate().atPose3(x0) 
         covariance = self.isam.marginalCovariance(x0)
@@ -86,116 +221,139 @@ class FactorGraph:
             covariance[3, 5],
             covariance[4, 5],
         )
-        return gt.NavState(post_pose, np.zeros(3)) # NOTE TODO 0 velocity initialization - confirm if keep 
+        return gt.NavState(post_pose, np.zeros(3))  
 
-    def create_imu_pim_obj(self, state_key, graph, initial, gyro_covar, accel_covar, integration_covar, gyro_bias, accel_bias): 
+    def _create_imu_pim_obj(self, state_key, graph, initial): 
         """
         Creates a gtsam.PreintegratedCombinedMeasurements object, which will be used to do IMU pre-integration with the CombinedImuFactor
         """
-        # Define Z axis pointing up. The factor will then handle gravity measurements internally. 
-        pim_params = gt.PreintegrationCombinedParams.MakeSharedU(9.806)
-        # Define covariances (noise models) 
-        # TODO we are expecting a 3x3 np matrix for all of these. Floats for each element. 
-        pim_params.setAccelerometerCovariance(accel_covar)
-        pim_params.setGyroscopeCovariance(gyro_covar)
-        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) # Uncertainty due to modeling errors in the integration from accel->v->p
-        pim_params.setBiasAccCovariance(IMU_ACCEL_WALK_COV) 
-        pim_params.setBiasOmegaCovariance(IMU_GYRO_WALK_COV) 
-        # Defining IMU bias and setting a prior
-        # The IMU calibration isn't perfect, this prior serves to anchor our confidence in it 
-        # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve. This gives it it's reference starting point. 
-        # TODO currently here, but some restructuring for clarity might be needed? harmonize with insert_init_prior? 
- 
+        # Defining Z axis pointing up. The factor will then handle gravity measurements internally. 
+        pim_params = gt.PreintegrationCombinedParams.MakeSharedU(GRAVITY_CM_S2)
+        # Defining covariances (noise models) 
+        pim_params.setAccelerometerCovariance(self.imu_accel_covar_density)
+        pim_params.setGyroscopeCovariance(self.imu_gyro_covar_density)
+        pim_params.setIntegrationCovariance(IMU_INTEGRATION_COVAR) 
+        pim_params.setBiasAccCovariance( IMU_ACCEL_WALK_COV * np.eye(3)) 
+        pim_params.setBiasOmegaCovariance(IMU_GYRO_WALK_COV * np.eye(3)) 
+        # Setting prior on IMU bias (calibration isn't perfect, this represents our confidence in it) 
+        # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve through time  
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
         imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS)
-        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, IMU_INITIAL_BIAS_COV)) # define noise in the imu class 
+        bias_noise = gt.noiseModel.Diagonal.Sigmas(IMU_BIAS_STD_DEV)
+        graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, bias_noise))
         initial.insert(gt.symbol('b', state_key), imu_bias) 
 
         # Creating the preintegration object 
         # Using combined version as we'll use CombinedImuFactor later
         return gt.PreintegratedCombinedMeasurements(pim_params, imu_bias)
 
-    def validate_update(self, timestamp:float)->bool: 
-        """
-        To be called before an update. Adjusts the internal timestamp and speed for the constant velocity model. 
-        Returns bool depending on if the update can be applied. 
-        NOTE: eventually, this will be replaced by an IMU factor 
-        """
-        if timestamp > self.last_measurement_time: 
-            self.dt = timestamp - self.last_measurement_time
-            self.last_measurement_time = timestamp
-            return True 
-        else: 
-            print("FG.validate_update(): Update not applied, bad timestamp.", 'error', 'loc')
-            return False 
+    def _prepare_new_state(self, state_boundary_ns: int) -> float:
+        """Advance the graph-state clock and return its duration in seconds.
 
-    def add_ranging_data(self, state_symbol, state_id, graph, initial_values, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple]): 
+        ``state_boundary_ns`` must be the canonical EstimatorClock timestamp for
+        the *new state boundary*.  It must not be a range timestamp or the first
+        or last IMU sample timestamp.  A non-increasing boundary is a coordinator
+        bug, so fail rather than silently omitting a scheduled graph state.
         """
-        Add anchor and tag ranging data of a new state to the graph. Does not add an initial belief to our own state. 
-        - state_symbol: gt.Symbol of the new state to add to the graph 
+        if state_boundary_ns <= self.last_state_time_ns:
+            raise ValueError(
+                "FactorGraph received a non-increasing state boundary: "
+                f"{state_boundary_ns} <= {self.last_state_time_ns}"
+            )
+
+        dt_s = (state_boundary_ns - self.last_state_time_ns) / NANOSECONDS_PER_SECOND
+        self.last_state_time_ns = state_boundary_ns
+        return dt_s
+
+    def _add_ranging_data(self, state_key, graph, initial_values, range_observations:list[RangeObservation]): 
+        """
+        Adds anchor and tag range observations to a graph state without adding a prior or solving for it.
+        """
+        range_str = lambda ro: f"{ro.target_id}: {ro.distance_cm}cm"
+        print(f"Adding range observations {[range_str(ro) for ro in range_observations]}", 'info', 'loc')
+        x = gt.symbol('x', state_key) 
+        for observation in range_observations:
+            target_id = observation.target_id
+            distance = observation.distance_cm
+            if observation.is_anchor:
+                anchor = gt.symbol('a', target_id)
+                if target_id not in self.seen_anchors:
+                    # Add a prior only the first time this anchor is observed.
+                    anchor_pos = ANCHORS.anchors_dict[target_id]
+                    graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
+                    initial_values.insert(anchor, gt.Point3(*anchor_pos))
+                    self.seen_anchors.add(target_id)
+                graph.add(gt.RangeFactor3D(x, anchor, distance, RANGING_NOISE))
+            else: 
+                # Ranging data from tags is useful only when their pose estimate is known.
+                if observation.target_pose is None:
+                    continue
+                n_pos = observation.target_pose.coordinates
+                n_cov = observation.target_pose.covar
+                if n_cov is None:
+                    raise ValueError(f"Tag range observation for target {target_id} has no pose covariance. This shouldn't happen, check why the task.py check didn't work.")
+                # Adding the other tag's position to the graph with a special ID that tracks it's position and the state
+                neighbor = gt.symbol('t', int(f'{target_id}000{state_key}')) 
+                # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
+                # If an indeterminate system is thrown when ranging with neighbors, printing out the matrix and checking that it's invertible 
+                # is a good debugging step, as gt.noiseModel.Gaussian.Covariance will attempt to invert it to get the Information Matrix
+                graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov.astype(float)))) 
+                initial_values.insert(neighbor, gt.Point3(*n_pos))
+                # Adding range data 
+                graph.add(gt.RangeFactor3D(x, neighbor, distance, RANGING_NOISE))
+
+    def _add_imu_link(self, state_id, graph, initial_values, interval_start_ns:int,
+                      interval_end_ns:int, start_sample:TimedIMUSample,
+                      timed_imu_samples:list[TimedIMUSample]):
+        """
+        Preintegrates IMU data to add a motion factor from the previous state to the next. \n 
+        The new state is initialized with a prior defined by the preintegration. 
         - state_id: Key corresponding to the new state 
         - graph: Factor Graph object 
         - initial_values: Values object related to the graph 
-        - anchors_ranging_data: list of measurements [(anchor_id, range), ...] 
-        - tags_ranging_data: list of measurements [(neighbor_id, neighbor_pose, range), ...]
         """
-        print(f"Adding anchors {anchors_ranging_data} ||| Tags {tags_ranging_data}", 'info', 'loc')
-        # ANCHORS
-        for id, z in anchors_ranging_data: 
-            anchor = gt.symbol('a', id) 
-            anchor_pos = anchors.anchors_dict[id] # Tuple of the x, y, z coordinates in cm
-            if id not in self.seen_anchors:
-                # ONLY if we have never seen this anchor -> need to add a prior on it's position 
-                graph.add(gt.PriorFactorPoint3(anchor, gt.Point3(*anchor_pos), ANCHOR_POS_NOISE))
-                initial_values.insert(anchor, gt.Point3(*anchor_pos))
-                self.seen_anchors.add(id) 
-            graph.add(gt.RangeFactor3D(state_symbol, anchor, z, RANGING_NOISE))
-        # TAGS 
-        for n_id, n_coords, z in tags_ranging_data:  
-            # tags_ranging_data only contains tags that have known positions/covar (filtered at TASK level)
-            # NOTE: in future, could be nice to add here or in TASK a filter for stale data based on timestamps 
-            n_pos, n_cov = n_coords.coordinates, n_coords.covar
-            # Adding the other tag's position to the graph with a special ID that tracks his position and the time
-            neighbor = gt.symbol('t', int(f'{n_id}000{state_id}')) 
-            # NOTE GTSAM needs a matrix of float types or it crashes out (builds the matrix as NaN -> indeterminate system)
-            # If an indeterminate system is thrown when ranging with neighbors, printing out the matrix and checking that it's invertible 
-            # is a good debugging step, as gt.noiseModel.Gaussian.Covariance will attempt to invert it to get the Information Matrix
-            graph.add(gt.PriorFactorPoint3(neighbor, gt.Point3(*n_pos), gt.noiseModel.Gaussian.Covariance(n_cov.astype(float)))) 
-            initial_values.insert(neighbor, gt.Point3(*n_pos))
-            # Adding range data 
-            graph.add(gt.RangeFactor3D(state_symbol, neighbor, z, RANGING_NOISE))
-
-    def add_imu_data(self, state_symbol, state_id, graph, initial_values):
-        """
-        Adds IMU data to the factor graph & uses it to set an initial belief on the state. 
-        - state_symbol: gt.Symbol of the new state to add to the graph 
-        - state_id: Key corresponding to the new state 
-        - graph: Factor Graph object 
-        - initial_values: Values object related to the graph 
-        """
-        # TODO add raw data preintegration 
-        # for each data triple do self.pim.integrateMeasurement(a, g, dt) ; a and g are np arrays 3x1 and dt is float 
+        x_old, v_old, b_old = gt.symbol('x', state_id-1), gt.symbol('v', state_id-1), gt.symbol('b', state_id-1)
+        x_new, v_new, b_new = gt.symbol('x', state_id),   gt.symbol('v', state_id),   gt.symbol('b', state_id)
+        # Zero-order hold: apply each measurement from its timestamp until the
+        # next sample, including both graph-state boundaries.  Consequently the
+        # integrated duration is exactly ``interval_end - interval_start``.
+        cursor_ns = interval_start_ns
+        held_sample = start_sample
+        for imu_sample in timed_imu_samples:
+            self._integrate_held_imu_sample(held_sample, imu_sample.timestamp_ns - cursor_ns)
+            cursor_ns = imu_sample.timestamp_ns
+            held_sample = imu_sample
+        self._integrate_held_imu_sample(held_sample, interval_end_ns - cursor_ns)
 
         # Adding pre-integrated data to the graph as a CombinedImuFactor
-        # Using this factor removes the need of an independent BetweenFactor to track the bias (would be needed with ImuFactor) 
-        # while keeping taking into account correlations between bias drift and IMU predictions 
-        # TODO figure out a better naming for these a bit too long and confusing 
-        graph.add( gt.CombinedImuFactor(prev_state_symbol, prev_velocity_symbol, state_symbol, velocity_symbol, prev_bias_symbol, bias_symbol, self.pim) )
+        # This removes the need of an independent BetweenFactor to track the bias (needed with ImuFactor)
+        # while still taking into account correlations between bias drift and IMU predictions
+        graph.add( gt.CombinedImuFactor(x_old, v_old, x_new, v_new, b_old, b_new, self.pim) )
 
-        # Adding initial guess for the state with the IMU's predictions
-        predicted_state = self.pim.predict(self.state, imu_bias) # self.state is already a NavState, and if this function is called, it doesn't represent the posterior yet
-        initial_values.insert(state_symbol, predicted_state.pose())
-        initial_values.insert(velocity_symbol, predicted_state.velocity())
-        initial_values.insert(bias_symbol, imu_bias) #TODO check if pim of combined values can automatically use up to date estimation for imu bias for it's pred? just a thought 
+        # Using IMU preintegration as initial values. Bias is set to the latest posterior. 
+        current_bias = self.isam.calculateEstimate().atConstantBias(b_old)
+        dead_reckoned_state = self.pim.predict(self._state, current_bias)
+        initial_values.insert(x_new, dead_reckoned_state.pose())
+        initial_values.insert(v_new, dead_reckoned_state.velocity())
+        initial_values.insert(b_new, current_bias)
 
-        # Make sure to clear out preintegration values for the next run 
-        self.pim.resetIntegration()
+    def _integrate_held_imu_sample(self, sample: TimedIMUSample, duration_ns: int) -> None:
+        """Integrate one zero-order-held IMU value for a positive duration."""
+        if duration_ns < 0:
+            raise ValueError("IMU samples must be chronological within a state interval")
+        if duration_ns == 0:
+            return
+        self.pim.integrateMeasurement(
+            sample.acceleration * MG_TO_CM_PER_S2,
+            sample.angular_velocity * MDPS_TO_RAD_PER_S,
+            duration_ns / NANOSECONDS_PER_SECOND,
+        )
 
-    def add_constant_velocity_link(self, graph, initial_values, current_state_symbol, current_state_id): 
+    def _add_constant_velocity_link(self, current_state_id, graph, initial_values, dt_s: float):
         """
-        Uses a constant velocity model to loosely link states with a BetweenFactorPose 
-        NOTE TODO The function is ready to use but I haven't configured support to switch to it 
-        Leaving it here to facilitate deploying the code on non-IMU platforms in the future if needed. 
+        Uses a constant velocity model to loosely link states with a BetweenFactorPose and uses the relative movement to seed the solver. 
+
+        Note that this simple model cannot track rotations so the orientation is left unchanged. 
         """
         def constant_velocity_model(nav_state): 
             """
@@ -209,105 +367,38 @@ class FactorGraph:
             """
             pose, vel = nav_state.pose(), nav_state.velocity()
             # Expected delta in the global reference frame 
-            delta_world = gt.Point3(vel[0]*self.dt, vel[1]*self.dt, vel[2]*self.dt)
+            delta_world = gt.Point3(vel[0]*dt_s, vel[1]*dt_s, vel[2]*dt_s)
             # Mapping it to the local frame so BetweenFactor can be applied 
             # this takes the orientation of the previous pose and uses it to convert the global displacement into a local one 
             delta_body = pose.rotation().unrotate(delta_world)
             return delta_body
         ODOMETRY_NOISE = gt.noiseModel.Diagonal.Sigmas([0.05, 0.05, 0.05, 50, 50, 20]) # ~~~constant velocity so very loose (except on z cause expect less mvt that way)
-        x = current_state_symbol
+        x = gt.symbol('x', current_state_id)
+        v = gt.symbol('v', current_state_id)
         ## Using BetweenFactor to loosely link states. This is the structural analogue of a Kalman Filter's prediction step. 
         # If we didn't have any model here, then the graph would simply have individual state estimates based on ranges, 
         # which would directly be ~equivalent to blindly trilaterating and discarding each step. 
         # Having even a loose motion model allows us to link states and smooth the global trajectory, for example, correcting sudden bad trilaterations due to NLOS. 
         # Any information is useful information to include, as long as it's even slightly relevant, as it will affect the joint posterior. 
         x_prev = gt.symbol('x', current_state_id-1) # fetching past state (corresponding to the current value of self.x)
-        # Connecting to previous state through a motion model 
-        delta_local_frame = constant_velocity_model(self.state) # Supposing constant velocity, what would be the local vector to the new state?
-        mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )    # NOTE simple constant velocity model keeps yaw constant
-        graph.add(gt.BetweenFactorPose3(x_prev, x, mvt, ODOMETRY_NOISE))
-        initial_values.insert(x, self.state.compose(mvt))
-
-    ### -------------------------------------------------- EXTERNAL METHODS USED BY estimator.py --------------------------------------------------
-    @property
-    def pose(self) -> Pose:
-        """The posterior pose after running the estimator, or the last estimate if we didn't run it yet"""
-        position = self.state.t()  # 1D array [x, y, z]
-        rot = self.state.R().ypr() # 1D array [yaw, pitch, roll]
-        return Pose(position[0], position[1], position[2], heading=rot[0], pitch=rot[1], roll=rot[2], covar=self.covars)
-
-    def incorporate_ranging_data(self, timestamp: float, anchors_ranging_data:list[tuple], tags_ranging_data:list[tuple[int, Pose, int]], raw_yaw:float):
-        """
-        Called whenever we get new ranges from anchors or tags to add to the factor graph. 
-        NOTE TODO currently not using raw_yaw to update, because without an IMU no info can be deduced on it. Yaw stays fixed with simple constant velocity model. 
-        """
-        # TODO replace current_state by new state to make it clearer? 
-        if not self.validate_update(timestamp): 
-            # If the timestamp is not valid, don't use this data for an update
-            return 
-
-        ## Initialize the new section of the graph and the new state 
-        graph = gt.NonlinearFactorGraph() 
-        initial_values = gt.Values() 
-
-        current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)    
-        v = gt.symbol('v', current_state_id)     
-
-        ## Linking states together 
-        self.add_constant_velocity_link(graph, initial_values, x, current_state_id)
-
-        ## Adding ranges 
-        self.add_ranging_data(x, current_state_id, graph, initial_values, anchors_ranging_data, tags_ranging_data) 
-            
-        ## Updating graph and internal data with the posterior 
-        self.isam.update(graph, initial_values) 
-        # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf. 
-        post = self.isam.calculateEstimate()    
-        self.state = gt.NavState(post.atPose3(x), post.atVector3(v)) # NOTE TODO when connecting IMU add velocity tracking (also for ZUPT) need to use v symbol upstream
-        # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it 
-        covariance = self.isam.marginalCovariance(x)
-        self.covars = (
-            covariance[3, 3],
-            covariance[4, 4],
-            covariance[5, 5],
-            covariance[3, 4],
-            covariance[3, 5],
-            covariance[4, 5],
-        )
-
-    def zero_movement_update(self, timestamp: float) -> None:
-        """Temporarily constrain the next pose to the current one after an input gap.
-
-        This mirrors the EKF's synthetic zero-movement update to limit drift from
-        the constant-velocity model. It is valid only when an idle input queue
-        really means the tag is stationary; it will be replaced by IMU-based
-        propagation and stationary detection.
-        """
-        if not self.validate_update(timestamp):
-            return
-
-        graph = gt.NonlinearFactorGraph()
-        initial_values = gt.Values()
-
-        current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)
-        x_prev = gt.symbol('x', current_state_id - 1)
-        pose = self.pose
-        previous_pose = gt.Pose3(
-            gt.Rot3.Ypr(pose.heading, 0, 0),
-            gt.Point3(*pose.coordinates),
-        )
-        zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
-
-        graph.add(gt.BetweenFactorPose3(x_prev, x, zero_motion, ZERO_MOVEMENT_NOISE))
-        initial_values.insert(x, previous_pose)
-
-        self.isam.update(graph, initial_values)
-        post_pose = self.isam.calculateEstimate().atPose3(x)
-        self.state = gt.NavState(post_pose, np.zeros(3))
-        
-    def pedometer_update():
-        pass 
-    def custom_odometry_update():
-        pass
+        # Motion model
+        delta_local_frame = constant_velocity_model(self._state) # Supposing constant velocity, what would be the local vector to the new state?
+        relative_mvt = gt.Pose3( gt.Rot3.Ypr(0,0,0), delta_local_frame )  
+        graph.add(gt.BetweenFactorPose3(x_prev, x, relative_mvt, ODOMETRY_NOISE))
+        initial_values.insert(x, self._state.pose().compose(relative_mvt))
+        # Carry the velocity through range-only intervals so every state has a
+        # valid V(k), including the path used by ``advance_to`` to form NavState.
+        v_prev = gt.symbol('v', current_state_id - 1)
+        previous_velocity = self._state.velocity()
+        graph.add(gt.BetweenFactorVector(v_prev, v, np.zeros(3), CONSTANT_VELOCITY_NOISE))
+        initial_values.insert(v, previous_velocity)
+        # With an IMU, carry the bias so every state has a B(k) for a later CombinedImuFactor.
+        # The between noise is the bias random walk accumulated over dt_s.
+        if hasattr(self, "pim"):
+            b_prev, b = gt.symbol('b', current_state_id - 1), gt.symbol('b', current_state_id)
+            bias_walk_noise = gt.noiseModel.Diagonal.Sigmas(np.concatenate((
+                np.full(3, np.sqrt(IMU_ACCEL_WALK_COV * dt_s)),
+                np.full(3, np.sqrt(IMU_GYRO_WALK_COV * dt_s)),
+            )))
+            graph.add(gt.BetweenFactorConstantBias(b_prev, b, gt.imuBias.ConstantBias(), bias_walk_noise))
+            initial_values.insert(b, self.pim.biasHat())

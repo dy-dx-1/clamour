@@ -3,7 +3,9 @@ from time import perf_counter, sleep
 from typing import TYPE_CHECKING
 
 from ...custom_terminal import print 
+from ...estimator_clock import EstimatorClock
 from ...interfaces import Tag, Anchors
+from ...messages.updateMessage import RangeObservation
 from ..neighborhood import Neighborhood
 from ..slot_assignment import SlotAssignment
 from ..timing import Timing
@@ -32,14 +34,14 @@ class Task(TDMAState):
     """
     def __init__(self, timing: Timing, anchors: Anchors, neighborhood: Neighborhood, 
                  shared_tag: Tag, shared_tag_lock: Lock, messenger: "Messenger",
-                 slot_assignment: SlotAssignment):
+                 slot_assignment: SlotAssignment, estimator_clock: EstimatorClock):
         self.timing = timing
-        self.anchors = anchors # TODO Remove, unused 
         self.tag = shared_tag
         self.tag_lock = shared_tag_lock
         self.neighborhood = neighborhood
         self.slot_assignment = slot_assignment
         self.messenger = messenger
+        self.estimator_clock = estimator_clock
         self.frame_id_done_discover = -1
         self.neighborUpdateFrequency = 5 # every five frames, do discovery and update neighbor information
         self.ranging_references = {'anchors':{}, 'tags':{}}     # Keeps track of what anchors/tags we previously used for ranging to allow variety in selection 
@@ -56,29 +58,10 @@ class Task(TDMAState):
 
         if self.neighborhood.changed:
             self.messenger.broadcast_topology_message()  # Broadcast topology change to other devices
-            self.messenger.send_topology_update(self.timing.logical_clock.clock, self.timing.logical_clock.offset, self.neighborhood.current_neighbors)
+            self.messenger.send_topology_update(self.neighborhood.current_neighbors)
             self.neighborhood.changed = False
 
         return self.next()
-
-    def testTDMA(self):
-        tosend = [0xFF] * 8
-        temp = self.slot_assignment.pure_send_list.copy()
-        for ele in temp:
-            if ele<0:
-                temp.remove(ele)
-        for i in range(min(len(temp), 8)):
-            tosend[i] = temp[i]
-        if self.timing.current_slot_id == 0:
-            tosend[-1] = (0 if tosend[-1]==255 else tosend[-1])
-            with self.tag_lock:
-                self.tag.broadcast(payload=tosend) # NOTE: previously there were 9 B's, but I don't think it matches format of tosend (26June26)
-        else:
-            tosend[-1] = (self.timing.current_slot_id-1 if tosend[-1]==255 else tosend[-1])
-            print(f"Task.testTDMA(): tosend: {tosend}", 'info', 'tdma')
-            with self.tag_lock:
-                self.tag.broadcast(payload=tosend)
-        print(f"Task.testTDMA(): {self.timing.frame_id} {self.timing.current_slot_id} {self.timing.get_full_cycle_duration()} {self.timing.current_time_in_cycle}", 'info', 'tdma')
 
     def next(self) -> State:
         if self.timing.in_cycle():
@@ -92,25 +75,35 @@ class Task(TDMAState):
         Ranges with appropriate anchors/neighbors through an intelligent selection policy. 
         Sends the collected info to the state estimator for positioning. 
         """
-        anchor_zs = []
-        tag_zs = []  
+        range_observations = []
         for target_id in self.select_ranging_targets():
-            z, target_pos = self.tag.ranging(target_id)  # target_pos also holds covar and will only be returned and used if target_id is another tag
-            if z: # Successful measurement, fetch position and add 
-                if self.tag.is_anchor(target_id): 
-                    anchor_zs.append( (target_id, z) )   # (id, range_measure_in_cm)
-                else: 
-                    if target_pos: # If None, we didn't get covariance info, so won't pass it to estimator
-                        tag_zs.append( (target_id, target_pos, z) ) 
-            sleep(0.000001) # Short break to ensure exchange finished. Should be more than enough.
-        # Packing in an update message and sending to estimator 
-        if anchor_zs or tag_zs: # Don't waste ressources sending ranging update if no data to add 
-            self.messenger.send_range_update(clock=self.timing.logical_clock.clock, 
-                                            offset=self.timing.logical_clock.offset,
-                                            anchors_ranging_data=anchor_zs,
-                                            tags_ranging_data=tag_zs,
-                                            yaw = self.tag.pose.heading,
-                                            topology= self.neighborhood.current_neighbors)
+            range_start_ns = self.estimator_clock.now_ns()
+            z, target_pose = self.tag.ranging(target_id)
+            range_end_ns = self.estimator_clock.now_ns()
+            if z:  # Successful measurement, fetch position and add.
+                # These UWB exchanges are applied at once into the new estimated state -> don't need to be as precise as IMU clock
+                # Therefore we just take the exchange midpoint as reference instead of dealing with hardware clock sync. 
+                range_time_ns = (range_start_ns + range_end_ns) // 2
+                is_anchor = self.tag.is_anchor(target_id)
+                if not is_anchor and target_pose is None: # If another tag doesn't share cov, we ignore it. Estimator needs cov. 
+                    continue
+                range_observations.append(
+                    RangeObservation(
+                        target_id=target_id,
+                        distance_cm=z,
+                        event_time_ns=range_time_ns,
+                        is_anchor=is_anchor,
+                        target_pose=target_pose,
+                    )
+                )
+            sleep(0.000001)  # Short break to ensure exchange finished. Should be more than enough.
+
+        if range_observations: 
+            self.messenger.send_range_update(
+                yaw=self.tag.pose.heading,
+                topology=self.neighborhood.current_neighbors,
+                range_observations=range_observations,
+            )
 
     def select_ranging_targets(self)->set:
         """
