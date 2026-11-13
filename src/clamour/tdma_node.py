@@ -1,6 +1,7 @@
 from multiprocessing.synchronize import Lock
 from time import sleep, time
 
+from .custom_terminal import print 
 from .interfaces import Anchors, Tag
 from .estimator_clock import EstimatorClock
 from .tdma import Neighborhood, SlotAssignment, Timing
