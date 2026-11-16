@@ -14,7 +14,7 @@ This project is a joint collaboration by the following laboratories:
 
 ## Table of contents
 -[Overview & Key Concepts](#overview--key--concepts)
--[System Architecture & Communication Cycle](#system-architecture-communication--cycle)
+-[System Architecture & Communication Cycle](#system-architecture--communication-cycle)
 -[Docker Deployement](#docker-deployement)
 ---
 
@@ -40,6 +40,7 @@ Each node operates as a state machine structured around a synchronized TDMA cycl
 
 Step 1 - Initialization
 The device first start to wait a random delay, then attempt to detect other tags around itself. It then update itself and switch to the next state
+
 Step 2 - Synchronisation
 This state prepares the tag for synchronization by converging the logical clock of the tags so that they can coordonnate their transmissions. Afte the preparations are done, the device switches to the Scheduling state
 
@@ -71,10 +72,9 @@ stateDiagram-v2
 ```
 ---
 ## Docker Deployement
-
 A Dockerfile is provided to run CLAMOUR inside a container.
 Containerization ensures consistent dependencies and static configurations across a cluster of Raspberry Pi nodes without configuration drift
----
+
 ## Running the container 
 Because CLAMOUR communicates with a Pozyx UWB transceiver over USB, you must pass the host's serial device to the container using the --device flag. On linux/Raspberry Pi, this device is typically /dev/ttyACMO (Verify the exact port on your node usiing ls /dev/ttyACM*).
 
