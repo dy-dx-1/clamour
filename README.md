@@ -1,41 +1,40 @@
 # CLAMOUR
 
-#### The name of this project, CLAMOUR, stands for Collaborative Localization Adapted from Modular Onboard UWB Ranger.
+**Collaborative Localization Adapted from Modular Onboard UWB Ranger**
 
-The objective of CLAMOUR is to create self-localizing audioguides for the Chambord Castle Museum's exposition (https://www.chambord.org/en/discovering/the-castle-visit/). These audioguides will generate music based on the visitor's position within the castle.
+CLAMOUR is a collaborative localization system designed to power self-localizing audioguides for the [Chambord Castle Museum](https://www.chambord.org/en/discovering/the-castle-visit/) exhibition. Based on a visitor's real-time position within the castle, the audioguide dynamically generates adaptive music.
 
-A prototype of this audioguide was realized in 2018. More details on this prototype and the research behind it can be found in the following paper: https://arxiv.org/abs/1905.03247
+An initial prototype was developed in 2018. Further details on the prototype and underlying research are available in the [arXiv paper (1905.03247)](https://arxiv.org/abs/1905.03247).
 
-This project is realized in collaboration by the following laboratories: MIST - Polytechnique, NXI Gestatio - UQAM, INIT Robots - ETS.
+This project is a joint collaboration by the following laboratories: - - **MIST lab** - Polytechnique Montréal
+- **NXI Gestatio** - UQAM
+- **INIT Robots** - ETS.
 
-#### Docker usage
-A Dockerfile is available to use CLAMOUR inside a container.
-The reasoning is that this way CLAMOUR can be deployed and updated easily on a cluster of Raspberry PI whilst guaranteeing us the configuration stays static and we never have discrepancies in configuration between nodes.
+##Table of contents
+-[Overview & Key Concepts](#overview--key--concepts)
+-[System Architecture & Communication Cycle](#system-architecture-communication--cycle)
+-[Docker Deployement](#docker-deployement)
 
-Since CLAMOUR uses a USB device (Pozyx), you need to give Docker access to the device when running the container.
+##Overview & Key concepts
 
-Chances are the USB device in question will be `/dev/ttyACM0`, but you should make sure to find the correct one for your node.
+The primary objective of CLAMOUR is to achieve **collaborative localization and tracking with minimal fixed infrastructure**
 
-Use the `--device` parameter with `docker run` command, like follows: `docker run --device=/dev/ttyACM0 clamour` where Pozyx device is `/dev/ttyACM0` and docker image name is `clamour`.
-
-### Project Description
-1. Objective 
-The goal of this project is to achieve collaborative localization and tracking with minimal infrastructure
-
-2. Key concept
-UWB - ultra wide band
+**UWB (Ultra-WideBand)**
 UWB is a radio technology used here to measure distances between devices. These mesurements are then used to estimate positions. 
 
-Anchor
+**Anchor**
 An anchor is a fixed reference point whose position is know. A device can measure its distance to an anchor to obtain information about its localisation. 
 
-Tag/mobile device
+**Tag (mobile device)**
 a tag is a UWB device that the the system aims to localize. it can also communicate with neighboring tags and contribute to their localization.
 
-TDMA - Time-Division Multiple Access
-Time is divided into slots. A device can transmit during its assigned slots instead of transmitting at the same time as its neighbors.
+**TDMA (Time-Division Multiple Access)**
+A channel access method where time is divided into discrete slots. Each tag transmits only during its assigned slot to prevent radio collisions with neighboring devices.
 
-3. the system's communication cycle
+#System Architecture & Communication Cycle
+
+Each node operates as a state machine structured around a synchronized TDMA cycle : 
+
 Step 1 - Initialization
 The device first start to wait a random delay, then attempt to detect other tags around itself. It then update itself and switch to the next state
 Step 2 - Synchronisation
@@ -54,4 +53,26 @@ This is the step start by discovering periodically the other devices. It also cl
 - the logical clock and the delay
 - the known topologic of the network
 
+```mermaid
+stateDiagram-v2
+    [*] --> Initialization
+    Initialization --> Synchronization : Neighbors detected & state initialized
+    Synchronization --> Scheduling : Logical clocks converged
+    Scheduling --> Listen : Planning window finished
+    Scheduling --> Synchronization : Scheduling error
+    Listen --> Listen : Active cycle (other tag's slot)
+    Listen --> Task : Active cycle (own slot)
+    Listen --> Synchronization : Cycle ended or re-sync needed
+    Task --> Listen : Ranging & estimation complete
 
+```
+##Docker Deployement
+
+A Dockerfile is provided to run CLAMOUR inside a container.
+Containerization ensures consistent dependencies and static configurations across a cluster of Raspberry Pi nodes without configuration drift
+
+#Running the container 
+Because CLAMOUR communicates with a Pozyx UWB transceiver over USB, you must pass the host's serial device to the container using the --device flag. On linux/Raspberry Pi, this device is typically /dev/ttyACMO (Verify the exact port on your node usiing ls /dev/ttyACM*).
+
+`docker run --device=/dev/ttyACM0 clamour`
+(Replace /dev/ttyACM0 with your node's actual USB device path and `clamour` with your built image name if different.)
