@@ -6,14 +6,16 @@ CLAMOUR is a collaborative localization system designed to power self-localizing
 
 An initial prototype was developed in 2018. Further details on the prototype and underlying research are available in the [arXiv paper (1905.03247)](https://arxiv.org/abs/1905.03247).
 
-This project is a joint collaboration by the following laboratories: - - **MIST lab** - Polytechnique Montréal
+This project is a joint collaboration by the following laboratories:
+- **MIST lab** - Polytechnique Montréal
 - **NXI Gestatio** - UQAM
 - **INIT Robots** - ETS.
-
+---
 ##Table of contents
 -[Overview & Key Concepts](#overview--key--concepts)
 -[System Architecture & Communication Cycle](#system-architecture-communication--cycle)
 -[Docker Deployement](#docker-deployement)
+---
 
 ##Overview & Key concepts
 
@@ -30,8 +32,8 @@ a tag is a UWB device that the the system aims to localize. it can also communic
 
 **TDMA (Time-Division Multiple Access)**
 A channel access method where time is divided into discrete slots. Each tag transmits only during its assigned slot to prevent radio collisions with neighboring devices.
-
-#System Architecture & Communication Cycle
+---
+##System Architecture & Communication Cycle
 
 Each node operates as a state machine structured around a synchronized TDMA cycle : 
 
@@ -66,12 +68,13 @@ stateDiagram-v2
     Task --> Listen : Ranging & estimation complete
 
 ```
+---
 ##Docker Deployement
 
 A Dockerfile is provided to run CLAMOUR inside a container.
 Containerization ensures consistent dependencies and static configurations across a cluster of Raspberry Pi nodes without configuration drift
-
-#Running the container 
+---
+##Running the container 
 Because CLAMOUR communicates with a Pozyx UWB transceiver over USB, you must pass the host's serial device to the container using the --device flag. On linux/Raspberry Pi, this device is typically /dev/ttyACMO (Verify the exact port on your node usiing ls /dev/ttyACM*).
 
 `docker run --device=/dev/ttyACM0 clamour`
