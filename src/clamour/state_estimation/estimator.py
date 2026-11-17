@@ -2,7 +2,7 @@ import csv
 from time import sleep
 
 from statistics import median
-from math import ceil, radians
+from math import ceil
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from queue import Empty
@@ -87,7 +87,6 @@ class StateEstimator:
         self.estimator = None 
         self.estimator_type = estimator_type # validity check done in config  
 
-        self.yaw_offset = 0  # Measured in degrees relative to global coordinates X-Axis
         self.last_known_neighbors = {}
 
         self.pose_callback = pose_callback # NOTE future eval if can just put this in here, idk why need to pass it as arg
@@ -105,12 +104,14 @@ class StateEstimator:
         # The latest measurement at or before the current state boundary.  Its
         # value is held until the next sample for zero-order-hold integration.
         self._held_imu_sample: TimedIMUSample | None = None
-        # EstimatorClock time of the first estimator state.  The processing loop
-        # starts its first interval here so the first IMU link and the cadence
-        # scheduler share the same boundary.
-        self._first_state_time_ns: int | None = None
 
-        self.state_csv, self.writer = self.initialize_csv()
+        if SAVE_TO_CSV:
+            self.state_csv = open('pose_estimation.csv', 'w')
+            self.writer = csv.DictWriter(self.state_csv, fieldnames=[
+                'tag_id', 'timestamp', 'update_type',
+                'estimator_x', 'estimator_y', 'estimator_z', 'estimator_yaw',
+                'covariance_matrix', 'slots', 'two_hop_neighbors'])
+            self.writer.writeheader()
         if DYNAMIC_MIST:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock_dest = (UDP_HOST, UDP_PORT)
@@ -121,60 +122,56 @@ class StateEstimator:
     def run(self) -> None: 
         try: 
             with self.imu_factory() as imu:
-                self.initialize_estimator(imu)
-                self._run_processing_loop()
-        except Exception as e: 
-            print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
-            if DYNAMIC_MIST: 
-                self._socket.close() 
-            raise e
+                first_state_time_ns = self.initialize_estimator(imu)
+                self._run_processing_loop(first_state_time_ns)
+        except Exception as e:
+            print(f'State Estimator crashed! Error: {e}', 'error', 'loc')
+            raise
+        finally:
+            if DYNAMIC_MIST:
+                self._socket.close()
 
-    def initialize_estimator(self, imu: IMU|None) -> None: 
+    def initialize_estimator(self, imu: IMU|None) -> int:
         """
         Wait for a trilateration-sufficient update to arrive in the communication queue.
-        Required to initialize the estimator with a fully constrained position in the global reference frame.  
+        Required to initialize the estimator with a fully constrained position in the global reference frame.
+        Returns the EstimatorClock time (ns) of the first estimator state.
         """
         print("Estimator initialization started. Keep the tag **stationary** until full initialization completes.", 'info', 'loc')
-        if self.imu is not None:
-            self._initialize_imu(imu)
-        while self.estimator is None:
-            # Initial state not set yet, always discard IMU samples 
-            if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
-                self.imu.discard_FIFO()
+        self._initialize_imu(imu)
+        while True:
             try:
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
             except Empty:
-                sleep(self.imu_fifo_poll_interval_ns / 1_000_000_000 if (self.imu is not None) else STATE_INTERVAL)
+                # Initial state not set yet, so IMU samples can't be integrated: drop them
+                self._idle_imu(STATE_INTERVAL_NS)
+                self._pending_imu_samples.clear()
                 continue
 
-            if msg.update_type == UpdateType.RANGING:
-                anchor_ros = [obs for obs in msg.range_observations if obs.is_anchor]
-                if len(anchor_ros) < 4:  # Need a fully constrained measurement for initialization
-                    continue
-                self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses
-                raw_yaw = self.correct_yaw(msg.measured_yaw)
+            if msg.update_type != UpdateType.RANGING:
+                continue
+            anchor_ros = [obs for obs in msg.range_observations if obs.is_anchor]
+            if len(anchor_ros) < 4:  # Need a fully constrained measurement for initialization
+                continue
 
-                # Anchoring first graph state to when we first get sufficient ranges 
-                self._first_state_time_ns = self.estimator_clock.now_ns()
-                if self.estimator_type == 'EKF':
-                    from .ekf import CustomEKF
-                    self.estimator = CustomEKF(anchor_ros, raw_yaw, self._first_state_time_ns, STATE_INTERVAL)
-                    self.estimator.incorporate_ranging_data(msg.range_observations, raw_yaw)
-                elif self.estimator_type == 'FG':
-                    from .factor_graph import FactorGraph
-                    accel_covar_density = self.imu.accel_covar_density_mg if self.imu is not None else None
-                    gyro_covar_density = self.imu.gyro_covar_density_mg if self.imu is not None else None
-                    self.estimator = FactorGraph(
-                        anchor_ros,
-                        radians(raw_yaw),
-                        self._first_state_time_ns,
-                        accel_covar_density,
-                        gyro_covar_density,
-                    )
-                # Estimator initialized. Internalise and publish the posterior.
-                self.publish_state(msg)
-
-        print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
+            # The global frame starts at the initial heading, so the initial yaw is 0 by definition.
+            # Anchoring first graph state to when we first get sufficient ranges
+            first_state_time_ns = self.estimator_clock.now_ns()
+            if self.estimator_type == 'EKF':
+                from .ekf import CustomEKF
+                self.estimator = CustomEKF(anchor_ros, 0.0, first_state_time_ns, STATE_INTERVAL)
+                self.estimator.incorporate_ranging_data(msg.range_observations, 0.0)
+            elif self.estimator_type == 'FG':
+                from .factor_graph import FactorGraph
+                if self.imu is not None:
+                    accel_covar_density, gyro_covar_density = self.imu.accel_covar_density_mg, self.imu.gyro_covar_density_mg
+                else:
+                    accel_covar_density = gyro_covar_density = None
+                self.estimator = FactorGraph(anchor_ros, 0.0, first_state_time_ns, accel_covar_density, gyro_covar_density)
+            # Estimator initialized. Internalise and publish the posterior.
+            self.publish_state(msg)
+            print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
+            return first_state_time_ns
 
     def _initialize_imu(self, imu: IMU|None) -> None:
         """
@@ -203,15 +200,24 @@ class StateEstimator:
         for delay in IMU_INIT_OBSERVATION_DELAYS:
             due_ns = start_ns + round(delay * 1_000_000_000)
             while (now := self.estimator_clock.now_ns()) < due_ns:
-                if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
-                    self._read_imu_fifo_into_pending()
-                sleep(min(due_ns - now, self.imu_fifo_poll_interval_ns) / 1_000_000_000)
+                self._idle_imu(due_ns - now)
             self._update_sensor_clock_mapper()  # Also drains the FIFO into pending samples
 
-        # TODO: estimate the initial attitude here. Can discard FIFO samples instead of moving into pending if use SFLP block 
+        # TODO: estimate the initial attitude here. Can discard FIFO samples instead of moving into pending if use SFLP block
         self._pending_imu_samples.clear()
 
-    def _run_processing_loop(self) -> None: 
+    def _idle_imu(self, max_sleep_ns: int) -> None:
+        """
+        Empty the IMU FIFO into pending samples if it is near full, then sleep.
+        With an IMU, the sleep is capped at the FIFO poll interval so the FIFO can't overflow.
+        """
+        if self.imu is not None:
+            if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
+                self._read_imu_fifo_into_pending()
+            max_sleep_ns = min(max_sleep_ns, self.imu_fifo_poll_interval_ns)
+        sleep(max_sleep_ns / 1_000_000_000)
+
+    def _run_processing_loop(self, first_state_time_ns: int) -> None:
         """
         Continuously estimates the posterior state every STATE_INTERVAL seconds.  
 
@@ -230,46 +236,34 @@ class StateEstimator:
         # publishing the initial posterior must not open a gap between the graph's
         # first state and the first interval.  If that boundary has already
         # passed, the loop closes the missed intervals immediately.
-        # NOTE: remove this check? self._first_state_time_ns is always initiated in initialize_estimator I think
-        if self._first_state_time_ns is not None:
-            last_state_boundary = self._first_state_time_ns
-        else:
-            last_state_boundary = self.estimator_clock.now_ns()
+        last_state_boundary = first_state_time_ns
         next_boundary = last_state_boundary + STATE_INTERVAL_NS
         pending_messages: list[UpdateMessage] = []
-        
+
         while True:
-            # Fetching measurements from comm queue
-            pending_messages.extend(self._drain_communication_queue())
-
-            # If IMU present, empty it's FIFO if sufficiently full 
-            # NOTE: can we make the "if sufficiently full" part implicit to read_imu_fifo or one of it's child functions?
-            if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
-                self._read_imu_fifo_into_pending()
-
             # Wait RANGE_LATENESS_NS past the boundary before closing the interval, so
             # batched ranges acquired just before it can still reach the queue.
             # Later events are kept as future measurements by their event time.
-            now = self.estimator_clock.now_ns()
             close_time = next_boundary + RANGE_LATENESS_NS
+            # ``now`` is read *before* draining: on the closing pass, the drain therefore
+            # happens after close_time and includes everything queued before it.
+            # Draining on every pass also keeps the bounded queue from filling up.
+            now = self.estimator_clock.now_ns()
+            pending_messages.extend(self._drain_communication_queue())
             if now < close_time:
-                # Keep latency low without using a repeated fixed sleep, which
-                # would accumulate scheduler drift over a long run.  In IMU mode,
-                # wake often enough to service the FIFO before it can overflow.
-                sleep_ns = close_time - now
-                if self.imu is not None:
-                    sleep_ns = min(sleep_ns, self.imu_fifo_poll_interval_ns)
-                sleep(sleep_ns / 1_000_000_000)
+                # Sleep until the close time rather than a fixed period, which would
+                # accumulate scheduler drift over a long run.
+                self._idle_imu(close_time - now)
                 continue
 
-            # Drain comm queue and IMU once more so we don't miss messages at boundary 
-            pending_messages.extend(self._drain_communication_queue()) 
             if self.imu is not None:
+                # Forces a final FIFO read; samples past the boundary stay pending for the next interval
                 imu_start_sample, imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
-                self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift
+                # Periodically refresh conversion of IMU clock to correct drift
+                if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns >= IMU_CLOCK_REFRESH_INTERVAL_NS:
+                    self._update_sensor_clock_mapper()
             else:
-                imu_start_sample = None
-                imu_samples = []
+                imu_start_sample, imu_samples = None, []
 
             # Aggregate all messages and process them 
             batch = SensorBatch(
@@ -345,13 +339,6 @@ class StateEstimator:
                 raise RuntimeError("IMU samples are not chronological after clock conversion")
             self._pending_imu_samples.append(sample)
 
-    def _refresh_imu_clock_if_due(self) -> None:
-        if self._last_imu_clock_observation_ns is None:
-            return
-        if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns < IMU_CLOCK_REFRESH_INTERVAL_NS:
-            return
-        self._update_sensor_clock_mapper()
-
     def _update_sensor_clock_mapper(self) -> None:
         """Update the IMU tick mapping after mapping the queued FIFO samples.
 
@@ -375,18 +362,32 @@ class StateEstimator:
         Generate a new posterior state update and retain range messages whose
         event times belong to a future state interval.
         """
-        # Parsing messages
-        range_messages = [] 
-        step_messages = [] 
+        # Parse messages. Ranges are split into the current interval, future intervals, and late drops.
+        interval_ranges = []
+        future_range_messages = []
+        interval_range_message = None  # Last message with a range in this interval, used for CSV
+        step_messages = []
         for message in batch.messages:
-            if message.update_type == UpdateType.TOPOLOGY:
-                self.update_neighbors(message.topology)
-            elif message.update_type == UpdateType.RANGING: 
-                self.update_neighbors(message.topology)
-                range_messages.append(message)
+            if message.update_type in (UpdateType.TOPOLOGY, UpdateType.RANGING):
+                self.last_known_neighbors = message.topology
+            if message.update_type == UpdateType.RANGING:
+                future_observations = []
+                for observation in message.range_observations:
+                    if observation.event_time_ns <= batch.start_time_ns:
+                        # TODO: Assign delayed measurements to their historical graph state if needed
+                        print(f"WARNING: Dropping late range to {observation.target_id} acquired at {observation.event_time_ns} ns; "
+                              f"current interval starts at {batch.start_time_ns} ns.", 'error', 'loc')
+                    elif observation.event_time_ns <= batch.boundary_time_ns:
+                        interval_ranges.append(observation)
+                        interval_range_message = message
+                    else:
+                        future_observations.append(observation)
+                if future_observations:
+                    # The message is kept for a later interval, holding only its future ranges
+                    message.range_observations = future_observations
+                    future_range_messages.append(message)
             elif message.update_type == UpdateType.PEDOMETER:
                 step_messages.append(message)
-        interval_ranges, future_range_messages, interval_range_message = self._partition_interval_ranges(range_messages, batch)
         range_observations = self._coalesce_ranges(interval_ranges)
 
         # Create the new state and integrate the info from the sensor batch. 
@@ -407,37 +408,8 @@ class StateEstimator:
         """
         
         # Optimise and publish
-        self.publish_state(interval_range_message if range_observations else None)
+        self.publish_state(interval_range_message)
         return future_range_messages
-
-    @staticmethod
-    def _partition_interval_ranges(messages: list[UpdateMessage], batch: SensorBatch) -> tuple[list[RangeObservation], list[UpdateMessage], UpdateMessage | None]:
-        """Split ranges into the current interval, future intervals, and late drops."""
-        interval_observations = []
-        future_messages = []
-        interval_message = None
-        for message in messages:
-            future_observations = []
-            for observation in message.range_observations:
-                if observation.event_time_ns <= batch.start_time_ns:
-                    print(
-                        "WARNING: Dropping late range "
-                        f"to {observation.target_id} acquired at {observation.event_time_ns} ns; "
-                        f"current interval starts at {batch.start_time_ns} ns.",
-                        'error',
-                        'loc',
-                    )
-                    # TODO: Assign delayed measurements to their historical graph state if needed
-                elif observation.event_time_ns <= batch.boundary_time_ns:
-                    interval_observations.append(observation)
-                    interval_message = message
-                else:
-                    future_observations.append(observation)
-
-            if future_observations:
-                message.range_observations = future_observations
-                future_messages.append(message)
-        return interval_observations, future_messages, interval_message
 
     @staticmethod
     def _coalesce_ranges(observations: list[RangeObservation]) -> list[RangeObservation]:
@@ -465,16 +437,6 @@ class StateEstimator:
             for target_id, grouped in anchor_groups.items()
         ]
         return coalesced_anchors + tag_observations
-
-    def update_neighbors(self, neighbors: dict):
-        self.last_known_neighbors = neighbors
-
-    def correct_yaw(self, measured_yaw: float) -> float:
-        """
-        The initial yaw that is measured is '0', subsequent ones need to be corrected to stay consistent. 
-        """
-        new_yaw = measured_yaw - self.yaw_offset
-        return new_yaw if new_yaw >= 0 else 360 + new_yaw 
 
     def validate_new_state(self, new_pose: Pose) -> bool:
         """
@@ -510,33 +472,18 @@ class StateEstimator:
  
         self.pose_callback(pose)
 
-        if DYNAMIC_MIST: 
-            meters = [coord/100 for coord in self.tag.pose.coordinates]
+        if DYNAMIC_MIST:
+            meters = [coord/100 for coord in pose.coordinates]
             packet = struct.pack("<ifff", self.tag.tag_id, *meters)
             self._socket.sendto(packet, self.sock_dest)
 
         if SAVE_TO_CSV and message is not None:
-            self.save_to_csv(message)
+            self.save_to_csv(message, pose)
 
         if self.sound_queue is not None:
-            self.sound_queue.put(SoundMessage.save(SoundMessage(self.estimator.pose)))
+            self.sound_queue.put(SoundMessage.save(SoundMessage(pose)))
 
-    @staticmethod 
-    def initialize_csv(): 
-        if not SAVE_TO_CSV: 
-            return None, None 
-        filepath = 'pose_estimation.csv'
-        fieldnames = ['tag_id', 'timestamp', 'update_type',
-                      'estimator_x', 'estimator_y', 'estimator_z', 'estimator_yaw',
-                      'covariance_matrix', 'slots', 'two_hop_neighbors']
-
-        state_csv = open(filepath, 'w')
-        writer = csv.DictWriter(state_csv, delimiter=',', fieldnames=fieldnames)
-        writer.writeheader()
-
-        return state_csv, writer
-    
-    def save_to_csv(self, message: UpdateMessage):
+    def save_to_csv(self, message: UpdateMessage, pose: Pose):
         """
         NOTE: Previously, this function also printed the raw position pre-EKF. During the move to FGs, I've removed this option. 
         This is because we now directly deal with multiple ranges, so we'd either need to:
@@ -545,22 +492,20 @@ class StateEstimator:
         ALSO: would need to figure out how to consider the IMU effect on the 'raw pos'. Do we incorporate it? Or do we just print out geometric results?
         What would be the benefit?
 
-        Since the answer to these questions may be clearer in the future, leaving it without raw position for now (2026-08-18). 
-        """
-        if message.update_type == UpdateType.RANGING: # TODO add compatibility to IMU in future 
-            pose = self.estimator.pose
-            csv_data = {
-                'tag_id': self.tag.tag_id,
-                'timestamp': message.timestamp,
-                'update_type': message.update_type,
-                'estimator_x': pose.x,
-                'estimator_y': pose.y,
-                'estimator_z': pose.z,
-                'estimator_yaw': pose.heading,
-                'covariance_matrix': "to implement", # previously: np.linalg.det(self.estimator.P)
-                'slots': message.slots,
-                'two_hop_neighbors': self.last_known_neighbors
-            }
+        Since the answer to these questions may be clearer in the future, leaving it without raw position for now (2026-08-18).
 
-            self.writer.writerow(csv_data)
-            self.state_csv.flush()
+        NOTE: ``message`` is always a RANGING message. TODO add compatibility to IMU in future
+        """
+        self.writer.writerow({
+            'tag_id': self.tag.tag_id,
+            'timestamp': message.timestamp,
+            'update_type': message.update_type,
+            'estimator_x': pose.x,
+            'estimator_y': pose.y,
+            'estimator_z': pose.z,
+            'estimator_yaw': pose.heading,
+            'covariance_matrix': "to implement", # previously: np.linalg.det(self.estimator.P)
+            'slots': message.slots,
+            'two_hop_neighbors': self.last_known_neighbors
+        })
+        self.state_csv.flush()
