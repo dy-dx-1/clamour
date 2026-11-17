@@ -269,8 +269,8 @@ class FactorGraph:
         """
         Adds anchor and tag range observations to a graph state without adding a prior or solving for it.
         """
-        range_str = lambda ro: f"{ro.target_id}: {ro.distance_cm}cm"
-        print(f"Adding range observations {[range_str(ro) for ro in range_observations]}", 'info', 'loc')
+        #range_str = lambda ro: f"{ro.target_id}: {ro.distance_cm}cm"
+        #print(f"Adding range observations {[range_str(ro) for ro in range_observations]}", 'info', 'loc')
         x = gt.symbol('x', state_key) 
         for observation in range_observations:
             target_id = observation.target_id

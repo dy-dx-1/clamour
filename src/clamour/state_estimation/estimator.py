@@ -121,8 +121,7 @@ class StateEstimator:
     def run(self) -> None: 
         try: 
             with self.imu_factory() as imu:
-                self._configure_imu(imu)
-                self.initialize_estimator()
+                self.initialize_estimator(imu)
                 self._run_processing_loop()
         except Exception as e: 
             print(f'State Estimator crashed! Error: {str(e)}', 'error', 'loc')
@@ -130,40 +129,16 @@ class StateEstimator:
                 self._socket.close() 
             raise e
 
-    def _configure_imu(self, imu: IMU | None) -> None:
-        """Attach the estimator-owned IMU and derive immutable FIFO timing."""
-        self.imu = imu
-        if imu is None:
-            return
-
-        self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits,
-                                                  IMU_CLOCK_FIT_OBSERVATIONS)
-        self.imu_fifo_watermark_words = ceil(imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
-        fifo_word_rate = imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
-        if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= imu.fifo_capacity_words:
-            raise ValueError("IMU FIFO capacity, watermark, and sample rate must leave overflow headroom")
-        time_from_watermark_to_overflow_s = (imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
-        self.imu_fifo_poll_interval_ns = max(
-            1,
-            round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000),
-        )
-
-    def initialize_estimator(self) -> None: 
+    def initialize_estimator(self, imu: IMU|None) -> None: 
         """
         Wait for a trilateration-sufficient update to arrive in the communication queue.
         Required to initialize the estimator with a fully constrained position in the global reference frame.  
         """
-        print(
-            "Estimator initialization started. Keep the tag **stationary** until full initialization completes.",
-            'info',
-            'loc',
-        )
+        print("Estimator initialization started. Keep the tag **stationary** until full initialization completes.", 'info', 'loc')
         if self.imu is not None:
-            self._initialize_imu()
+            self._initialize_imu(imu)
         while self.estimator is None:
-            # No graph state exists yet, so pre-initialisation samples cannot be
-            # integrated.  The deterministic discard makes that intentional
-            # rather than relying on continuous-mode FIFO overwrite semantics.
+            # Initial state not set yet, always discard IMU samples 
             if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
                 self.imu.discard_FIFO()
             try:
@@ -179,6 +154,7 @@ class StateEstimator:
                 self.yaw_offset = msg.measured_yaw  # Store initial value, which we'll use to correct further poses
                 raw_yaw = self.correct_yaw(msg.measured_yaw)
 
+                # Anchoring first graph state to when we first get sufficient ranges 
                 self._first_state_time_ns = self.estimator_clock.now_ns()
                 if self.estimator_type == 'EKF':
                     from .ekf import CustomEKF
@@ -188,10 +164,6 @@ class StateEstimator:
                     from .factor_graph import FactorGraph
                     accel_covar_density = self.imu.accel_covar_density_mg if self.imu is not None else None
                     gyro_covar_density = self.imu.gyro_covar_density_mg if self.imu is not None else None
-                    # Bootstrap assumes the tag is stationary.  Anchor the
-                    # first graph state at the instant fusion begins, rather
-                    # than at the earlier UWB acquisition time, so the first
-                    # IMU factor and the cadence scheduler share a boundary.
                     self.estimator = FactorGraph(
                         anchor_ros,
                         radians(raw_yaw),
@@ -204,11 +176,27 @@ class StateEstimator:
 
         print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
 
-    def _initialize_imu(self) -> None:
+    def _initialize_imu(self, imu: IMU|None) -> None:
         """
         Stationary IMU initialization, run before listening for ranging observations.
-        Calibrates the IMU clock mapping with observations at IMU_INIT_OBSERVATION_DELAYS.
+        - Assigns self.imu
+        - Creates self.imu_clock_mapper
+        - Sets safe FIFO reading parameters
+        - Calibrates the IMU clock mapping with observations at IMU_INIT_OBSERVATION_DELAYS.
         """
+        self.imu = imu
+        if imu is None:
+            return
+
+        self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits,
+                                                  IMU_CLOCK_FIT_OBSERVATIONS)
+        self.imu_fifo_watermark_words = ceil(imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
+        fifo_word_rate = imu.sample_rate_hz * IMU_FIFO_WORST_CASE_WORDS_PER_SAMPLE
+        if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= imu.fifo_capacity_words:
+            raise ValueError("IMU FIFO capacity, watermark, and sample rate must leave overflow headroom")
+        time_from_watermark_to_overflow_s = (imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
+        self.imu_fifo_poll_interval_ns = max(1, round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000))
+
         self.imu.discard_FIFO()
         self._update_sensor_clock_mapper()
         start_ns = self._last_imu_clock_observation_ns
@@ -242,6 +230,7 @@ class StateEstimator:
         # publishing the initial posterior must not open a gap between the graph's
         # first state and the first interval.  If that boundary has already
         # passed, the loop closes the missed intervals immediately.
+        # NOTE: remove this check? self._first_state_time_ns is always initiated in initialize_estimator I think
         if self._first_state_time_ns is not None:
             last_state_boundary = self._first_state_time_ns
         else:
@@ -250,11 +239,11 @@ class StateEstimator:
         pending_messages: list[UpdateMessage] = []
         
         while True:
-            # Fetching measurements from comm queue.  Retain them until the
-            # interval closes; recreating this list on each poll would lose events.
+            # Fetching measurements from comm queue
             pending_messages.extend(self._drain_communication_queue())
 
             # If IMU present, empty it's FIFO if sufficiently full 
+            # NOTE: can we make the "if sufficiently full" part implicit to read_imu_fifo or one of it's child functions?
             if self.imu is not None and self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
                 self._read_imu_fifo_into_pending()
 
@@ -273,10 +262,8 @@ class StateEstimator:
                 sleep(sleep_ns / 1_000_000_000)
                 continue
 
-            # Drain comm queue once more so we don't miss messages at boundary 
+            # Drain comm queue and IMU once more so we don't miss messages at boundary 
             pending_messages.extend(self._drain_communication_queue()) 
-            # Force one IMU final read so samples below the watermark are included 
-            # imu_samples will only contain interval-valid samples 
             if self.imu is not None:
                 imu_start_sample, imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
                 self._refresh_imu_clock_if_due() # Periodically refresh conversion of IMU clock to correct drift
@@ -335,9 +322,9 @@ class StateEstimator:
 
         start_sample = self._held_imu_sample
         # DEBUG: next_ahead_ms > 0 is how far the first unaccepted sample lies past the boundary
-        next_ahead_ms = (self._pending_imu_samples[0].timestamp_ns - boundary_time_ns) / 1e6 if self._pending_imu_samples else None
-        print(f"IMU drain: held={start_sample is not None} n_interval={len(interval_samples)} "
-              f"n_pending={len(self._pending_imu_samples)} next_ahead_ms={next_ahead_ms}", 'info', 'loc')
+        #next_ahead_ms = (self._pending_imu_samples[0].timestamp_ns - boundary_time_ns) / 1e6 if self._pending_imu_samples else None
+        #print(f"IMU drain: held={start_sample is not None} n_interval={len(interval_samples)} "
+        #      f"n_pending={len(self._pending_imu_samples)} next_ahead_ms={next_ahead_ms}", 'info', 'loc')
         if interval_samples:
             self._held_imu_sample = interval_samples[-1]
         return start_sample, interval_samples
@@ -403,10 +390,6 @@ class StateEstimator:
         range_observations = self._coalesce_ranges(interval_ranges)
 
         # Create the new state and integrate the info from the sensor batch. 
-        # Until the first usable IMU sample is available, use the range-only
-        # constant-velocity fallback.  Thereafter the held sample lets the IMU
-        # factor cover the whole cadence interval, even if no new sample lands
-        # inside a particular interval.
         self.estimator.advance_to(
             batch.boundary_time_ns,
             batch.imu_start_sample,
@@ -416,11 +399,7 @@ class StateEstimator:
             
         """ 
         PEDOMETER AND CUSTOM POSES NOT YET IMPLEMENTED
-        # A step must become a relative step factor between timestamp-bracketing
-        # states; it is not an absolute pose update and should not be treated as
-        # one during the state-interval batch.
-        if step_messages:
-            self._queue_step_constraints(step_messages, batch)
+        # A step must become a relative step factor between timestamp-bracketing states
 
         # CustomOdometry is intentionally not forwarded here.  It will either be
         # removed with the retired Cognifly integration or reintroduced later as a
@@ -448,7 +427,7 @@ class StateEstimator:
                         'error',
                         'loc',
                     )
-                    # TODO: Assign delayed measurements to their historical graph state.
+                    # TODO: Assign delayed measurements to their historical graph state if needed
                 elif observation.event_time_ns <= batch.boundary_time_ns:
                     interval_observations.append(observation)
                     interval_message = message
