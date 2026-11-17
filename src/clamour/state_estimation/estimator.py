@@ -4,14 +4,14 @@ from time import sleep
 from statistics import median
 from math import ceil
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from queue import Empty
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
 import socket 
 import struct 
 
-# NOTE: CustomEKF and FactorGraph are imported in initialize_estimator so the EKF can run without gtsam installed
+# NOTE: CustomEKF and FactorGraph are imported in _initialize_estimator so the EKF can run without gtsam installed
 from ..estimator_clock import EstimatorClock, SensorClockMapper
 from ..custom_terminal import print 
 from ..config import SAVE_TO_CSV, DYNAMIC_MIST, UDP_HOST, UDP_PORT
@@ -25,8 +25,9 @@ from ..rooms import Floorplan
 
 # This is deliberately local while the fusion configuration is being introduced.  It
 # is the cadence of *states*, not necessarily the IMU sample, range, or output rate.
+NS_PER_S = 1_000_000_000
 STATE_INTERVAL = 0.1  # seconds
-STATE_INTERVAL_NS = round(STATE_INTERVAL * 1_000_000_000)
+STATE_INTERVAL_NS = round(STATE_INTERVAL * NS_PER_S)
 # Ranges are sent in batches, so the oldest range of a batch reaches the queue late.
 # Tolerance covers one failed TWR exchange (2 × 15 ms DW listen timeouts) plus margin for queue transit.
 RANGE_LATENESS_NS = 35 * 1_000_000
@@ -34,7 +35,7 @@ assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
 # The IMU -> EstimatorClock mapping must be refreshed periodically to correct drift.
 # 5s was the value decided after testing. It's a cheap check and tracks temp changes due to startup easily. 
 # Could even be longer, as the error is very small, but it really doesn't cost much to do it every 5s. 
-IMU_CLOCK_REFRESH_INTERVAL_NS = round(5.0 * 1_000_000_000)
+IMU_CLOCK_REFRESH_INTERVAL_NS = round(5.0 * NS_PER_S)
 IMU_CLOCK_FIT_OBSERVATIONS = 16
 # Stationary IMU initialization: clock observations at these delays (s) after the first one.  
 # The nominal tick rate is ~0.6% off. Early increasingly spaced observations
@@ -59,9 +60,9 @@ class SensorBatch:
     """
     start_time_ns: int
     boundary_time_ns: int
-    messages: list[UpdateMessage] = field(default_factory=list)
-    imu_start_sample: TimedIMUSample | None = None
-    imu_samples: list[TimedIMUSample] = field(default_factory=list)
+    messages: list[UpdateMessage]
+    imu_start_sample: TimedIMUSample | None
+    imu_samples: list[TimedIMUSample]
 
 class StateEstimator:
     """
@@ -122,8 +123,8 @@ class StateEstimator:
     def run(self) -> None: 
         try: 
             with self.imu_factory() as imu:
-                first_state_time_ns = self.initialize_estimator(imu)
-                self._run_processing_loop(first_state_time_ns)
+                first_state_time_ns = self._initialize_estimator(imu)
+                self._run_fusion_loop(first_state_time_ns)
         except Exception as e:
             print(f'State Estimator crashed! Error: {e}', 'error', 'loc')
             raise
@@ -131,7 +132,7 @@ class StateEstimator:
             if DYNAMIC_MIST:
                 self._socket.close()
 
-    def initialize_estimator(self, imu: IMU|None) -> int:
+    def _initialize_estimator(self, imu: IMU|None) -> int:
         """
         Wait for a trilateration-sufficient update to arrive in the communication queue.
         Required to initialize the estimator with a fully constrained position in the global reference frame.
@@ -144,7 +145,7 @@ class StateEstimator:
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
             except Empty:
                 # Initial state not set yet, so IMU samples can't be integrated: drop them
-                self._idle_imu(STATE_INTERVAL_NS)
+                self._idle(STATE_INTERVAL_NS)
                 self._pending_imu_samples.clear()
                 continue
 
@@ -169,7 +170,7 @@ class StateEstimator:
                     accel_covar_density = gyro_covar_density = None
                 self.estimator = FactorGraph(anchor_ros, 0.0, first_state_time_ns, accel_covar_density, gyro_covar_density)
             # Estimator initialized. Internalise and publish the posterior.
-            self.publish_state(msg)
+            self._publish_pose(msg)
             print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
             return first_state_time_ns
 
@@ -192,32 +193,35 @@ class StateEstimator:
         if fifo_word_rate <= 0 or self.imu_fifo_watermark_words >= imu.fifo_capacity_words:
             raise ValueError("IMU FIFO capacity, watermark, and sample rate must leave overflow headroom")
         time_from_watermark_to_overflow_s = (imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
-        self.imu_fifo_poll_interval_ns = max(1, round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * 1_000_000_000))
+        self.imu_fifo_poll_interval_ns = max(1, round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * NS_PER_S))
 
         self.imu.discard_FIFO()
-        self._update_sensor_clock_mapper()
+        self._observe_imu_clock()
         start_ns = self._last_imu_clock_observation_ns
         for delay in IMU_INIT_OBSERVATION_DELAYS:
-            due_ns = start_ns + round(delay * 1_000_000_000)
+            due_ns = start_ns + round(delay * NS_PER_S)
             while (now := self.estimator_clock.now_ns()) < due_ns:
-                self._idle_imu(due_ns - now)
-            self._update_sensor_clock_mapper()  # Also drains the FIFO into pending samples
+                self._idle(due_ns - now)
+            self._observe_imu_clock()  # Also drains the FIFO into pending samples
 
         # TODO: estimate the initial attitude here. Can discard FIFO samples instead of moving into pending if use SFLP block
         self._pending_imu_samples.clear()
 
-    def _idle_imu(self, max_sleep_ns: int) -> None:
+    def _idle(self, max_sleep_ns: int) -> None:
         """
-        Empty the IMU FIFO into pending samples if it is near full, then sleep.
-        With an IMU, the sleep is capped at the FIFO poll interval so the FIFO can't overflow.
+        Sleep for up to max_sleep_ns while keeping the IMU serviced.
+        - Without an IMU: plain sleep of max_sleep_ns.
+        - With an IMU: first empties the FIFO into pending samples if it is near full, then
+          caps the sleep at the FIFO poll interval so the FIFO can't overflow. Callers loop
+          until their deadline, so a shortened sleep is fine.
         """
         if self.imu is not None:
             if self.imu.get_FIFO_count() >= self.imu_fifo_watermark_words:
                 self._read_imu_fifo_into_pending()
             max_sleep_ns = min(max_sleep_ns, self.imu_fifo_poll_interval_ns)
-        sleep(max_sleep_ns / 1_000_000_000)
+        sleep(max_sleep_ns / NS_PER_S)
 
-    def _run_processing_loop(self, first_state_time_ns: int) -> None:
+    def _run_fusion_loop(self, first_state_time_ns: int) -> None:
         """
         Continuously estimates the posterior state every STATE_INTERVAL seconds.  
 
@@ -245,25 +249,19 @@ class StateEstimator:
             # batched ranges acquired just before it can still reach the queue.
             # Later events are kept as future measurements by their event time.
             close_time = next_boundary + RANGE_LATENESS_NS
-            # ``now`` is read *before* draining: on the closing pass, the drain therefore
-            # happens after close_time and includes everything queued before it.
-            # Draining on every pass also keeps the bounded queue from filling up.
             now = self.estimator_clock.now_ns()
+            # Get messages from comm queue. now_ns() is read before draining so on the closing pass
+            # drain happens after close_time and ensures we get all relevant msgs 
             pending_messages.extend(self._drain_communication_queue())
             if now < close_time:
                 # Sleep until the close time rather than a fixed period, which would
                 # accumulate scheduler drift over a long run.
-                self._idle_imu(close_time - now)
+                # Also fetch IMU samples if needed
+                self._idle(close_time - now)
                 continue
 
-            if self.imu is not None:
-                # Forces a final FIFO read; samples past the boundary stay pending for the next interval
-                imu_start_sample, imu_samples = self._drain_imu_samples(last_state_boundary, next_boundary)
-                # Periodically refresh conversion of IMU clock to correct drift
-                if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns >= IMU_CLOCK_REFRESH_INTERVAL_NS:
-                    self._update_sensor_clock_mapper()
-            else:
-                imu_start_sample, imu_samples = None, []
+            # Aggregate interval IMU samples if available and refresh IMU clock mapping if needed
+            imu_start_sample, imu_samples = self._take_interval_imu_samples(last_state_boundary, next_boundary)
 
             # Aggregate all messages and process them 
             batch = SensorBatch(
@@ -290,16 +288,19 @@ class StateEstimator:
             except Empty:
                 return pending_messages
 
-    def _drain_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> tuple[TimedIMUSample | None, list[TimedIMUSample]]:
+    def _take_interval_imu_samples(self, start_time_ns: int, boundary_time_ns: int) -> tuple[TimedIMUSample | None, list[TimedIMUSample]]:
         """Return the held start sample and samples in ``(start, boundary]``.
 
         The graph uses the returned start sample as a zero-order-held control
-        value from the prior state boundary until the first new sample.  Keeping
-        only one sample makes this O(number of newly read samples) in time and
-        O(1) additional memory.
+        value from the prior state boundary until the first new sample.
+
+        Returns ``(None, [])`` without an IMU. Also refreshes the IMU clock mapping when it is due.
         """
+        if self.imu is None:
+            return None, []
         # The boundary always forces a final read.  Earlier watermark reads have
         # already appended their samples to the same pending deque.
+        # Samples past the boundary stay pending for the next interval.
         self._read_imu_fifo_into_pending()
         interval_samples = []
         while self._pending_imu_samples:
@@ -321,6 +322,10 @@ class StateEstimator:
         #      f"n_pending={len(self._pending_imu_samples)} next_ahead_ms={next_ahead_ms}", 'info', 'loc')
         if interval_samples:
             self._held_imu_sample = interval_samples[-1]
+
+        # Periodically refresh conversion of IMU clock to correct drift
+        if self.estimator_clock.now_ns() - self._last_imu_clock_observation_ns >= IMU_CLOCK_REFRESH_INTERVAL_NS:
+            self._observe_imu_clock()
         return start_sample, interval_samples
 
     def _read_imu_fifo_into_pending(self) -> None:
@@ -339,7 +344,7 @@ class StateEstimator:
                 raise RuntimeError("IMU samples are not chronological after clock conversion")
             self._pending_imu_samples.append(sample)
 
-    def _update_sensor_clock_mapper(self) -> None:
+    def _observe_imu_clock(self) -> None:
         """Update the IMU tick mapping after mapping the queued FIFO samples.
 
         A current hardware-clock read is newer than FIFO samples still in the
@@ -348,6 +353,8 @@ class StateEstimator:
         or the timestamp read cannot be avoided.  Draining first still keeps
         most queued samples on the calibration in force when they were acquired.
         """
+        # Skipped on the first call: the FIFO was just discarded and the mapper has
+        # no observation yet, so it couldn't convert sample ticks.
         if self._last_imu_clock_observation_ns is not None:
             self._read_imu_fifo_into_pending()
         before_ns = self.estimator_clock.now_ns()
@@ -408,7 +415,7 @@ class StateEstimator:
         """
         
         # Optimise and publish
-        self.publish_state(interval_range_message)
+        self._publish_pose(interval_range_message)
         return future_range_messages
 
     @staticmethod
@@ -457,7 +464,7 @@ class StateEstimator:
 
         return False
 
-    def publish_state(self, message: UpdateMessage | None):
+    def _publish_pose(self, message: UpdateMessage | None):
         """
         - Saves the pose and covariance in its Tag object
         - Prints out the current posterior from the estimator
@@ -478,12 +485,12 @@ class StateEstimator:
             self._socket.sendto(packet, self.sock_dest)
 
         if SAVE_TO_CSV and message is not None:
-            self.save_to_csv(message, pose)
+            self._write_csv_row(message, pose)
 
         if self.sound_queue is not None:
             self.sound_queue.put(SoundMessage.save(SoundMessage(pose)))
 
-    def save_to_csv(self, message: UpdateMessage, pose: Pose):
+    def _write_csv_row(self, message: UpdateMessage, pose: Pose):
         """
         NOTE: Previously, this function also printed the raw position pre-EKF. During the move to FGs, I've removed this option. 
         This is because we now directly deal with multiple ranges, so we'd either need to:
