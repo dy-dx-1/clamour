@@ -236,10 +236,7 @@ class StateEstimator:
         NOTE: All sensor timings are compared on the same EstimatorClock reference
         NOTE: Each interval is closed RANGE_LATENESS_NS after its boundary, which delays publishing by the same amount
         """
-        # Start from the first graph state's time, not a fresh ``now``: time spent
-        # publishing the initial posterior must not open a gap between the graph's
-        # first state and the first interval.  If that boundary has already
-        # passed, the loop closes the missed intervals immediately.
+        # Start from the first graph state's time
         last_state_boundary = first_state_time_ns
         next_boundary = last_state_boundary + STATE_INTERVAL_NS
         pending_messages: list[UpdateMessage] = []
