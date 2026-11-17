@@ -15,7 +15,6 @@ ANCHORS = Anchors()
 # Pose converts the posterior angles back to degrees at the public boundary.
 ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY_CM] * 3)
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15)  # 15 cm
-ZERO_MOVEMENT_NOISE = gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1, 1, 1])
 INITIAL_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 1.0)  # cm/s; stationary bootstrap
 CONSTANT_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 50.0)  # cm/s; deliberately loose
 
@@ -133,11 +132,12 @@ class FactorGraph:
 
         ## Updating graph and internal data with the posterior
         self.isam.update(graph, initial_values)
-        # NOTE TODO compare to calculateEstimatePose3(X(i)) to only call for latest frame? better for perf.
-        post = self.isam.calculateEstimate()
-        self._state = gt.NavState(post.atPose3(x_new), post.atVector(v_new))
-        if imu_start_sample is not None:
-            self.pim.resetIntegrationAndSetBias(post.atConstantBias(gt.symbol('b', new_state_id)))
+        # Only read the newest keys: update() already re-solved past states, the full calculateEstimate() would only copy them out.
+        self._state = gt.NavState(self.isam.calculateEstimatePose3(x_new), self.isam.calculateEstimateVector(v_new))
+        if hasattr(self, "pim"):
+            # Kept on both motion paths so the next link always starts from the latest bias posterior.
+            self._bias = self.isam.calculateEstimateConstantBias(gt.symbol('b', new_state_id))
+            self.pim.resetIntegrationAndSetBias(self._bias)
         # Updating covariance. No need to cast to int here as update_covar called in estimator.py will do it
         covariance = self.isam.marginalCovariance(x_new)
         self.covars = (
@@ -149,36 +149,6 @@ class FactorGraph:
             covariance[4, 5],
         )   
 
-    def zero_movement_update(self, state_boundary_ns: int) -> None:
-        """Temporarily constrain the next pose to the current one after an input gap.
-
-        This mirrors the EKF's synthetic zero-movement update to limit drift from
-        the constant-velocity model. It is valid only when an idle input queue
-        really means the tag is stationary; it will be replaced by IMU-based
-        propagation and stationary detection.
-        """
-        self._prepare_new_state(state_boundary_ns)
-
-        graph = gt.NonlinearFactorGraph()
-        initial_values = gt.Values()
-
-        current_state_id = self.state_counter
-        x = gt.symbol('x', current_state_id)
-        x_prev = gt.symbol('x', current_state_id - 1)
-        pose = self.pose
-        previous_pose = gt.Pose3(
-            gt.Rot3.Ypr(np.deg2rad(pose.heading), 0, 0),
-            gt.Point3(*pose.coordinates),
-        )
-        zero_motion = gt.Pose3(gt.Rot3.Ypr(0, 0, 0), gt.Point3(0, 0, 0))
-
-        graph.add(gt.BetweenFactorPose3(x_prev, x, zero_motion, ZERO_MOVEMENT_NOISE))
-        initial_values.insert(x, previous_pose)
-
-        self.isam.update(graph, initial_values)
-        post_pose = self.isam.calculateEstimate().atPose3(x)
-        self._state = gt.NavState(post_pose, np.zeros(3))
-        
     def pedometer_update():
         pass 
     def custom_odometry_update():
@@ -211,7 +181,9 @@ class FactorGraph:
         self._add_ranging_data(state_key, graph, initial_values, range_observations)
         # GETTING ESTIMATE AND UPDATING INTERNAL TRACKER 
         self.isam.update(graph, initial_values)
-        post_pose = self.isam.calculateEstimate().atPose3(x0) 
+        post_pose = self.isam.calculateEstimatePose3(x0)
+        if hasattr(self, "pim"):
+            self._bias = self.isam.calculateEstimateConstantBias(gt.symbol('b', state_key))
         covariance = self.isam.marginalCovariance(x0)
         self.covars = (
             covariance[3, 3],
@@ -330,12 +302,11 @@ class FactorGraph:
         # while still taking into account correlations between bias drift and IMU predictions
         graph.add( gt.CombinedImuFactor(x_old, v_old, x_new, v_new, b_old, b_new, self.pim) )
 
-        # Using IMU preintegration as initial values. Bias is set to the latest posterior. 
-        current_bias = self.isam.calculateEstimate().atConstantBias(b_old)
-        dead_reckoned_state = self.pim.predict(self._state, current_bias)
+        # Using IMU preintegration as initial values. Bias is set to the latest posterior (b_old).
+        dead_reckoned_state = self.pim.predict(self._state, self._bias)
         initial_values.insert(x_new, dead_reckoned_state.pose())
         initial_values.insert(v_new, dead_reckoned_state.velocity())
-        initial_values.insert(b_new, current_bias)
+        initial_values.insert(b_new, self._bias)
 
     def _integrate_held_imu_sample(self, sample: TimedIMUSample, duration_ns: int) -> None:
         """Integrate one zero-order-held IMU value for a positive duration."""
@@ -401,4 +372,4 @@ class FactorGraph:
                 np.full(3, np.sqrt(IMU_GYRO_WALK_COV * dt_s)),
             )))
             graph.add(gt.BetweenFactorConstantBias(b_prev, b, gt.imuBias.ConstantBias(), bias_walk_noise))
-            initial_values.insert(b, self.pim.biasHat())
+            initial_values.insert(b, self._bias)
