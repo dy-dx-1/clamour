@@ -56,7 +56,8 @@ class BitcrazeTag(Tag):
 
         self._id = tag_id        # NOTE: It's expected that all ID's used are max 2bytes (<0xFFFF). Should be enforced by config.py
         self._twr_seq = 0        # keeps track of TWR Sequence, only access through property. 
-        self._dw = DW1000(dw1000_bus, dw1000_cs, BC_CHANNEL, BC_PRF, BC_BITRATE, BC_PREAMBLE_LENGTH, BC_PREAMBLE_CODE, smart_tx_power, tx_power_settings)
+        # TODO: tune full SPI speed by checking how high we can go while keeping zero `spi_read_errors`
+        self._dw = DW1000(dw1000_bus, dw1000_cs, 1_000_000, 10_000_000, BC_CHANNEL, BC_PRF, BC_BITRATE, BC_PREAMBLE_LENGTH, BC_PREAMBLE_CODE, smart_tx_power, tx_power_settings)
 
         self._active_tags = dict()      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 

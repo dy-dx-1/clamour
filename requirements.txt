@@ -1,6 +1,6 @@
-dw1000-spi
+dw1000-spi==0.2.0
 filterpy
-gtsam
+gtsam~=4.3.0
 matplotlib
 numpy
 pygame
