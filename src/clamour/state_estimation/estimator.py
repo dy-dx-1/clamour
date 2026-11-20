@@ -38,8 +38,8 @@ assert RANGE_LATENESS_NS < STATE_INTERVAL_NS
 IMU_CLOCK_REFRESH_INTERVAL_NS = round(5.0 * NS_PER_S)
 IMU_CLOCK_FIT_OBSERVATIONS = 16
 # Stationary IMU initialization: clock observations at these delays (s) after the first one.  
-# The nominal tick rate is ~0.6% off. Early increasingly spaced observations
-# correct the scale quickly while growing the baseline that averages pairing noise.
+# Nominal tick rate is ~0.6% off. Early increasingly spaced observations correct the scale quickly while growing the baseline that averages pairing noise.
+# NOTE: IF CHANGING <2S IN THE FUTURE, NEED TO ENSURE IMU STILL GETS >=1.5S TO INITIALIZE IT'S SFLP BLOCK FOR INITIAL ATTITUDE ESTIMATION!
 IMU_INIT_OBSERVATION_DELAYS = (0.25, 0.5, 1.0, 2.0)
 # FIFO emptying safeties - we empty the FIFO before the limit to avoid losing info
 # poll_interval = SF × time_to_overflow
@@ -139,7 +139,9 @@ class StateEstimator:
         Returns the EstimatorClock time (ns) of the first estimator state.
         """
         print("Estimator initialization started. Keep the tag **stationary** until full initialization completes.", 'info', 'loc')
-        self._initialize_imu(imu)
+        # (yaw, pitch, roll) in degrees, IMU convention, or None without an IMU.
+        # The EKF ignores it: it has no pitch/roll states and its yaw is 0 by definition.
+        initial_attitude = self._initialize_imu(imu)
         while True:
             try:
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
@@ -168,24 +170,30 @@ class StateEstimator:
                     accel_covar_density, gyro_covar_density = self.imu.accel_covar_density_mg, self.imu.gyro_covar_density_mg
                 else:
                     accel_covar_density = gyro_covar_density = None
-                self.estimator = FactorGraph(anchor_ros, 0.0, first_state_time_ns, accel_covar_density, gyro_covar_density)
+                # Yaw is 0 (global frame starts at the initial heading)
+                prior_ypr = (0.0, *initial_attitude[1:]) if initial_attitude is not None else (0.0, 0.0, 0.0)
+                self.estimator = FactorGraph(anchor_ros, prior_ypr, first_state_time_ns, accel_covar_density, gyro_covar_density)
             # Estimator initialized. Internalise and publish the posterior.
             self._publish_pose(msg)
-            print(f"ESTIMATOR ({self.estimator_type}) INITIALIZATION DONE", 'ok', 'loc')
+            print(f"{self.estimator_type} INITIALIZATION DONE! INITIAL ATTITUDE: (pitch: {int(initial_attitude[1])}, roll: {int(initial_attitude[2])}, yaw: {int(initial_attitude[0])} degs)", 'ok', 'loc')
             return first_state_time_ns
 
-    def _initialize_imu(self, imu: IMU|None) -> None:
+    def _initialize_imu(self, imu: IMU|None) -> tuple[float, float, float] | None:
         """
         Stationary IMU initialization, run before listening for ranging observations.
         - Assigns self.imu
         - Creates self.imu_clock_mapper
         - Sets safe FIFO reading parameters
         - Calibrates the IMU clock mapping with observations at IMU_INIT_OBSERVATION_DELAYS.
+        - Reads the initial attitude once the clock calibration wait has let it stabilize.
+
+        Returns the initial (yaw, pitch, roll) in degrees where (X=pitch, Y=roll, Z=yaw) or None without an IMU.
         """
         self.imu = imu
         if imu is None:
-            return
+            return None
 
+        # Initializing clock mapper & safe FIFO reading params 
         self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits,
                                                   IMU_CLOCK_FIT_OBSERVATIONS)
         self.imu_fifo_watermark_words = ceil(imu.fifo_capacity_words * IMU_FIFO_WATERMARK_FRACTION)
@@ -195,6 +203,7 @@ class StateEstimator:
         time_from_watermark_to_overflow_s = (imu.fifo_capacity_words - self.imu_fifo_watermark_words) / fifo_word_rate
         self.imu_fifo_poll_interval_ns = max(1, round(time_from_watermark_to_overflow_s * IMU_FIFO_POLL_SAFETY_FACTOR * NS_PER_S))
 
+        # Initial IMU->EstimatorClock mapping 
         self.imu.discard_FIFO()
         self._observe_imu_clock()
         start_ns = self._last_imu_clock_observation_ns
@@ -204,8 +213,11 @@ class StateEstimator:
                 self._idle(due_ns - now)
             self._observe_imu_clock()  # Also drains the FIFO into pending samples
 
-        # TODO: estimate the initial attitude here. Can discard FIFO samples instead of moving into pending if use SFLP block
+        # The calibration wait above (~2s, stationary) covers the attitude's 1.5s calibration + stabilization time
+        initial_attitude = imu.get_attitude()
+        # Attitude comes from the IMU directly, so the stationary FIFO samples aren't needed
         self._pending_imu_samples.clear()
+        return initial_attitude
 
     def _idle(self, max_sleep_ns: int) -> None:
         """

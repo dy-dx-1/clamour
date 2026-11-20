@@ -17,6 +17,8 @@ ANCHOR_POS_NOISE = gt.noiseModel.Diagonal.Sigmas([ANCHOR_POS_UNCERTAINTY_CM] * 3
 RANGING_NOISE = gt.noiseModel.Isotropic.Sigma(1, 15)  # 15 cm
 INITIAL_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 1.0)  # cm/s; stationary bootstrap
 CONSTANT_VELOCITY_NOISE = gt.noiseModel.Isotropic.Sigma(3, 50.0)  # cm/s; deliberately loose
+# Initial pose prior: 2deg on each body-frame rotation axis (LSM6 attitude err is 1.5), position left free (set by the ranges)
+INITIAL_POSE_NOISE = gt.noiseModel.Diagonal.Sigmas([np.deg2rad(2)] * 3 + [1e5] * 3)
 
 GRAVITY_CM_S2 = 980.665  # cm/s^2
 MG_TO_CM_PER_S2 = GRAVITY_CM_S2 / 1000
@@ -33,18 +35,20 @@ IMU_INTEGRATION_COVAR = (1e-5)**2 * np.eye(3) # Represents uncertainty due to th
 
 
 class FactorGraph: 
-    def __init__(self, range_observations:list[RangeObservation], prior_yaw:float, initial_state_time_ns:int, imu_accel_covar_density_mg2_s:float | None = None, imu_gyro_covar_density_mdps2_s:float | None = None):
+    def __init__(self, range_observations:list[RangeObservation], prior_ypr:tuple[float, float, float], initial_state_time_ns:int, imu_accel_covar_density_mg2_s:float | None = None, imu_gyro_covar_density_mdps2_s:float | None = None):
         """
-        Factor Graph based 3D pose estimator. 
+        Factor Graph based 3D pose estimator.
         - range_observations: Range observations used to initialize the graph; at least 3 anchors are required to fully initialize the prior position.
-        - prior_yaw: prior yaw value on initialization **[rad]**
+        - prior_ypr: prior (yaw, pitch, roll) attitude on initialization **[deg]**
+            - Expected in the **IMU convention** (as IMU.get_attitude()): Z=Yaw, X=Pitch, Y=Roll
+            - Will be converted internally to radians and to the gtsam.Rot3.Ypr convention (Z=Yaw, Y=Pitch, X=Roll)
         - imu_accel_covar_density_mg2_s: accelerometer measurement covariance density in (mg^2)*s
         - imu_gyro_covar_density_mdps2_s: gyroscope measurement covariance density in (mdps^2)*s
         - initial_state_time_ns: EstimatorClock timestamp of the initial graph state
-        NOTE on units: 
-        - All angle units are **radians** 
-        - All spatial units are **cm-based**
-            - IMU samples and covariance densities are converted from mg/mdps-based units at the graph boundary.
+        NOTE on units:
+        - All internal angle units are **radians**
+        - All internal spatial units are **cm-based**
+            - IMU samples, covariance densities and the attitude prior are converted from mg/mdps/deg-based units at the graph boundary.
         """
         self.last_state_time_ns = initial_state_time_ns
         
@@ -68,7 +72,7 @@ class FactorGraph:
             self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
         # Initializing the state by locking rotation and position 
         # Internal state tracker is a NavState for Pose3 and Velocity. Public access is the pose() property, which formats it into a Pose container.
-        self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_yaw, range_observations) 
+        self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_ypr, range_observations)
 
     ### Properties
     @property
@@ -155,23 +159,26 @@ class FactorGraph:
         pass
 
     ### -------------------------------------------------- INTERNAL COMPUTATION METHODS --------------------------------------------------
-    def _insert_init_prior(self, state_key, graph, initial_values, yaw_prior:float, range_observations:list[RangeObservation])->gt.NavState: 
+    def _insert_init_prior(self, state_key, graph, initial_values, prior_ypr:tuple[float, float, float], range_observations:list[RangeObservation])->gt.NavState:
         """
-        Constrains the initial state of the graph with a rotation lock & sufficient range data to multilaterate the position. 
+        Constrains the initial state of the graph with a rotation prior & sufficient range data to multilaterate the position.
+        prior_ypr is (yaw, pitch, roll) in deg, IMU convention (see __init__).
 
         Only to be used in __init__! \n 
-        NOTE: **Currently supposing graph is initialized while stationnary!**
+        NOTE: **Graph must be initialized while stationnary!**
         NOTE: To avoid imprecise/unstable measures, ensure anchors are geometrically separated enough to avoid ambiguity in the solution.
         """     
         x0 = gt.symbol('x', state_key)
         v0 = gt.symbol('v', state_key)
-        # ROTATION LOCK 
+        # ROTATION PRIOR
         anchor_observations = [observation for observation in range_observations if observation.is_anchor]
         throwaway_pos = ANCHORS.get_centroid_for(*(observation.target_id for observation in anchor_observations))
-        graph.add(gt.PriorFactorPose3(x0, 
-                                      gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)),
-                                      gt.noiseModel.Diagonal.Sigmas([1, 1, 1, 1e5, 1e5, 1e5]))) 
-        initial_values.insert(x0, gt.Pose3(gt.Rot3.Ypr(yaw_prior, 0, 0), gt.Point3(*throwaway_pos)))
+        # Same ZYX decomposition, only named differently: Rot3.Ypr takes the (Z, Y, X) angles,
+        # so the IMU's roll (about Y) is GTSAM's pitch and the IMU's pitch (about X) is GTSAM's roll
+        yaw_z, pitch_x, roll_y = np.deg2rad(prior_ypr)
+        prior_pose = gt.Pose3(gt.Rot3.Ypr(yaw_z, roll_y, pitch_x), gt.Point3(*throwaway_pos))
+        graph.add(gt.PriorFactorPose3(x0, prior_pose, INITIAL_POSE_NOISE))
+        initial_values.insert(x0, prior_pose)
         # Bootstrap is explicitly stationary.  This both seeds V(0) for the
         # first CombinedImuFactor and prevents an unconstrained velocity key.
         initial_velocity = np.zeros(3)
