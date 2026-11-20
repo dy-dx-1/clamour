@@ -31,12 +31,12 @@ IMU_GYRO_SCALE_FACTOR_MDPS  =  np.array([[1.0,0.0,0.0],
                                     [0.0,1.0,0.0],
                                     [0.0,0.0,1.0]])
 # Initial accel bias from calibration, in mg; the FG estimates its drift automatically.
-# The initial gyro bias is estimated at each startup from the stationary IMU samples (see estimator.py).
 IMU_ACCEL_INITIAL_BIAS_MG   = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
-# Per-axis standard deviations of the initial bias in mg and mdps, respectively.
-# NOTE TEMP VALUES AWAITING CALIB TODO 
+# The initial gyro bias and it's std dev is estimated at each startup from the stationary IMU samples (see estimator.py).
+
+# Per-axis standard deviations of the initial accel bias in mg 
+# NOTE TEMP VALUES AWAITING CALIB TODO
 IMU_ACCEL_INITIAL_BIAS_STD_MG = np.array([0.5, 0.5, 0.5])
-IMU_GYRO_INITIAL_BIAS_STD_MDPS = np.array([1.0, 1.0, 1.0])
 # Accelerometer and gyro bias random-walk covariance densities. These are
 # variances per second and require Allan-variance analysis for calibration.
 IMU_ACCEL_WALK_COV_MG2_PER_S = 0.032**2  # (mg^2)/s
@@ -107,16 +107,10 @@ assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS_MG.dtype, float)
 assert IMU_ACCEL_INITIAL_BIAS_MG.shape == (3,)
 if ESTIMATOR_TYPE == "FG":
     assert IMU_ACCEL_INITIAL_BIAS_STD_MG is not None
-    assert IMU_GYRO_INITIAL_BIAS_STD_MDPS is not None
     assert isinstance(IMU_ACCEL_INITIAL_BIAS_STD_MG, np.ndarray)
     assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS_STD_MG.dtype, float)
     assert IMU_ACCEL_INITIAL_BIAS_STD_MG.shape == (3,)
     assert np.all(np.isfinite(IMU_ACCEL_INITIAL_BIAS_STD_MG))
     assert np.all(IMU_ACCEL_INITIAL_BIAS_STD_MG > 0)
-    assert isinstance(IMU_GYRO_INITIAL_BIAS_STD_MDPS, np.ndarray)
-    assert np.issubdtype(IMU_GYRO_INITIAL_BIAS_STD_MDPS.dtype, float)
-    assert IMU_GYRO_INITIAL_BIAS_STD_MDPS.shape == (3,)
-    assert np.all(np.isfinite(IMU_GYRO_INITIAL_BIAS_STD_MDPS))
-    assert np.all(IMU_GYRO_INITIAL_BIAS_STD_MDPS > 0)
 assert isinstance(IMU_ACCEL_WALK_COV_MG2_PER_S, float)
 assert isinstance(IMU_GYRO_WALK_COV_MDPS2_PER_S, float)
