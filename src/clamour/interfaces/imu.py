@@ -92,6 +92,10 @@ class IMU(ABC):
         """Return the current raw hardware timestamp tick."""
 
     @abstractmethod
+    def get_attitude(self) -> tuple[float, float, float]:
+        """Return the current (yaw, pitch, roll) attitude estimate in degrees, following the convention X=pitch, Y=roll, Z=yaw."""
+
+    @abstractmethod
     def close(self) -> None:
         """Release the hardware connection."""
 

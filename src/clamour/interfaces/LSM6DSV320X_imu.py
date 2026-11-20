@@ -515,8 +515,8 @@ class LSM6DSV320X(IMU):
         - Orientation stabilization time: 0.7s
 
         Game rotation vector (no magnetometer): yaw is relative to the SFLP (re)initialization heading.
-        Angles follow the ZYX convention of gtsam.Rot3.Ypr (yaw about Z, pitch about Y, roll about X),
-        NOT the X=pitch/Y=roll naming of get_pitch_roll_yaw_speeds().
+        Angles follow the LSM6 convention (X=pitch ; Y=roll) 
+        **NOT** the ZYX convention of gtsam.Rot3.Ypr (Y=pitch, X=roll),
         """
         # SFLP_QUATW_L (2Ah) to SFLP_QUATZ_H (31h), embedded functions bank, each a little-endian half-float (p.139)
         self.bus.write_byte_data(self.TAD, 0x01, 0x80) # FUNC_CFG_ACCESS: embedded functions bank
@@ -531,6 +531,6 @@ class LSM6DSV320X(IMU):
             raise RuntimeError("SFLP quaternion is zero, is SFLP_GAME_EN set and the gyro/accel running?")
         w, x, y, z = w/norm, x/norm, y/norm, z/norm
         yaw   = np.arctan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
-        pitch = np.arcsin(np.clip(2*(w*y - z*x), -1.0, 1.0))
-        roll  = np.arctan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
+        pitch  = np.arctan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
+        roll = np.arcsin(np.clip(2*(w*y - z*x), -1.0, 1.0))
         return float(np.rad2deg(yaw)), float(np.rad2deg(pitch)), float(np.rad2deg(roll))
