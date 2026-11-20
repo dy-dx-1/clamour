@@ -41,6 +41,7 @@ IMU_CLOCK_FIT_OBSERVATIONS = 16
 # Stationary IMU initialization: clock observations at these delays (s) after the first one.  
 # Nominal tick rate is ~0.6% off. Early increasingly spaced observations correct the scale quickly while growing the baseline that averages pairing noise.
 # NOTE: IF CHANGING <2S IN THE FUTURE, NEED TO ENSURE IMU STILL GETS >=1.5S TO INITIALIZE IT'S SFLP BLOCK FOR INITIAL ATTITUDE ESTIMATION!
+# NOTE: FIRST DELAY MUST STAY ABOVE 0.1S TO ALLOW DISCARDING INITIAL BAD GYRO SAMPLES (see _initialize_imu)
 IMU_INIT_OBSERVATION_DELAYS = (0.25, 0.5, 1.0, 2.0)
 # FIFO emptying safeties - we empty the FIFO before the limit to avoid losing info
 # poll_interval = SF × time_to_overflow
@@ -216,11 +217,14 @@ class StateEstimator:
         self.imu.discard_FIFO()
         self._observe_imu_clock()
         start_ns = self._last_imu_clock_observation_ns
-        for delay in IMU_INIT_OBSERVATION_DELAYS:
+        for i, delay in enumerate(IMU_INIT_OBSERVATION_DELAYS):
             due_ns = start_ns + round(delay * NS_PER_S)
             while (now := self.estimator_clock.now_ns()) < due_ns:
                 self._idle(due_ns - now)
             self._observe_imu_clock()  # Also drains the FIFO into pending samples
+            if i == 0:
+                # Drop the first drain (0.25s): it holds the gyro's turn-on bad samples which corrupts the gyro bias estimate
+                self._pending_imu_samples.clear()
 
         # The calibration wait above (~2s, stationary) covers the attitude's 1.5s calibration + stabilization time
         initial_attitude = imu.get_attitude()
@@ -233,7 +237,7 @@ class StateEstimator:
         gyro_samples = np.array([sample.angular_velocity for sample in self._pending_imu_samples])
         block_means = np.array([block.mean(axis=0) for block in np.array_split(gyro_samples, IMU_INIT_GYRO_BIAS_BLOCKS)])
         gyro_bias_mdps = gyro_samples.mean(axis=0)
-        # Setting 2.0 mdps floor (datasheet noise) to ensure the bias is not too configdent
+        # Setting 2.0 mdps floor (datasheet noise) to ensure the bias is not too confident
         gyro_bias_std_mdps = np.maximum(block_means.std(axis=0, ddof=1) / np.sqrt(IMU_INIT_GYRO_BIAS_BLOCKS), 2.0)
 
         # Motion check: a moving tag invalidates both the gyro bias and the SFLP attitude
