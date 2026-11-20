@@ -49,6 +49,14 @@ ACCEL_SCALE_CONVERSION = {2:  0.061,
                             8:  0.244, 
                             16: 0.488}
 
+# SFLP_ODR (5Eh) SFLP_GAME_ODR_[2:0] bits for a rate in Hz (p.149). SFLP can't run above 480Hz
+SFLP_ODR_FROM_HZ = {15:  0b000,
+                    30:  0b001,
+                    60:  0b010,
+                    120: 0b011,
+                    240: 0b100,
+                    480: 0b101}
+
 def uint16_to_int16(value:int)->int: 
     """
     Converts an unsigned 2-byte int to a signed int, following two's complement 
@@ -75,7 +83,8 @@ class LSM6DSV320X(IMU):
         - Accel/gyro values are always returned in **mg** and **mdps** units 
             - Values are always scale-corrected
             - Bias correction is optional so they can be applied by an external estimator if desired (ex: GTSAM). See class attributes.
-
+        - **Wait 2s stationnary on init** for SFLP attitude estimation to calibrate (else, `get_attitude` will be inaccurate)
+            
         ARGS: 
         - ODR_rate: Output Data Rate in Hz (must match High Perf mode see p.65 manual)
         - accelerometer_scale: Full scale of the accelerometer measurements in g's 
@@ -111,7 +120,7 @@ class LSM6DSV320X(IMU):
                 raise RuntimeError("Could not validate connection to the LSM6DSV320X IMU.")
             time.sleep(0.005)
         self.configure(accelerometer_scale, gyro_dps_scale, ODR_rate)
-        print("SUCCESSFULLY CONNECTED TO IMU")
+        print("SUCCESSFULLY CONNECTED TO IMU, WAIT 2s FOR ATTITUDE READINGS TO CALIBRATE!")
 
     def __enter__(self):
         return self 
@@ -249,7 +258,9 @@ class LSM6DSV320X(IMU):
         """
         Configures the settings of the IMU and the internal dependent conversion factors. Args are taken from __init__
         
-        **Currently only supporting high performance mode accel/gyro**
+        NOTE 1: **Currently only supporting high performance mode accel/gyro**
+
+        NOTE 2: **WAIT 1.5S WHILE STATIC BEFORE READING SFLP ATTITUDE, required for calibration**
         
         Affects the following registers: 
         - CTRL3 (0x12) 
@@ -291,12 +302,20 @@ class LSM6DSV320X(IMU):
         current = self.bus.read_byte_data(self.TAD, 0x50) 
         TIMESTAMP_EN = 1<<6 
         self.bus.write_byte_data(self.TAD, 0x50, current|TIMESTAMP_EN)
-        ### Configuring pedometer 
+
+        ### Configuring pedometer and SFLP block for attitude
         ## Enable embedded functions registers in FUNC_CFG_ACCESS
         self.bus.write_byte_data(self.TAD, 0x01, 0x80)
-        ## Enableing at EMB_FUNC_EN_A 
+        ## Enableing pedometer & SFLP block at EMB_FUNC_EN_A 
         current = self.bus.read_byte_data(self.TAD, 0x04)
-        self.bus.write_byte_data(self.TAD, 0x04, current|(1<<3))
+        self.bus.write_byte_data(self.TAD, 0x04, current|(0b1010))
+        # SFLP_ODR: match the accel/gyro ODR (capped at SFLP's 480Hz max). Bits 6, 1, 0 must be 1 (0x43)
+        sflp_rate = min(ODR_rate, 480)
+        if sflp_rate not in SFLP_ODR_FROM_HZ:
+            raise ValueError(f"SFLP needs an ODR_rate of at least 15Hz, got {ODR_rate}")
+        self.bus.write_byte_data(self.TAD, 0x5E, 0x43 | SFLP_ODR_FROM_HZ[sflp_rate]<<3)
+        # Ensuring SFLP block is reinitialized (takes ~1.5s to get ready afterwards) 
+        self.bus.write_byte_data(self.TAD, 0x66, 0b10) 
         ## Enableing MLC at EMB_FUNC_B for false positive detection
         # Don't care about the FSM or FIFO compression
         self.bus.write_byte_data(self.TAD, 0x05, 1<<4)
@@ -484,3 +503,34 @@ class LSM6DSV320X(IMU):
         finally:
             self.bus.write_byte_data(self.TAD, 0x01, 0x00) # Back to main bank
         return data[0] | (data[1] << 8)
+
+    def get_attitude(self)->tuple[float, float, float]:
+        """
+        Returns the current estimated attitude in degrees (yaw, pitch, roll) from the SFLP block (see p.8 datasheet)
+        As of nov 20 2026, only planning to use static measure for initialization, FG tracks the rest. 
+        - Static accuracy: 
+            - Yaw: 0.5deg/5min 
+            - Pitch & Roll: 1.5deg 
+        -  Calibration time: 0.8s
+        - Orientation stabilization time: 0.7s
+
+        Game rotation vector (no magnetometer): yaw is relative to the SFLP (re)initialization heading.
+        Angles follow the ZYX convention of gtsam.Rot3.Ypr (yaw about Z, pitch about Y, roll about X),
+        NOT the X=pitch/Y=roll naming of get_pitch_roll_yaw_speeds().
+        """
+        # SFLP_QUATW_L (2Ah) to SFLP_QUATZ_H (31h), embedded functions bank, each a little-endian half-float (p.139)
+        self.bus.write_byte_data(self.TAD, 0x01, 0x80) # FUNC_CFG_ACCESS: embedded functions bank
+        try:
+            data = self.bus.read_i2c_block_data(self.TAD, 0x2A, 8)
+        finally:
+            self.bus.write_byte_data(self.TAD, 0x01, 0x00) # Back to main bank
+        w, x, y, z = np.frombuffer(bytes(data), dtype='<f2').astype(float)
+        # Normalize: half-float precision and the lack of BDU on these registers leave a small norm error
+        norm = np.sqrt(w*w + x*x + y*y + z*z)
+        if norm == 0:
+            raise RuntimeError("SFLP quaternion is zero, is SFLP_GAME_EN set and the gyro/accel running?")
+        w, x, y, z = w/norm, x/norm, y/norm, z/norm
+        yaw   = np.arctan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
+        pitch = np.arcsin(np.clip(2*(w*y - z*x), -1.0, 1.0))
+        roll  = np.arctan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
+        return float(np.rad2deg(yaw)), float(np.rad2deg(pitch)), float(np.rad2deg(roll))
