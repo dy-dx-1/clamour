@@ -30,10 +30,9 @@ IMU_ACCEL_SCALE_FACTOR_MG = np.array([[1.0017558373609916,      0.0,            
 IMU_GYRO_SCALE_FACTOR_MDPS  =  np.array([[1.0,0.0,0.0],
                                     [0.0,1.0,0.0],
                                     [0.0,0.0,1.0]])
-# Initial bias from calibration; the FG estimates its drift automatically.
-# Acceleration bias is in mg, angular-rate bias is in mdps.
+# Initial accel bias from calibration, in mg; the FG estimates its drift automatically.
+# The initial gyro bias is estimated at each startup from the stationary IMU samples (see estimator.py).
 IMU_ACCEL_INITIAL_BIAS_MG   = np.array([-1.9653053938720833, -14.595203153973426, -2.6589320093328133])
-IMU_GYRO_INITIAL_BIAS_MDPS  = np.array([-376.4132487893914, -21.328286579486857,-206.75801625034532])
 # Per-axis standard deviations of the initial bias in mg and mdps, respectively.
 # NOTE TEMP VALUES AWAITING CALIB TODO 
 IMU_ACCEL_INITIAL_BIAS_STD_MG = np.array([0.5, 0.5, 0.5])
@@ -106,9 +105,6 @@ assert IMU_GYRO_SCALE_FACTOR_MDPS.shape == (3, 3)
 assert isinstance(IMU_ACCEL_INITIAL_BIAS_MG, np.ndarray)
 assert np.issubdtype(IMU_ACCEL_INITIAL_BIAS_MG.dtype, float)
 assert IMU_ACCEL_INITIAL_BIAS_MG.shape == (3,)
-assert isinstance(IMU_GYRO_INITIAL_BIAS_MDPS, np.ndarray)
-assert np.issubdtype(IMU_GYRO_INITIAL_BIAS_MDPS.dtype, float)
-assert IMU_GYRO_INITIAL_BIAS_MDPS.shape == (3,)
 if ESTIMATOR_TYPE == "FG":
     assert IMU_ACCEL_INITIAL_BIAS_STD_MG is not None
     assert IMU_GYRO_INITIAL_BIAS_STD_MDPS is not None

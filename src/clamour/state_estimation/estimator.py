@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from queue import Empty
 from typing import Callable, ContextManager, Literal
 from multiprocessing.synchronize import Lock
-import socket 
-import struct 
+import socket
+import struct
+import numpy as np
 
 # NOTE: CustomEKF and FactorGraph are imported in _initialize_estimator so the EKF can run without gtsam installed
 from ..estimator_clock import EstimatorClock, SensorClockMapper
@@ -141,7 +142,8 @@ class StateEstimator:
         print("Estimator initialization started. Keep the tag **stationary** until full initialization completes.", 'info', 'loc')
         # (yaw, pitch, roll) in degrees, IMU convention, or None without an IMU.
         # The EKF ignores it: it has no pitch/roll states and its yaw is 0 by definition.
-        initial_attitude = self._initialize_imu(imu)
+        # Initial gyro bias in mdps, or None without an IMU. Only used by the FG.
+        initial_attitude, initial_gyro_bias_mdps = self._initialize_imu(imu)
         while True:
             try:
                 msg = UpdateMessage.load(*self.com_queue.get_nowait())
@@ -172,13 +174,14 @@ class StateEstimator:
                     accel_covar_density = gyro_covar_density = None
                 # Yaw is 0 (global frame starts at the initial heading)
                 prior_ypr = (0.0, *initial_attitude[1:]) if initial_attitude is not None else (0.0, 0.0, 0.0)
-                self.estimator = FactorGraph(anchor_ros, prior_ypr, first_state_time_ns, accel_covar_density, gyro_covar_density)
+                self.estimator = FactorGraph(anchor_ros, prior_ypr, first_state_time_ns, accel_covar_density, gyro_covar_density,
+                                             initial_gyro_bias_mdps)
             # Estimator initialized. Internalise and publish the posterior.
             self._publish_pose(msg)
-            print(f"{self.estimator_type} INITIALIZATION DONE! INITIAL ATTITUDE: (pitch: {int(initial_attitude[1])}, roll: {int(initial_attitude[2])}, yaw: {int(initial_attitude[0])} degs)", 'ok', 'loc')
+            print(f"{self.estimator_type} INITIALIZATION DONE! INITIAL ATTITUDE: (pitch: {int(prior_ypr[1])}, roll: {int(prior_ypr[2])}, yaw: {int(prior_ypr[0])} degs)", 'ok', 'loc')
             return first_state_time_ns
 
-    def _initialize_imu(self, imu: IMU|None) -> tuple[float, float, float] | None:
+    def _initialize_imu(self, imu: IMU|None) -> tuple[tuple[float, float, float] | None, np.ndarray | None]:
         """
         Stationary IMU initialization, run before listening for ranging observations.
         - Assigns self.imu
@@ -186,12 +189,15 @@ class StateEstimator:
         - Sets safe FIFO reading parameters
         - Calibrates the IMU clock mapping with observations at IMU_INIT_OBSERVATION_DELAYS.
         - Reads the initial attitude once the clock calibration wait has let it stabilize.
+        - Estimates the initial gyro bias as the mean of the stationary FIFO gyro samples.
 
-        Returns the initial (yaw, pitch, roll) in degrees where (X=pitch, Y=roll, Z=yaw) or None without an IMU.
+        Returns (initial_attitude, gyro_bias_mdps), both None without an IMU:
+        - initial_attitude: (yaw, pitch, roll) in degrees where (X=pitch, Y=roll, Z=yaw)
+        - gyro_bias_mdps: per-axis gyro bias in mdps, scale-corrected like the FIFO samples. Let's us always start the graph with fresh gyro data (changes from power up to power up)
         """
         self.imu = imu
         if imu is None:
-            return None
+            return None, None
 
         # Initializing clock mapper & safe FIFO reading params 
         self.imu_clock_mapper = SensorClockMapper(imu.timestamp_tick_ns, imu.timestamp_counter_bits,
@@ -215,9 +221,13 @@ class StateEstimator:
 
         # The calibration wait above (~2s, stationary) covers the attitude's 1.5s calibration + stabilization time
         initial_attitude = imu.get_attitude()
-        # Attitude comes from the IMU directly, so the stationary FIFO samples aren't needed
+        # While stationary, the mean gyro reading is the bias (~2.7mdps 1-sigma noise over 2s)
+        if not self._pending_imu_samples:
+            raise RuntimeError("No IMU samples collected during stationary initialization, can't estimate the gyro bias")
+        gyro_bias_mdps = np.mean([sample.angular_velocity for sample in self._pending_imu_samples], axis=0)
+        # Samples were taken before the first state, they can't be integrated
         self._pending_imu_samples.clear()
-        return initial_attitude
+        return initial_attitude, gyro_bias_mdps
 
     def _idle(self, max_sleep_ns: int) -> None:
         """

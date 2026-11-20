@@ -7,7 +7,7 @@ from ...interfaces import Anchors, Pose
 from ...estimator_clock import NANOSECONDS_PER_SECOND
 from ...config import (ANCHOR_POS_UNCERTAINTY_CM,
                        IMU_ACCEL_INITIAL_BIAS_MG, IMU_ACCEL_INITIAL_BIAS_STD_MG, IMU_ACCEL_WALK_COV_MG2_PER_S,
-                       IMU_GYRO_INITIAL_BIAS_MDPS, IMU_GYRO_INITIAL_BIAS_STD_MDPS, IMU_GYRO_WALK_COV_MDPS2_PER_S)
+                       IMU_GYRO_INITIAL_BIAS_STD_MDPS, IMU_GYRO_WALK_COV_MDPS2_PER_S)
 ANCHORS = Anchors()
 
 ### Defining noise models 
@@ -24,7 +24,6 @@ GRAVITY_CM_S2 = 980.665  # cm/s^2
 MG_TO_CM_PER_S2 = GRAVITY_CM_S2 / 1000
 MDPS_TO_RAD_PER_S = 0.001*np.pi/180
 IMU_ACCEL_INITIAL_BIAS = IMU_ACCEL_INITIAL_BIAS_MG  * MG_TO_CM_PER_S2
-IMU_GYRO_INITIAL_BIAS  = IMU_GYRO_INITIAL_BIAS_MDPS * MDPS_TO_RAD_PER_S
 IMU_ACCEL_WALK_COV = IMU_ACCEL_WALK_COV_MG2_PER_S * MG_TO_CM_PER_S2**2
 IMU_GYRO_WALK_COV = IMU_GYRO_WALK_COV_MDPS2_PER_S * MDPS_TO_RAD_PER_S**2
 IMU_BIAS_STD_DEV = np.concatenate((
@@ -35,7 +34,8 @@ IMU_INTEGRATION_COVAR = (1e-5)**2 * np.eye(3) # Represents uncertainty due to th
 
 
 class FactorGraph: 
-    def __init__(self, range_observations:list[RangeObservation], prior_ypr:tuple[float, float, float], initial_state_time_ns:int, imu_accel_covar_density_mg2_s:float | None = None, imu_gyro_covar_density_mdps2_s:float | None = None):
+    def __init__(self, range_observations:list[RangeObservation], prior_ypr:tuple[float, float, float], initial_state_time_ns:int, imu_accel_covar_density_mg2_s:float | None = None, imu_gyro_covar_density_mdps2_s:float | None = None,
+                 imu_gyro_initial_bias_mdps:np.ndarray | None = None):
         """
         Factor Graph based 3D pose estimator.
         - range_observations: Range observations used to initialize the graph; at least 3 anchors are required to fully initialize the prior position.
@@ -44,11 +44,12 @@ class FactorGraph:
             - Will be converted internally to radians and to the gtsam.Rot3.Ypr convention (Z=Yaw, Y=Pitch, X=Roll)
         - imu_accel_covar_density_mg2_s: accelerometer measurement covariance density in (mg^2)*s
         - imu_gyro_covar_density_mdps2_s: gyroscope measurement covariance density in (mdps^2)*s
+        - imu_gyro_initial_bias_mdps: initial gyroscope bias in mdps (3,), required with an IMU. Its uncertainty is IMU_GYRO_INITIAL_BIAS_STD_MDPS (config.py)
         - initial_state_time_ns: EstimatorClock timestamp of the initial graph state
         NOTE on units:
         - All internal angle units are **radians**
         - All internal spatial units are **cm-based**
-            - IMU samples, covariance densities and the attitude prior are converted from mg/mdps/deg-based units at the graph boundary.
+            - IMU samples, covariance densities, the gyro bias and the attitude prior are converted from mg/mdps/deg-based units at the graph boundary.
         """
         self.last_state_time_ns = initial_state_time_ns
         
@@ -67,9 +68,12 @@ class FactorGraph:
         initial_values = gt.Values()
         # Defining IMU objects if present 
         if imu_accel_covar_density_mg2_s is not None and imu_gyro_covar_density_mdps2_s is not None:
+            if imu_gyro_initial_bias_mdps is None:
+                raise ValueError("An initial gyro bias is required when the factor graph is initialized with an IMU")
             self.imu_accel_covar_density = imu_accel_covar_density_mg2_s * np.eye(3) * MG_TO_CM_PER_S2**2
             self.imu_gyro_covar_density = imu_gyro_covar_density_mdps2_s * np.eye(3) * MDPS_TO_RAD_PER_S**2
-            self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values) # PreintegratedCombinedMeasurements object, used for IMU pre-integration. 
+            gyro_initial_bias = np.asarray(imu_gyro_initial_bias_mdps, dtype=float) * MDPS_TO_RAD_PER_S
+            self.pim  = self._create_imu_pim_obj(initial_state_key, graph, initial_values, gyro_initial_bias) # PreintegratedCombinedMeasurements object, used for IMU pre-integration.
         # Initializing the state by locking rotation and position 
         # Internal state tracker is a NavState for Pose3 and Velocity. Public access is the pose() property, which formats it into a Pose container.
         self._state = self._insert_init_prior(initial_state_key, graph, initial_values, prior_ypr, range_observations)
@@ -202,9 +206,10 @@ class FactorGraph:
         )
         return gt.NavState(post_pose, np.zeros(3))  
 
-    def _create_imu_pim_obj(self, state_key, graph, initial): 
+    def _create_imu_pim_obj(self, state_key, graph, initial, gyro_initial_bias:np.ndarray):
         """
         Creates a gtsam.PreintegratedCombinedMeasurements object, which will be used to do IMU pre-integration with the CombinedImuFactor
+        - gyro_initial_bias: initial gyroscope bias in rad/s
         """
         # Defining Z axis pointing up. The factor will then handle gravity measurements internally. 
         pim_params = gt.PreintegrationCombinedParams.MakeSharedU(GRAVITY_CM_S2)
@@ -217,7 +222,7 @@ class FactorGraph:
         # Setting prior on IMU bias (calibration isn't perfect, this represents our confidence in it) 
         # Subsequent uses of CombinedImuFactor will allow the bias estimate to evolve through time  
         # NOTE biases will be SUBSTRACTED from readings (coherent with theory/def of 'bias')
-        imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, IMU_GYRO_INITIAL_BIAS)
+        imu_bias = gt.imuBias.ConstantBias(IMU_ACCEL_INITIAL_BIAS, gyro_initial_bias)
         bias_noise = gt.noiseModel.Diagonal.Sigmas(IMU_BIAS_STD_DEV)
         graph.add(gt.PriorFactorConstantBias(gt.symbol('b', state_key), imu_bias, bias_noise))
         initial.insert(gt.symbol('b', state_key), imu_bias) 
