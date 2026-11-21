@@ -515,9 +515,10 @@ class StateEstimator:
         """
         pose = self.estimator.pose
 
-        with self.tag_lock:
-            self.tag.pose = pose
- 
+        # No tag lock: the pose is a SharedPose with its own lock, and the TDMA process holds the
+        # tag lock during ranging/listening (DW timeouts of ~15ms), which would stall the fusion loop.
+        self.tag.pose = pose
+
         self.pose_callback(pose)
 
         if DYNAMIC_MIST:
