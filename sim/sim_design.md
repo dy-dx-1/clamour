@@ -20,6 +20,7 @@ those measurements and do their own estimation. `sim.py` collects GT and estimat
 | 6 | Clamour changes | Allowed, but **every change touching `src/clamour` must be approved first.** Simulated interfaces (`SimulationTag`, `simulated_imu`) live in clamour. |
 | 7 | Scale | ≤ 5 tags for initial testing. |
 | 8 | Ranging model | Gaussian noise, max range, fully opaque walls. A richer model (NLOS bias, attenuation, dropouts) comes later. |
+| 9 | Units | **The sim works in SI units (metres, seconds, rad).** Clamour will move to metres later. Until then, convert only at the clamour boundary, inside `SimulationTag` (m → integer cm) and `simulated_imu` (m/s² → mg, rad/s → mdps). Removing those conversions is the only sim change needed when clamour switches. |
 
 ## Priority 0 — Tag pose not shared between processes (clamour bug)
 
@@ -40,9 +41,9 @@ those measurements and do their own estimation. `sim.py` collects GT and estimat
   flag and 6 covariance terms, with its own lock (atomic reads/writes).
 - `BitcrazeTag` and `SyntheticTag` create one in `__init__` (before the child processes start). Their `pose` getter/setter
   read/write it. The getter returns a copy.
-- `PozyxTag` is unchanged: it stores its pose on the device, so it is already shared (it does drop angles and covariance, but it's
-  legacy and has no inter-tag ranging).
-- The `Tag.pose` docstring now states the requirement.
+- `PozyxTag` also uses `SharedPose` now (it used to store the pose on the device over serial, which would race with TDMA
+  once the tag lock was dropped, see finding 3).
+- The `Tag` docstrings now state the requirement, and that `pose` is accessed without the tag lock.
 - `SimulationTag` must use `SharedPose` too. The sim must **not** hide this kind of bug behind a world-side store.
 
 Hardware test: with 2 Bitcraze tags, check that inter-tag ranges reach the estimator (they were all dropped before), and that
@@ -55,18 +56,16 @@ Tag state is fine wherever only one process uses it. Ownership today:
 - **TDMA process:** everything else (`_active_tags`, `_available_anchors`, `_twr_seq`, the DW1000 handle, `pose` read).
 - `Neighborhood`, `SlotAssignment`, `Messenger` and `Anchors` are built per process and only used by TDMA (or are read-only config).
 
-Open findings (not fixed):
-1. **Start method.** The tag is handed to the children by `fork` inheritance. Python 3.14 switches the Linux default start method
-   to `forkserver`. That would pickle the tag, and the DW1000/serial handles most likely can't be pickled. Either pin `fork` in
-   clamour, or keep the target on Python < 3.14 and note it. The sim's launcher must not change the start method that clamour's own
-   children use (use a `multiprocessing.get_context("spawn")` for the tag processes instead of `set_start_method`).
-2. **`add_neighbor` is missing `self`** in `Tag` (abstract), `PozyxTag` and `SyntheticTag`. `Messenger` calls
-   `self.tag.add_neighbor(sender_id)`, which raises `TypeError` there. Bitcraze is correct. With Pozyx it triggers whenever a
-   message is received.
-3. **Estimator waits on the tag lock.** `_publish_pose` writes the pose under `shared_tag_lock`. The TDMA process holds that lock
-   during `receive_data()`/`ranging()`, which can block for DW listen timeouts (~15 ms each). `SharedPose` has its own lock, so the
-   estimator could skip `shared_tag_lock` for the pose write. That would be a departure from the `Tag` contract ("all methods under
-   lock"), so decide first.
+Findings, all fixed 2026-11-21:
+1. **Start method → `fork` pinned** in `ContextManagedProcess` (`get_context('fork')`), which every clamour process goes through.
+   Python 3.14 switches the Linux default to `forkserver`, which would have to pickle the tag and its hardware handles.
+   It is pinned there and not with `set_start_method`, so the sim launcher can use its own `get_context("spawn")` for tag
+   processes. Note: `fork` doesn't exist on Windows, so importing clamour there fails (fine: it targets Linux).
+2. **`add_neighbor` was missing `self`** in `Tag`, `PozyxTag` and `SyntheticTag` (a `TypeError` when `Messenger` called it). Added.
+3. **Estimator no longer takes the tag lock** for the pose write in `_publish_pose` (`SharedPose` has its own lock; the TDMA
+   process holds the tag lock through DW listen timeouts). A comment in `estimator.py` explains why.
+   - `PozyxTag` was switched to `SharedPose` so its pose write no longer touches the serial port.
+   - `StateEstimator.tag_lock` is now unused.
 
 ## Architecture
 
@@ -85,7 +84,7 @@ sim.py (main process)
 - **World as a server.** Tag calls come from grandchild processes, so the world answers requests over IPC (e.g. a `multiprocessing`
   manager or pipes). IPC latency (~100 µs) is small next to 25 ms TDMA slots.
 - **Abstract radio** (decision 2):
-  - `ranging(target)`: if reachable, return the noisy GT distance in cm. For a tag target, also return that tag's *published*
+  - `ranging(target)`: if reachable, return the noisy GT distance (world: metres; `SimulationTag` hands clamour integer cm). For a tag target, also return that tag's *published*
     estimated pose (see Priority 0: published by the tag itself, not read from a shortcut).
   - `broadcast(payload)`: put the payload in the receive queue of every reachable tag.
   - `receive_data()`: pop from this tag's queue.
@@ -107,8 +106,9 @@ sim.py (main process)
 - **Anchors must match.** The world and every tag must use the same anchor set (`sim/config.py` overrides `clamour.config.ANCHORS`).
   Anchor IDs are 1–10.
 - **Tag ID constraints.** `TAG_ID > 10` and `TAG_ID & 0xFF < SCHEDULING_SLOT_COUNT (20)`, with unique low bytes.
-- **Units.** Clamour uses integer cm, 3D. The map is 2D with cm resolution. Use a fixed height per tag, 3D distances for ranges,
-  and a 2D line-of-sight check on the grid. `sim/config.py` must use cm (`UWB_NOISE` is currently in metres).
+- **Units.** The sim is in metres (decision 9). Clamour is still integer cm, 3D. The map is 2D, with a grid resolution of 1 cm
+  (given in metres in the map). Use a fixed height per tag, 3D distances for ranges, and a 2D line-of-sight check on the grid.
+  Anchors from `clamour.config` (cm) are converted to metres when the world loads them.
 - **Startup requirements:**
   - The IMU init needs the tag **stationary for ~2 s** (otherwise `_initialize_imu` raises an error).
   - The estimator only starts after a ranging batch with **≥ 4 anchor ranges**.
@@ -127,13 +127,13 @@ sim.py (main process)
 - **Runs on Linux.** gtsam isn't installed on the Windows dev machine.
 - **Pose output.** `pose_callback` runs in the estimator process. Under `spawn` it must be picklable (no lambdas); simplest is a
   top-level function that forwards to the World server / a queue.
-- **Small draft fixes:** `sim/maps/square.py` should use `from .map_contract import BaseMap`; `side_length` units (cm); `world.Tag`
+- **Small draft fixes:** `sim/maps/square.py` should use `from .map_contract import BaseMap`; `side_length` in metres; `world.Tag`
   needs float positions and shouldn't be confused with clamour's `Tag`.
 
 ## Implementation plan
 
 0. ~~**Fix the Priority 0 pose bug in clamour.**~~ Done; hardware test pending. Decide on the audit findings.
-1. **Sim config & maps.** Finish `sim/config.py` (cm units, tags with initial pose, height and motion mode, anchors, map, seed, UWB
+1. **Sim config & maps.** Finish `sim/config.py` (metres, tags with initial pose, height and motion mode, anchors, map, seed, UWB
    params). Fix `SquareMap` and add obstacle support.
 2. **Trajectories.** Waypoint splines + smooth random paths, giving position, velocity, acceleration and heading at any `t`, with an
    initial stationary period.

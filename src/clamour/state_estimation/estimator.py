@@ -73,7 +73,6 @@ class StateEstimator:
 
     ARGS: 
     - tag: Tag object to track 
-    - tag_lock: Multiprocessing Lock for the tag
     - imu_factory: function that creates an IMU instance or None if not available 
     - estimator_clock: EstimatorClock object that will serve as common clock time
     - estimator_type: EKF or Factor Graph
@@ -81,11 +80,10 @@ class StateEstimator:
     - communication_queue: Queue where pose updates / messages to process appear 
     - sound_queue: Optional, if a Queue is passed, will send updates to it to allow for sound playing 
     """
-    def __init__(self, tag: Tag, tag_lock: Lock, imu_factory: Callable[[], ContextManager[IMU | None]],
+    def __init__(self, tag: Tag, imu_factory: Callable[[], ContextManager[IMU | None]],
                   estimator_clock: EstimatorClock, estimator_type: Literal['EKF', 'FG'], 
                   pose_callback, communication_queue: ContextManagedQueue, sound_queue: None|ContextManagedQueue):
         self.tag = tag 
-        self.tag_lock = tag_lock 
 
         self.estimator = None 
         self.estimator_type = estimator_type # validity check done in config  

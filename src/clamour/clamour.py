@@ -78,7 +78,7 @@ class Clamour:
             estimator_clock = EstimatorClock.start()
             with ContextManagedQueue() as sound_queue:
                 sound_processing_queue = sound_queue if sound else None # Passing None instead of a sound queue to the StateEstimator turns off the sound function
-                estimator = StateEstimator(shared_tag, shared_tag_lock, create_imu,
+                estimator = StateEstimator(shared_tag, create_imu,
                                            estimator_clock, ESTIMATOR_TYPE, pose_callback,
                                            communication_queue, sound_processing_queue)
                 #pedometer = Pedometer(communication_queue, shared_pozyx, shared_pozyx_lock)
