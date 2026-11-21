@@ -1,7 +1,7 @@
 from ..custom_terminal import print 
 
 from .tag import Tag
-from .containers import Pose
+from .containers import Pose, SharedPose
 from dw1000_spi import DW1000
 from .anchors import Anchors
 
@@ -61,7 +61,7 @@ class BitcrazeTag(Tag):
 
         self._active_tags = dict()      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = set() # keeps track of currently in-range anchors 
-        self._pose = Pose()             # Tag position, orientation, and covariance
+        self._pose = SharedPose()       # Tag position, orientation, and covariance, shared by all processes
 
         self.EXPECTED_RANGING_HEADER = RANGING_BC_HEADER + list(self.tag_id.to_bytes(6, 'little')) + [0xCF, 0xBC] # the header message that we expect for ranging requests sent to this tag. Generated here to avoid regenerating it every time.
 
@@ -277,15 +277,15 @@ class BitcrazeTag(Tag):
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     @property
     def pose(self) -> Pose:
-        return self._pose
+        return self._pose.read()
     
     @pose.setter
     def pose(self, new_pose: Pose):
-        self._pose = new_pose
+        self._pose.write(new_pose)
 
     @property
     def orientation(self) -> Pose:
-        return self._pose.angles
+        return self.pose.angles
 
     @staticmethod
     def extract_report_neighbor_info(report_msg:list) -> Pose|None:

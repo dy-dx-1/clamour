@@ -35,14 +35,38 @@ those measurements and do their own estimation. `sim.py` collects GT and estimat
   - `Task.collect_ranges()` sends `yaw=self.tag.pose.heading`, which is therefore always 0.
 - Found by reading the code; not yet confirmed on hardware.
 
-Fix options (to decide):
-1. **Shared pose buffer.** A small shared-memory pose (e.g. `multiprocessing.Array` holding x, y, z, angles, 6 covariance terms),
-   created once in `Clamour.start()`, used by every `Tag` implementation's `pose` property and guarded by the existing tag lock.
-   Hardware agnostic and transparent to callers.
-2. Estimator pushes pose updates to the TDMA process over a queue. More moving parts, and the pose is stale between drains.
+**Status: implemented 2026-11-21, not yet tested on hardware.**
+- `SharedPose` (`interfaces/containers.py`): a `multiprocessing.Array` holding x, y, z, heading, roll, pitch, a covariance
+  flag and 6 covariance terms, with its own lock (atomic reads/writes).
+- `BitcrazeTag` and `SyntheticTag` create one in `__init__` (before the child processes start). Their `pose` getter/setter
+  read/write it. The getter returns a copy.
+- `PozyxTag` is unchanged: it stores its pose on the device, so it is already shared (it does drop angles and covariance, but it's
+  legacy and has no inter-tag ranging).
+- The `Tag.pose` docstring now states the requirement.
+- `SimulationTag` must use `SharedPose` too. The sim must **not** hide this kind of bug behind a world-side store.
 
-Leaning towards (1). Check `PozyxTag` and `SyntheticTag` as well. The simulation must **not** hide this bug: `SimulationTag` stores
-its pose exactly like the hardware tags do, rather than in a world-side store that every process could reach.
+Hardware test: with 2 Bitcraze tags, check that inter-tag ranges reach the estimator (they were all dropped before), and that
+`measured_yaw` in range updates is no longer always 0.
+
+### Audit of other per-process tag state (2026-11-21)
+
+Tag state is fine wherever only one process uses it. Ownership today:
+- **Estimator process:** `pose` (write) and `tag_id` (immutable).
+- **TDMA process:** everything else (`_active_tags`, `_available_anchors`, `_twr_seq`, the DW1000 handle, `pose` read).
+- `Neighborhood`, `SlotAssignment`, `Messenger` and `Anchors` are built per process and only used by TDMA (or are read-only config).
+
+Open findings (not fixed):
+1. **Start method.** The tag is handed to the children by `fork` inheritance. Python 3.14 switches the Linux default start method
+   to `forkserver`. That would pickle the tag, and the DW1000/serial handles most likely can't be pickled. Either pin `fork` in
+   clamour, or keep the target on Python < 3.14 and note it. The sim's launcher must not change the start method that clamour's own
+   children use (use a `multiprocessing.get_context("spawn")` for the tag processes instead of `set_start_method`).
+2. **`add_neighbor` is missing `self`** in `Tag` (abstract), `PozyxTag` and `SyntheticTag`. `Messenger` calls
+   `self.tag.add_neighbor(sender_id)`, which raises `TypeError` there. Bitcraze is correct. With Pozyx it triggers whenever a
+   message is received.
+3. **Estimator waits on the tag lock.** `_publish_pose` writes the pose under `shared_tag_lock`. The TDMA process holds that lock
+   during `receive_data()`/`ranging()`, which can block for DW listen timeouts (~15 ms each). `SharedPose` has its own lock, so the
+   estimator could skip `shared_tag_lock` for the pose write. That would be a departure from the `Tag` contract ("all methods under
+   lock"), so decide first.
 
 ## Architecture
 
@@ -70,7 +94,7 @@ sim.py (main process)
 
 ## Clamour changes (each needs approval before implementation)
 
-1. Priority 0 fix: shared pose.
+1. ~~Priority 0 fix: shared pose.~~ Done (see above).
 2. `interfaces/simulation_tag.py`: `SimulationTag(Tag)` that talks to the World server.
 3. `interfaces/simulated_imu.py`: idealized IMU following the `IMU` contract.
 4. `"Simulation"` case in the `TAG_TYPE` / `IMU_TYPE` `match` blocks of `clamour.py`, and the matching config validation.
@@ -108,7 +132,7 @@ sim.py (main process)
 
 ## Implementation plan
 
-0. **Fix the Priority 0 pose bug in clamour** (approval needed).
+0. ~~**Fix the Priority 0 pose bug in clamour.**~~ Done; hardware test pending. Decide on the audit findings.
 1. **Sim config & maps.** Finish `sim/config.py` (cm units, tags with initial pose, height and motion mode, anchors, map, seed, UWB
    params). Fix `SquareMap` and add obstacle support.
 2. **Trajectories.** Waypoint splines + smooth random paths, giving position, velocity, acceleration and heading at any `t`, with an

@@ -126,6 +126,11 @@ class Tag(ABC):
     def pose(self) -> Pose:
         """
         The last-known pose of the tag, including position and covariance.
+
+        The estimator process writes the pose and the TDMA process reads it (e.g. to share it in ranging responses),
+        and each process holds its own copy of the tag object. Store it where every process sees the same value:
+        a SharedPose (containers.py) created in __init__, or the device itself.
+        Returns a copy: modifying it does not change the tag's pose, use the setter.
         """
 
     @pose.setter

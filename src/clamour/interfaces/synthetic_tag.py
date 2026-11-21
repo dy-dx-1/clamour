@@ -1,7 +1,7 @@
 from ..custom_terminal import print 
 
 from .tag import Tag
-from .containers import Pose
+from .containers import Pose, SharedPose
 from .anchors import Anchors
 
 import numpy as np
@@ -23,7 +23,7 @@ class SyntheticTag(Tag):
         self._id = tag_id        # NOTE: It's expected that all ID's used are max 2bytes (<0xFFFF). Should be enforced by config.py
         self._active_tags = {tag_id:1 for tag_id in ACTIVE_TAGS}      # keeps track of nearby tags and when they were last seen 
         self._available_anchors = VISIBLE_ANCHORS # keeps track of currently in-range anchors 
-        self._pose = Pose()             # Tag position, orientation, and covariance
+        self._pose = SharedPose()       # Tag position, orientation, and covariance, shared by all processes
 
         print(f"SYNTHETIC TAG STARTED!", 'ok', 'device') 
         print(f"TAG ID: {self._id}", 'ok', 'device')
@@ -81,15 +81,15 @@ class SyntheticTag(Tag):
 
     @property
     def pose(self) -> Pose:
-        return self._pose
+        return self._pose.read()
 
     @pose.setter
     def pose(self, new_pose: Pose) -> None:
-        self._pose = new_pose 
+        self._pose.write(new_pose)
 
     @property
     def orientation(self) -> list:
-        return self._pose.angles 
+        return self.pose.angles 
 
     def ranging(self, target_id:int) -> tuple[int|None, Pose|None]:
         dist_vect = np.array(FAKE_POS) - np.array(ANCHORS_DICT[target_id])

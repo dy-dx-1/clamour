@@ -1,5 +1,7 @@
 """Containers that transport spatial and angular tag state within Clamour."""
 
+from multiprocessing import Array
+
 import numpy as np
 
 
@@ -117,3 +119,38 @@ class Pose:
     @pitch.setter
     def pitch(self, value):
         self._angles[2] = int(value)
+
+
+class SharedPose:
+    """Process-shared storage for one :class:`Pose`.
+
+    Clamour hands one ``Tag`` object to several processes (estimator, TDMA), and each
+    process gets its own copy of it. A plain ``Pose`` attribute would therefore only
+    change in the process that wrote it. This buffer lives in shared memory, so a pose
+    written by the estimator is the pose the TDMA process reads (e.g. to answer a
+    ranging request).
+
+    Create it before the child processes start (i.e. in the tag's ``__init__``).
+    Reads and writes are atomic through the buffer's own lock. ``read`` returns a copy:
+    modifying it does not change the shared pose, call ``write`` instead.
+    """
+
+    # Layout: x, y, z, heading, roll, pitch, has_covar, xx, yy, zz, xy, xz, yz
+    _SIZE = 13
+
+    def __init__(self, pose: Pose | None = None):
+        self._buffer = Array('q', self._SIZE)
+        self.write(pose if pose is not None else Pose())
+
+    def read(self) -> Pose:
+        with self._buffer.get_lock():
+            values = self._buffer[:]
+        covar = tuple(values[7:]) if values[6] else None
+        return Pose(*values[:6], covar=covar)
+
+    def write(self, pose: Pose) -> None:
+        c = pose.covar
+        covar_terms = [0] * 7 if c is None else [1, c[0][0], c[1][1], c[2][2], c[0][1], c[0][2], c[1][2]]
+        values = [int(value) for value in (*pose.coordinates, *pose.angles, *covar_terms)]
+        with self._buffer.get_lock():
+            self._buffer[:] = values
