@@ -11,7 +11,7 @@ class Tag(ABC):
     """
     Reference class for interfacing with UWB tags in Clamour. 
     All tag classes need to follow this blueprint to work with the rest of the code.
-    NOTE: All of these methods, except is_anchor, need to be called with the appropriate lock context manager to ensure thread safety. 
+    NOTE: All of these methods, except is_anchor and pose, need to be called with the appropriate lock context manager to ensure thread safety.
     """
 
     @abstractmethod
@@ -63,7 +63,7 @@ class Tag(ABC):
         """
 
     @abstractmethod
-    def add_neighbor(tag_id: int) -> None: 
+    def add_neighbor(self, tag_id: int) -> None: 
         """
         Adds a neighboring tag to the tag's internal active tags dictionary. 
 
@@ -128,8 +128,9 @@ class Tag(ABC):
         The last-known pose of the tag, including position and covariance.
 
         The estimator process writes the pose and the TDMA process reads it (e.g. to share it in ranging responses),
-        and each process holds its own copy of the tag object. Store it where every process sees the same value:
-        a SharedPose (containers.py) created in __init__, or the device itself.
+        and each process holds its own copy of the tag object. Store it in a SharedPose (containers.py) created in __init__,
+        so every process sees the same value. Unlike other methods, pose is accessed WITHOUT the tag lock (SharedPose has
+        its own), so never back it with the device: that would race with the TDMA process's device traffic.
         Returns a copy: modifying it does not change the tag's pose, use the setter.
         """
 

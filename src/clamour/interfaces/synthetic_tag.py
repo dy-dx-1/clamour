@@ -51,7 +51,7 @@ class SyntheticTag(Tag):
     def is_anchor(device_id: int) -> bool:
         return True if device_id<=10 else False 
 
-    def add_neighbor(tag_id: int) -> None: 
+    def add_neighbor(self, tag_id: int) -> None: 
         pass 
 
     def clear_anchors(self) -> None:
