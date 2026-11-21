@@ -1,5 +1,5 @@
 from .tag import Tag
-from .containers import Pose
+from .containers import Pose, SharedPose
 from .anchors import Anchors
 from ..custom_terminal import print 
 import struct 
@@ -51,6 +51,7 @@ class PozyxTag(Tag):
             raise Exception("No Pozyx connected. Check your USB cable or your driver.")
         self._pozyx_serial = PozyxSerial(serial_port)
         self._id = get_pozyx_id(self._pozyx_serial)
+        self._pose = SharedPose()       # Tag position, orientation, and covariance, shared by all processes
         #if self._id != get_pozyx_id(self._pozyx_serial): # NOTE removed this because using setNetworkId breaks ranging for some reason. Dk why and it's not relevant rn. 
         #    self._pozyx_serial.setNetworkId(id)
         print(f"Successfully initialized pozyx tag on port {serial_port} with id: {self._id}", 'ok', 'device')
@@ -91,7 +92,7 @@ class PozyxTag(Tag):
             return True 
         return device_id < 0x500
     
-    def add_neighbor(tag_id):
+    def add_neighbor(self, tag_id):
         """
         Since pozyx offers network discovery this function is unused. 
         Also don't need to maintain internal dictionary like in BitcrazeTag
@@ -195,21 +196,13 @@ class PozyxTag(Tag):
     ### -------------------------------------------- LOCALIZATION --------------------------------------------
     @property
     def pose(self) -> Pose:
-        # Not sure why pypozyx seems to only get the X position with getCoordinates().
-        # If precision is way off in the future, look into this. 
-        coords_container = pozyxCoordinates() # Need to pass a pozyx Coords object in the pypozyx method 
-        try:
-            status = self._pozyx_serial.getCoordinates(coords_container) # if successful, this'll update the ref_coordinates value
-        except struct.error as s: 
-            status = 0 
-            print(f"PozyxTag.getCoordinates: {str(s)}", 'error', 'loc') 
-        assert status == POZYX_SUCCESS # There's no status check in task.py where this is used so if it is not successful we should add one 
-        return Pose(coords_container.x / 10, coords_container.y / 10, coords_container.z / 10) # Convert Pozyx hardware units to cm
+        # Kept in shared memory rather than on the device: the estimator writes it without the tag lock,
+        # which would race with the TDMA process's serial traffic.
+        return self._pose.read()
 
     @pose.setter
     def pose(self, new_pose: Pose):
-        pozyx_coords = pozyxCoordinates(new_pose.x * 10, new_pose.y * 10, new_pose.z * 10)
-        self._pozyx_serial.setCoordinates(pozyx_coords)
+        self._pose.write(new_pose)
     
     @property
     def orientation(self):
