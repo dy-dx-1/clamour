@@ -1,9 +1,14 @@
 from .custom_terminal import print 
 import traceback as tb
-from multiprocessing import Process
+from multiprocessing import get_context
 import os 
 
-class ContextManagedProcess(Process):
+# Clamour hands the live tag object (with its open DW1000/serial handle) to its child processes by fork inheritance.
+# spawn/forkserver would need to pickle it, which hardware handles don't support (forkserver is the Linux default
+# from Python 3.14). Pinned here rather than with set_start_method so programs embedding clamour keep their own default.
+FORK_CONTEXT = get_context('fork')
+
+class ContextManagedProcess(FORK_CONTEXT.Process):
     def __enter__(self):
         # Record the PID of the parent process that entered the context
         self._parent_pid = os.getpid()
