@@ -83,7 +83,7 @@ Known network topology (and surrounding changes)
 From these inputs, the estimator produces continuously updated position estimates for the tag (and collaborative state information).
 
 ## Sound Playing Process
-The sound playing process runs concurently with localization and TDMA. Its roles is straightforward: it consumes position estimates from the localization estimator and generates a sounds depending on the result.
+The sound playing process runs concurently with localization and TDMA. Its role is straightforward: it consumes position estimates from the localization estimator and generates a sounds depending on the result.
 
 
 ## TDMA Communication Cycle
