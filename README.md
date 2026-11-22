@@ -43,22 +43,55 @@ A channel access method where time is divided into discrete slots. Each tag tran
 At runtime, each tag continuously executes **three main processes in parallel**: **Localization (Estimator)**, **TDMA**, and **Sound Playing**. The diagram below illustrates how these processes interact and exchange data.
 
 ```mermaid
-flowchart LR
-    subgraph Tag["Tag (Parallel Processes)"]
-        TDMA["TDMA Process<br/>(Slot coordination, discovery,<br/>ranging, logical clock & topology)"]
-        EST["Localization Process<br/>(Factor Graph / EKF Estimator)"]
-        SND["Sound Playing Process<br/>(Adaptive music / audio output)"]
+flowchart TD
+    START(["start<br/>config.py"])
+
+    subgraph LOOP_EST["Boucle continue : State Estimation (EKF / FG)"]
+        EST["<b>State Estimation (EKF / FG)</b><br/>Fuse ranges, clock/delay, topology &amp; other<br/>sensor data (pedometer/IMU) if available"]
     end
 
-    EXT["Anchors, Neighboring Tags<br/>& UWB Radio Channel"]
+    subgraph LOOP_TDMA["Boucle continue : TDMA"]
+        TDMA["<b>TDMA</b><br/>TDMA cycle; take ranges<br/>&amp; update topology in Task"]
+    end
 
-    EXT <-->|"TDMA slots, TWR ranges,<br/>clock/delay & topology updates"| TDMA
-    TDMA -->|"Distances, clock/delay,<br/>topology & updates"| EST
-    EST -->|"Estimated position"| SND
+    subgraph LOOP_SND["Boucle continue : Sound"]
+        SND["<b>Sound</b><br/>Play sound according to<br/>position / state"]
+    end
+
+    STATE[["state<br/>(estimated position)"]]
+
+    START --> EST
+
+    START --> TDMA
+    START --> SND
+
+    TDMA -->|"topo + ranges"| EST
+    EST --> STATE
+    STATE --> SND
+
+    EST -. "loop" .-> EST
+    TDMA -. "loop" .-> TDMA
+    SND -. "loop" .-> SND
 ```
 ---
+## Localization Process (Estimator)
+The localization process runs continuously as an estimator (such as a factor graph or Extended Kalman Filter (EKF)) that fuses spatial and temporal observations over time. It consumes outputs produced during the TDMA cycle:
 
-## Communication Cycle
+Measured distances between the tag and fixed anchors
+
+Measured distances between the tag and neighboring tags
+
+Logical clock and delay estimates
+
+Known network topology (and surrounding changes)
+
+From these inputs, the estimator produces continuously updated position estimates for the tag (and collaborative state information).
+
+## Sound Playing Process
+The sound playing process runs concurently with localization and TDMA. Its roles is straightforward: it consumes position estimates from the localization estimator and generates a sounds depending on the result.
+
+
+## TDMA Communication Cycle
 
 Each node operates as a state machine structured around a synchronized TDMA cycle : 
 
@@ -68,11 +101,11 @@ The device first start to wait a random delay, then attempts to detect other tag
 
 **Step 2 - Synchronisation:**
 
-This state prepares the tag for synchronization by converging the logical clock of the tags so that they can coordonnate their transmissions. After the preparations are done, the device switches to the Scheduling state
+This state prepares the tag for synchronization by converging the logical clock of the tags so that they can coordonnate their transmissions. Each tags exchanges Sync messages to align their logical clock within a 15 ms threshold. Each tag computes the clock offset against received neighbor timestamps plus a small delay. Then, depending on the offset magnitude, the tag eitheir applies a direct offset correction or uses collaborative offset compensation over recent neighbor offsets. After the preparations are done, the device switches to the Scheduling state
 
 **Step 3 - Scheduling:**
 
-This state attributes slots for each tag using the temporal information prepared during the synchronization state. When the planification window is finished, it switches to the Listen state. If an error message is returned, it switches to the Synchronization state.
+This state attributes slots for each tag using the temporal information (such as their logical clock, their synchronisation timestamp and the duration of the scheduling window computed from the discovered neighbor) prepared during the synchronization state. When the planification window is finished, it switches to the Listen state. If a scheduling error is returned, it switches to the Synchronization state.
 
 **Step 4 - Listen:**
 
@@ -80,7 +113,7 @@ This state can be divided in four different outcomes. If a re-synchronisation is
 
 **Step 5 - Task:**
 
-This is state starts by discovering periodically the other devices. It also cleans the obsolete information by the mean of a garbage collector. After the other tags have been discovered, the program starts mesuring distances between devices and transmits the result. If the surroundings have changed, the device sends a message to the other devices about the change and then updates the logical clock and the delay with the surrounding device. The estimator receives : 
+This is state starts by discovering periodically the other devices and cleaning up obsolete neighbor entries via a garbage collector, which removes neighbors whose timestamp is older than 20 seconds. After the other tags have been discovered, the program starts mesuring distances between devices and transmits the result. If the surroundings have changed, the device sends a message to the other devices about the change and then updates the logical clock and the delay with the surrounding device. The estimator receives : 
 - the distance mesured between the device and the anchors
 - the distance mesured between the device and the other tags
 - the logical clock and the delay
