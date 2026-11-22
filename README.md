@@ -60,7 +60,7 @@ flowchart TD
     START --> TDMA
     START --> SND
 
-    TDMA -->|"topo + ranges"| EST
+    TDMA -->|"topology + ranges"| EST
     EST --> STATE
     STATE --> SND
 
