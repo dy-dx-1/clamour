@@ -16,8 +16,9 @@ This project is a joint collaboration by the following laboratories:
 - [Overview & Key Concepts](#overview--key-concepts)
 - [System Architecture](#system-architecture)
   - [Localization Process (Estimator)](#localization-process-estimator)
-  - [TDMA Communication Cycle](#tdma-communication-cycle)
   - [Sound Playing Process](#sound-playing-process)
+  - [TDMA Communication Cycle](#tdma-communication-cycle)
+  
 
 ---
 
@@ -47,7 +48,6 @@ flowchart TD
     START(["start<br/>config.py"])
 
         EST["<b>State Estimation (EKF / FG)</b><br/>Fuse ranges, clock/delay, topology &amp; other<br/>sensor data (pedometer/IMU) if available"]
-
 
         TDMA["<b>TDMA</b><br/>TDMA cycle; take ranges<br/>&amp; update topology in Task"]
 
