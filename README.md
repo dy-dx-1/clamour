@@ -46,17 +46,12 @@ At runtime, each tag continuously executes **three main processes in parallel**:
 flowchart TD
     START(["start<br/>config.py"])
 
-    subgraph LOOP_EST["Boucle continue : State Estimation (EKF / FG)"]
         EST["<b>State Estimation (EKF / FG)</b><br/>Fuse ranges, clock/delay, topology &amp; other<br/>sensor data (pedometer/IMU) if available"]
-    end
 
-    subgraph LOOP_TDMA["Boucle continue : TDMA"]
+
         TDMA["<b>TDMA</b><br/>TDMA cycle; take ranges<br/>&amp; update topology in Task"]
-    end
 
-    subgraph LOOP_SND["Boucle continue : Sound"]
         SND["<b>Sound</b><br/>Play sound according to<br/>position / state"]
-    end
 
     STATE[["state<br/>(estimated position)"]]
 
