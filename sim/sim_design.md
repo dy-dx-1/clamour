@@ -112,9 +112,19 @@ sim.py (main process)
 - **Startup requirements:**
   - The IMU init needs the tag **stationary for ~2 s** (otherwise `_initialize_imu` raises an error).
   - The estimator only starts after a ranging batch with **≥ 4 anchor ranges**.
-  - Scenarios must start with the tags still and in view of ≥ 4 anchors.
-- **Smooth trajectories.** The IMU needs continuous position, velocity, acceleration and heading. Use splines through waypoints, and
-  smooth random paths. No instantaneous bounces.
+  - TDMA only ranges in its Task phase, after SYNC (5 s) and scheduling (30 ms × max(neighbours, 2) × 200, i.e. 12–24 s).
+    The first estimate therefore comes ~20–30 s after start.
+  - So tags must start still and in view of ≥ 4 anchors. **Motion starts once every tag has published its first estimate**,
+    plus `MOTION_START_DELAY_S` (the world's job, step 3). Trajectory time `t = 0` is that moment.
+- **Smooth trajectories** (done, `sim/trajectory.py`):
+  - The geometric path is a natural cubic spline over chord length. A separate smoothstep speed profile (ramp up, cruise,
+    ramp down) drives it, so velocity, acceleration and yaw rate are continuous and zero at rest.
+  - Heading is the path tangent, so it stays defined when stopped. Using the velocity direction instead would make the yaw rate
+    shoot off to infinity right when a tag starts moving.
+  - Speed and acceleration are nominal (chord length ≈ arc length).
+  - Paths are checked against the map: a scripted path that hits a wall raises `ValueError`, and random paths are redrawn.
+  - Random paths: segment lengths from `RANDOM_SEGMENT_LENGTH`, at most 120° of turn per waypoint, line of sight between
+    waypoints, seeded per tag with `(SEED, tag_id)`.
 - **IMU contract details** (even if idealized):
   - Gravity on z.
   - Accel in mg and gyro in mdps, *without* bias correction.
@@ -127,17 +137,24 @@ sim.py (main process)
 - **Runs on Linux.** gtsam isn't installed on the Windows dev machine.
 - **Pose output.** `pose_callback` runs in the estimator process. Under `spawn` it must be picklable (no lambdas); simplest is a
   top-level function that forwards to the World server / a queue.
-- **Small draft fixes:** `sim/maps/square.py` should use `from .map_contract import BaseMap`; `side_length` in metres; `world.Tag`
-  needs float positions and shouldn't be confused with clamour's `Tag`.
+- **Map conventions** (done, `sim/maps/`):
+  - The grid is `grid[iy, ix]` (rows are y) at `RESOLUTION = 0.01` m, `uint8` (0 = free, 1 = opaque).
+  - `BaseMap` provides `size`, `are_free`, `is_free`, `line_of_sight` (sampled every half cell, so walls must be several cells
+    thick) and `fill_rect`.
+  - `SquareMap` has 0.1 m walls, and optionally an interior wall at mid-width.
+- **`world.Tag`** (draft) needs float positions and shouldn't be confused with clamour's `Tag`. Likely replaced by `Trajectory`.
+- **Imports.** The sim modules import each other by plain name (`import config`, `from maps import ...`), so run them as
+  scripts from the repo root (`python sim/sim.py`); `sim/` itself is not a package.
+- **`sim/plot_trajectories.py`** prints per-tag motion stats and saves `trajectories.png` (headless, works over SSH).
 
 ## Implementation plan
 
 0. ~~**Fix the Priority 0 pose bug in clamour.**~~ Done; hardware test pending. Decide on the audit findings.
-1. **Sim config & maps.** Finish `sim/config.py` (metres, tags with initial pose, height and motion mode, anchors, map, seed, UWB
+1. ~~**Sim config & maps.**~~ Done 2026-11-25. Finish `sim/config.py` (metres, tags with initial pose, height and motion mode, anchors, map, seed, UWB
    params). Fix `SquareMap` and add obstacle support.
-2. **Trajectories.** Waypoint splines + smooth random paths, giving position, velocity, acceleration and heading at any `t`, with an
+2. ~~**Trajectories.**~~ Done 2026-11-25; check with `plot_trajectories.py` on Linux. Waypoint splines + smooth random paths, giving position, velocity, acceleration and heading at any `t`, with an
    initial stationary period.
-3. **World.** GT evaluation, LOS raycast on the grid, range model (noise, max range, opaque walls), per-tag message queues,
+3. **World.** GT evaluation (motion start once every tag has published its first estimate), LOS check on the grid, range model (noise, max range, opaque walls), per-tag message queues,
    estimate store, seeded RNG.
 4. **World server / IPC** and the client API used by the sim interfaces.
 5. **`SimulationTag`** in clamour (approval needed).
