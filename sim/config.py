@@ -2,7 +2,13 @@
 Simulation-specific configuration, in SI units (m, s, rad).
 Tags all run exactly the clamour code, so if you don't see a setting here, it's probably in clamour's config.py
 """
+import sys
+from pathlib import Path
+
 from maps import SquareMap
+
+# Make clamour (src/) importable by every sim script, all of which import this config first
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
 # Seeds every random draw of the sim (random paths, measurement noise). Each tag draws from its own (SEED, tag_id) stream.
 SEED = 0
