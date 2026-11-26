@@ -43,20 +43,22 @@ sim.py (main process)
   returns its address. sim.py uses the World object directly.
   - **Protocol:** typeid `'world'`, exposed methods `range`, `publish_pose`, `broadcast`, `listen`, `reachable_devices`.
     They return plain types only, so clients never need sim modules to unpickle results.
-  - **Client** (in clamour, next to the sim interfaces): a `BaseManager` subclass that registers `'world'`, then
-    `connect()` and `.world()`. Only the address has to reach the tag process; the authkey is inherited from sim.py.
-  - Connect lazily in each process (on first use, checking `os.getpid()`), because the tag object is built before
-    clamour forks.
-- **Abstract radio**, as `SimulationTag` (step 5) will use it, with no clamour TDMA changes:
-  - `ranging(target)` → `world.range()`: noisy distance, or `None` if unreachable. For a tag target, it also returns that tag's
-    last *published* pose.
-  - **Pose publishing:** `SimulationTag.receive_data()` (TDMA process) publishes its `SharedPose` with `world.publish_pose()`.
-    This mirrors Bitcraze answering ranging from inside `receive_data()`, so pose-sharing bugs stay visible.
-  - **Listen windows:** `receive_data()` → `world.listen(timeout=15 ms, the DW listen timeout)` returns the first frame heard,
-    or nothing. `broadcast` only reaches reachable tags that are listening at that moment, so messages arrive without delay
-    (TDMA sync depends on that) and are lost otherwise, as on hardware.
-  - `get_device_list` / `available_anchors` / `active_tags` come from `world.reachable_devices()`.
-  - Ranging should take realistic time (a few ms per exchange), because TDMA slot logic depends on it.
+  - **Client:** `_WorldClient` in `simulation_tag.py`, so clamour never imports from `sim/`. Only the address has to reach
+    the tag process; the authkey is inherited from sim.py. It connects lazily, once per process, because clamour forks
+    after building the tag.
+- ✅ **`SimulationTag`** (`src/clamour/interfaces/simulation_tag.py`) behaves like `BitcrazeTag`, with no clamour TDMA changes:
+  - **Ranging:** `world.range()` gives metres, returned to clamour as integer cm. For a tag target, it also returns that
+    tag's last published pose.
+  - **Pose publishing:** `receive_data()` (TDMA process) publishes its `SharedPose` in Bitcraze's TWR report layout
+    (9 ints, no angles, `xx == 0` = no pose). This mirrors Bitcraze answering ranging from inside `receive_data()`, so
+    pose-sharing bugs stay visible.
+  - **Listen windows:** `receive_data()` → `world.listen(15 ms)` returns the first frame heard. `broadcast` only reaches
+    reachable tags that are listening at that moment, so messages arrive without delay (TDMA sync depends on that) and are
+    lost otherwise.
+  - **Discovery:** anchors come from `reachable_devices()` ∩ clamour's anchors, cached until `clear_anchors()`. Tags are known
+    only from messages heard, and dropped after 15 s of silence.
+  - **Timing emulation:** a successful TWR takes 4 ms, a failed one 30 ms. Each anchor poll takes 4 ms if it answers, 15 ms if
+    not, plus a 5 ms pause. **TODO:** calibrate these placeholders against real Bitcraze timings.
 
 ## Clamour changes
 
@@ -65,8 +67,8 @@ sim.py (main process)
 - ✅ `fork` pinned in `ContextManagedProcess` (Python 3.14 defaults to `forkserver`, which can't pickle hardware handles).
 - ✅ `add_neighbor` was missing `self` in `Tag`, `PozyxTag` and `SyntheticTag`.
 - ✅ Estimator writes the pose without the tag lock (`StateEstimator.tag_lock` is now unused).
+- ✅ `interfaces/simulation_tag.py`: `SimulationTag(tag_id, world_address)`, see Architecture.
 - Pending, each needs approval:
-  - `interfaces/simulation_tag.py`: `SimulationTag(Tag)`, which talks to the World. It must use `SharedPose`.
   - `interfaces/simulated_imu.py`: idealized IMU following the `IMU` contract.
   - A `"Simulation"` case in the `TAG_TYPE` / `IMU_TYPE` `match` blocks of `clamour.py`, plus config validation.
   - A way for a tag process to get the World server's address (e.g. a config value patched by the sim).
@@ -105,7 +107,7 @@ sim.py (main process)
 3. ✅ **World** (`sim/world.py`), see Architecture. Anchors fall back to clamour's (cm → m), and it warns if a tag starts with
    fewer than 4 anchors reachable.
 4. ✅ **World server** (`sim/world_server.py`), see Architecture.
-5. **`SimulationTag`** in clamour (approval needed).
+5. ✅ **`SimulationTag`**, see Architecture.
 6. **`simulated_imu`** in clamour (approval needed).
 7. **Clamour hooks**: `"Simulation"` tag/IMU types + config validation (approval needed).
 8. **`sim.py`**: spawn tag processes with config overrides, run the snapshot loop, print a terminal summary (GT vs estimate error),
