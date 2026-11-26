@@ -38,6 +38,12 @@ class _WorldClient(BaseManager):
 
 _WorldClient.register(WORLD_TYPEID)
 
+def connect_world(world_address):
+    """Proxy to the World server (sim/world_server.py). Connect in the process that uses it: proxies don't survive a fork."""
+    client = _WorldClient(address=world_address)
+    client.connect()
+    return getattr(client, WORLD_TYPEID)()
+
 def _sleep_until(deadline: float) -> None:
     remaining = deadline - time.perf_counter()
     if remaining > 0:
@@ -70,9 +76,7 @@ class SimulationTag(Tag):
     def world(self):
         """Proxy to the World. Connects on first use in each process, since clamour forks after building the tag."""
         if self._world_pid != os.getpid():
-            client = _WorldClient(address=self._world_address)
-            client.connect()
-            self._world = getattr(client, WORLD_TYPEID)()
+            self._world = connect_world(self._world_address)
             self._world_pid = os.getpid()
         return self._world
 

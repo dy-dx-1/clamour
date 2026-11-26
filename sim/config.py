@@ -4,13 +4,14 @@ Tags all run exactly the clamour code, so if you don't see a setting here, it's 
 """
 import sys
 from pathlib import Path
+import numpy as np
 
 from maps import SquareMap
 
 # Make clamour (src/) importable by every sim script, all of which import this config first
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
-# Seeds every random draw of the sim (random paths, measurement noise). Each tag draws from its own (SEED, tag_id) stream.
+# Seeds every random draw of the sim (random paths, measurement noise, IMU biases). Each tag has its own streams.
 SEED = 0
 
 ### Map, any BaseMap from maps/
@@ -40,8 +41,19 @@ RANDOM_SEGMENT_LENGTH = (1.0, 3.0)  # m, (min, max) distance between consecutive
 UWB_RANGE = 30.0   # m, no range measurement beyond this distance. TODO: gradual reliability drop-out model
 UWB_NOISE = 0.15   # m, std dev of the Gaussian range noise
 
+### Simulated IMU: idealized (constant biases + white noise), x along the heading, z up
+# Noise densities match the LSM6DSV320X datasheet values clamour uses, so clamour's noise models are right.
+# Each tag's accel bias is drawn from clamour's own prior (config.IMU_ACCEL_INITIAL_BIAS_MG +/- IMU_ACCEL_INITIAL_BIAS_STD_MG).
+IMU_SAMPLE_RATE_HZ = 120.0
+IMU_ACCEL_NOISE_DENSITY = 0.060e-3 * 9.80665  # m/s^2/sqrt(Hz) (60 ug/sqrt(Hz))
+IMU_GYRO_NOISE_DENSITY = 3.8e-3 * np.pi / 180  # rad/s/sqrt(Hz) (3.8 mdps/sqrt(Hz))
+IMU_GYRO_BIAS_STD = 0.5 * np.pi / 180          # rad/s, per-axis std of each tag's constant gyro bias
+IMU_CLOCK_RATE_ERROR = 0.006                   # Relative rate error of the IMU's sample/timestamp clock (real unit: ~0.6%)
+
 ### ----------------------- VALIDATION CHECKS ----------------------- ###
 assert UWB_RANGE > 0 and UWB_NOISE >= 0
+assert IMU_SAMPLE_RATE_HZ > 0 and IMU_ACCEL_NOISE_DENSITY >= 0 and IMU_GYRO_NOISE_DENSITY >= 0 and IMU_GYRO_BIAS_STD >= 0
+assert abs(IMU_CLOCK_RATE_ERROR) < 0.1
 assert MOTION_START_DELAY_S >= 0 and TAG_MAX_ACCEL > 0
 assert 0 < RANDOM_SEGMENT_LENGTH[0] <= RANDOM_SEGMENT_LENGTH[1]
 for _tag_id, _spec in TAGS.items():

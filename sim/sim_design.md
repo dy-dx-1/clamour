@@ -15,7 +15,7 @@ those measurements and do their own estimation. `sim.py` collects GT and estimat
 | 1 | Time model | **Real time, 1:1.** Runs are not bit-for-bit reproducible (OS scheduling, TDMA random backoffs). Seed all sim noise and log GT + estimates so runs can be compared offline. |
 | 2 | Radio fidelity | **Abstract.** Only estimation is evaluated. Any reachable target answers a ranging request; broadcasts reach reachable tags. No collisions, no busy responders. |
 | 3 | Motion | Config option for **both** scripted waypoints and random smooth paths. Tags stop at their last waypoint; heading = direction of travel. |
-| 4 | IMU | **Idealized** IMU (bias + white noise), as a new clamour interface `simulated_imu`. |
+| 4 | IMU | **Idealized** IMU (constant biases + white noise), as a new clamour interface `simulated_imu`. |
 | 5 | Output | **Linux terminal output first.** GUI later (probably matplotlib via port forwarding). |
 | 6 | Clamour changes | Allowed, but **every change touching `src/clamour` must be approved first.** Simulated interfaces (`SimulationTag`, `simulated_imu`) live in clamour. |
 | 7 | Scale | ≤ 5 tags for initial testing. |
@@ -39,13 +39,19 @@ sim.py (main process)
   - **Motion** starts when `sim.py` calls `start_motion(MOTION_START_DELAY_S)`, after every tag's first estimate has arrived
     through `pose_callback`. All tags start together.
   - **Noise:** random streams are seeded with `(SEED, tag_id, stream)`.
+  - **IMU** (`imu_spec`, `imu_samples`, `imu_attitude`): body frame with x along the heading and z up.
+    - Accel = specific force (+g on z at rest) + bias + white noise. Gyro = yaw rate + bias + white noise.
+    - Noise densities match the LSM6DSV320X values clamour uses.
+    - Each tag's accel bias is drawn from clamour's own prior (`IMU_ACCEL_INITIAL_BIAS_MG ± _STD_MG`); the gyro bias is
+      random (`IMU_GYRO_BIAS_STD`).
+  - Random paths start facing +x, and the World warns if a scripted path starts more than 2° off (see ⚠️ below).
 - ✅ **Server** (`sim/world_server.py`): `serve(world)` runs a multiprocessing `BaseManager` from a daemon thread of sim.py and
   returns its address. sim.py uses the World object directly.
-  - **Protocol:** typeid `'world'`, exposed methods `range`, `publish_pose`, `broadcast`, `listen`, `reachable_devices`.
-    They return plain types only, so clients never need sim modules to unpickle results.
-  - **Client:** `_WorldClient` in `simulation_tag.py`, so clamour never imports from `sim/`. Only the address has to reach
-    the tag process; the authkey is inherited from sim.py. It connects lazily, once per process, because clamour forks
-    after building the tag.
+  - **Protocol:** typeid `'world'`, exposed methods listed in `EXPOSED`. They return plain types only (including numpy
+    arrays), so clients never need sim modules to unpickle results.
+  - **Client:** `connect_world()` in `simulation_tag.py`, so clamour never imports from `sim/`. Only the address has to reach
+    the tag process; the authkey is inherited from sim.py. Proxies don't survive a fork, so connect in the process that uses
+    them.
 - ✅ **`SimulationTag`** (`src/clamour/interfaces/simulation_tag.py`) behaves like `BitcrazeTag`, with no clamour TDMA changes:
   - **Ranging:** `world.range()` gives metres, returned to clamour as integer cm. For a tag target, it also returns that
     tag's last published pose.
@@ -59,6 +65,15 @@ sim.py (main process)
     only from messages heard, and dropped after 15 s of silence.
   - **Timing emulation:** a successful TWR takes 4 ms, a failed one 30 ms. Each anchor poll takes 4 ms if it answers, 15 ms if
     not, plus a 5 ms pause. **TODO:** calibrate these placeholders against real Bitcraze timings.
+- ✅ **`SimulatedIMU`** (`src/clamour/interfaces/simulated_imu.py`) follows the `IMU` contract like the LSM6DSV320X:
+  - **FIFO:** 256 words, 3 per sample, oldest samples lost on overflow. Samples are generated on demand by the World at the
+    IMU's own sample times.
+  - **Clock:** 32-bit ticks of nominal 21.7 µs from a random start tick, running `IMU_CLOCK_RATE_ERROR` (0.6%) fast. This
+    exercises clamour's `SensorClockMapper`.
+  - **Units:** mg / mdps, not bias-corrected. `get_attitude()` gives yaw relative to the start heading, with pitch and roll 0.
+  - **Constants:** noise densities come from the World. Scale factor matrices are stored but not applied (an ideal sensor
+    needs no correction).
+  - It connects to the World right away, so build it inside the estimator process (as `create_imu` does).
 
 ## Clamour changes
 
@@ -68,8 +83,12 @@ sim.py (main process)
 - ✅ `add_neighbor` was missing `self` in `Tag`, `PozyxTag` and `SyntheticTag`.
 - ✅ Estimator writes the pose without the tag lock (`StateEstimator.tag_lock` is now unused).
 - ✅ `interfaces/simulation_tag.py`: `SimulationTag(tag_id, world_address)`, see Architecture.
+- ✅ `interfaces/simulated_imu.py`: `SimulatedIMU(tag_id, world_address)`, see Architecture.
+- ⚠️ **To fix later in clamour: initial yaw.** ⚠️ The FG's initial yaw prior is 0 ± 2° in the *anchor* frame
+  (`_initialize_estimator` assumes "the global frame starts at the initial heading"). A tag that doesn't start facing +x
+  integrates its IMU in the wrong direction, and the tight prior resists the correction. This applies on hardware too. Until
+  it's fixed, the sim starts random paths facing +x and warns about scripted paths that don't.
 - Pending, each needs approval:
-  - `interfaces/simulated_imu.py`: idealized IMU following the `IMU` contract.
   - A `"Simulation"` case in the `TAG_TYPE` / `IMU_TYPE` `match` blocks of `clamour.py`, plus config validation.
   - A way for a tag process to get the World server's address (e.g. a config value patched by the sim).
 
@@ -85,13 +104,6 @@ sim.py (main process)
   - The estimator starts only after a batch with ≥ 4 anchor ranges.
   - TDMA ranges only after SYNC (5 s) and scheduling (12–24 s), so the first estimate comes ~20–30 s after start. That's why
     motion waits for every tag's first estimate (see World).
-- **IMU contract (idealized):**
-  - gravity on z;
-  - mg / mdps, not bias-corrected;
-  - raw ticks (`timestamp_tick_ns`, `timestamp_counter_bits`);
-  - FIFO semantics, with samples generated at `sample_rate_hz` between reads;
-  - `get_attitude()` returns (yaw, pitch, roll);
-  - covariance densities.
 - **Shutdown:** `Clamour.start()` never returns, so the sim must terminate each tag's process tree.
 - **CPU:** about 2 busy processes per tag, plus GTSAM. Check that TDMA timing stays sane at 5 tags.
 - **Pose output:** `pose_callback` runs in the estimator process and must be picklable under `spawn` (a top-level function).
@@ -108,7 +120,7 @@ sim.py (main process)
    fewer than 4 anchors reachable.
 4. ✅ **World server** (`sim/world_server.py`), see Architecture.
 5. ✅ **`SimulationTag`**, see Architecture.
-6. **`simulated_imu`** in clamour (approval needed).
+6. ✅ **`SimulatedIMU`**, see Architecture.
 7. **Clamour hooks**: `"Simulation"` tag/IMU types + config validation (approval needed).
 8. **`sim.py`**: spawn tag processes with config overrides, run the snapshot loop, print a terminal summary (GT vs estimate error),
    shut down cleanly.

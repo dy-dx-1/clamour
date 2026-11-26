@@ -15,6 +15,8 @@ from scipy.interpolate import CubicSpline
 
 from maps import BaseMap, RESOLUTION
 
+# WARNING: clamour's FG assumes every tag starts facing the anchor frame's +x (yaw prior 0 +/- 2 deg, see sim_design.md)
+START_HEADING = 0.0               # rad, initial heading of random paths
 MAX_TURN_RAD = np.deg2rad(120)    # Random paths: max direction change at a waypoint, avoids near-reversals that loop tightly
 RANDOM_WAYPOINT_ATTEMPTS = 100    # Random paths: candidates drawn per waypoint before restarting the path
 RANDOM_PATH_ATTEMPTS = 100        # Random paths: full paths drawn before giving up
@@ -35,8 +37,10 @@ class Trajectory:
         - speed: nominal cruise speed in m/s
         - max_accel: nominal peak acceleration of the start/stop ramps in m/s^2
         - world_map: the path must stay in its free space, else ValueError
+        - start_heading: if given (rad), the path leaves the first waypoint exactly in this direction
     """
-    def __init__(self, waypoints, z: float, speed: float, max_accel: float, world_map: BaseMap):
+    def __init__(self, waypoints, z: float, speed: float, max_accel: float, world_map: BaseMap,
+                 start_heading: float | None = None):
         waypoints = np.asarray(waypoints, dtype=float)
         if waypoints.ndim != 2 or waypoints.shape[1] != 2 or len(waypoints) < 2:
             raise ValueError("A trajectory needs at least two (x, y) waypoints")
@@ -44,7 +48,9 @@ class Trajectory:
         if np.any(segment_lengths == 0):
             raise ValueError("Consecutive waypoints must differ")
         knots = np.concatenate(([0.0], np.cumsum(segment_lengths)))
-        self._path = CubicSpline(knots, waypoints, bc_type='natural')
+        # Chord-length parameterization: a unit start tangent fixes the initial heading without distorting the speed
+        start_bc = 'natural' if start_heading is None else (1, [np.cos(start_heading), np.sin(start_heading)])
+        self._path = CubicSpline(knots, waypoints, bc_type=(start_bc, 'natural'))
         self._path_d1 = self._path.derivative(1)
         self._path_d2 = self._path.derivative(2)
         self.length = knots[-1]
@@ -95,15 +101,15 @@ class Trajectory:
 def random_trajectory(start, n_waypoints: int, segment_length: tuple[float, float], z: float, speed: float,
                       max_accel: float, world_map: BaseMap, rng: np.random.Generator) -> Trajectory:
     """
-    Random smooth path from start through n_waypoints random waypoints. Consecutive waypoints are segment_length
-    (min, max) apart with line of sight, and the direction changes by at most MAX_TURN_RAD at each waypoint.
+    Random smooth path from start, leaving in START_HEADING, through n_waypoints random waypoints. Consecutive waypoints
+    are segment_length (min, max) apart with line of sight, and the direction changes by at most MAX_TURN_RAD at each one.
     """
     for _ in range(RANDOM_PATH_ATTEMPTS):
         waypoints = [np.asarray(start, dtype=float)]
-        direction = None
+        direction = START_HEADING
         while len(waypoints) <= n_waypoints:
             for _ in range(RANDOM_WAYPOINT_ATTEMPTS):
-                angle = rng.uniform(-np.pi, np.pi) if direction is None else direction + rng.uniform(-MAX_TURN_RAD, MAX_TURN_RAD)
+                angle = direction + rng.uniform(-MAX_TURN_RAD, MAX_TURN_RAD)
                 candidate = waypoints[-1] + rng.uniform(*segment_length) * np.array([np.cos(angle), np.sin(angle)])
                 if world_map.is_free(*candidate) and world_map.line_of_sight(waypoints[-1], candidate):
                     waypoints.append(candidate)
@@ -113,7 +119,7 @@ def random_trajectory(start, n_waypoints: int, segment_length: tuple[float, floa
                 break  # Stuck (e.g. facing a corner): restart the path
         if len(waypoints) > n_waypoints:
             try:
-                return Trajectory(waypoints, z, speed, max_accel, world_map)
+                return Trajectory(waypoints, z, speed, max_accel, world_map, start_heading=START_HEADING)
             except ValueError:
                 pass  # The spline between waypoints clipped an obstacle: draw another path
     raise RuntimeError(f"No valid random path found from {tuple(start)}. Check the start point, segment lengths and map.")
