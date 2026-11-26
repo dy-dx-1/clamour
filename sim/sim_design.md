@@ -26,7 +26,7 @@ those measurements and do their own estimation. `sim.py` collects GT and estimat
 
 ```
 sim.py (main process)
- ├─ World server ── GT, map, anchors, measurements, published poses, broadcasts
+ ├─ World + server thread ── GT, map, anchors, measurements, published poses, broadcasts
  ├─ snapshot loop ── samples GT + estimates for terminal output / logs (does NOT drive time)
  └─ per tag: spawned process → patch clamour.config → import clamour → Clamour.start()
        ├─ estimator process ── simulated_imu  ──┐
@@ -39,6 +39,14 @@ sim.py (main process)
   - **Motion** starts when `sim.py` calls `start_motion(MOTION_START_DELAY_S)`, after every tag's first estimate has arrived
     through `pose_callback`. All tags start together.
   - **Noise:** random streams are seeded with `(SEED, tag_id, stream)`.
+- ✅ **Server** (`sim/world_server.py`): `serve(world)` runs a multiprocessing `BaseManager` from a daemon thread of sim.py and
+  returns its address. sim.py uses the World object directly.
+  - **Protocol:** typeid `'world'`, exposed methods `range`, `publish_pose`, `broadcast`, `listen`, `reachable_devices`.
+    They return plain types only, so clients never need sim modules to unpickle results.
+  - **Client** (in clamour, next to the sim interfaces): a `BaseManager` subclass that registers `'world'`, then
+    `connect()` and `.world()`. Only the address has to reach the tag process; the authkey is inherited from sim.py.
+  - Connect lazily in each process (on first use, checking `os.getpid()`), because the tag object is built before
+    clamour forks.
 - **Abstract radio**, as `SimulationTag` (step 5) will use it, with no clamour TDMA changes:
   - `ranging(target)` → `world.range()`: noisy distance, or `None` if unreachable. For a tag target, it also returns that tag's
     last *published* pose.
@@ -61,7 +69,7 @@ sim.py (main process)
   - `interfaces/simulation_tag.py`: `SimulationTag(Tag)`, which talks to the World. It must use `SharedPose`.
   - `interfaces/simulated_imu.py`: idealized IMU following the `IMU` contract.
   - A `"Simulation"` case in the `TAG_TYPE` / `IMU_TYPE` `match` blocks of `clamour.py`, plus config validation.
-  - A way for a tag process to reach the World (e.g. config values patched by the sim).
+  - A way for a tag process to get the World server's address (e.g. a config value patched by the sim).
 
 ## Things not to forget
 
@@ -94,10 +102,9 @@ sim.py (main process)
    `line_of_sight`. `SquareMap` has walls and an optional interior wall.
 2. ✅ **Trajectories** (`sim/trajectory.py`). Spline path + smooth speed profile: velocity, acceleration and yaw rate are continuous
    and zero at rest. Paths are checked against the map; random paths are seeded per tag. Check with `sim/plot_trajectories.py`.
-3. ✅ **World** (`sim/world.py`): ground truth, reachability, range model, published poses, listen-window broadcasts.
-   Anchors fall back to clamour's (cm → m) and are checked against the map. It warns if a tag starts with fewer than 4 anchors
-   reachable. `plot_trajectories.py` now builds the `World`, which needs clamour importable.
-4. **World server / IPC** and the client API used by the sim interfaces.
+3. ✅ **World** (`sim/world.py`), see Architecture. Anchors fall back to clamour's (cm → m), and it warns if a tag starts with
+   fewer than 4 anchors reachable.
+4. ✅ **World server** (`sim/world_server.py`), see Architecture.
 5. **`SimulationTag`** in clamour (approval needed).
 6. **`simulated_imu`** in clamour (approval needed).
 7. **Clamour hooks**: `"Simulation"` tag/IMU types + config validation (approval needed).
